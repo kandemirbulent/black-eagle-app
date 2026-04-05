@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order Details | Black Eagle</title>
+  <style>
+    * {box-sizing: border-box; margin: 0; padding: 0; font-family: 'Poppins', sans-serif;}
+    body {display: flex; min-height: 100vh; background-color: #f4f6f8;}
+
+    /* Sidebar */
+    .sidebar {width: 250px; background-color: #111; color: #fff; display: flex; flex-direction: column; padding-top: 20px;}
+    .sidebar h2 {text-align: center; margin-bottom: 30px; font-size: 22px;}
+    .sidebar a {color: #ccc; text-decoration: none; padding: 15px 20px; display: block; transition: 0.3s;}
+    .sidebar a:hover {background-color: #fbc531; color: #111;}
+
+    /* Main */
+    .main {flex: 1; padding: 25px 35px;}
+    .topbar {display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;}
+    .topbar h1 {font-size: 24px; color: #222;}
+    .user-info {display: flex; align-items: center; gap: 10px;}
+    .user-info img {width: 35px; height: 35px; border-radius: 50%;}
+
+    /* Content */
+    .order-box {background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);}
+    .order-box h2 {margin-bottom: 15px;}
+    .order-detail {margin-bottom: 15px; font-size: 15px;}
+    .order-detail strong {width: 150px; display: inline-block; color: #333;}
+    .btn-area {margin-top: 25px; display: flex; gap: 10px;}
+    .btn {background: #fbc531; color: #111; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; transition: 0.3s; font-weight: 500;}
+    .btn:hover {background: #d1a900;}
+    iframe {width: 100%; height: 600px; border: 1px solid #ccc; border-radius: 10px; margin-top: 20px;}
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <h2>🦅 Black Eagle</h2>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="#" class="menu-orders">Orders</a>
+    <a href="#" class="menu-payments">Payments</a>
+    <a href="#" class="menu-settings">Settings</a>
+    <a href="#" class="menu-logout">Logout</a>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <h1>Order Details</h1>
+      <div class="user-info">
+        <img src="https://i.pravatar.cc/100" alt="User" />
+        <span id="userRoleLabel">Loading...</span>
+      </div>
+    </div>
+
+    <div class="order-box">
+      <h2 id="orderTitle">Order #—</h2>
+
+      <div class="order-detail"><strong>Customer:</strong> <span id="customerName">—</span></div>
+      <div class="order-detail"><strong>Date:</strong> <span id="orderDate">—</span></div>
+      <div class="order-detail"><strong>Amount:</strong> <span id="orderAmount">—</span></div>
+      <div class="order-detail"><strong>Status:</strong> <span id="orderStatus">—</span></div>
+      <div class="order-detail"><strong>Description:</strong> <span id="orderDesc">—</span></div>
+
+      <div class="btn-area">
+        <button class="btn" id="viewInvoiceBtn">View Invoice</button>
+        <button class="btn" id="downloadInvoiceBtn">Download PDF</button>
+        <button class="btn" onclick="history.back()">← Back</button>
+      </div>
+
+      <!-- Invoice preview -->
+      <iframe id="invoiceFrame" style="display:none;"></iframe>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get("orderId");
+    document.getElementById("userRoleLabel").textContent = "CUSTOMER";
+
+    if (orderId) {
+      fetch(`/get-order/${orderId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            const o = data.order;
+            document.getElementById("orderTitle").textContent = `Order #${o.orderId}`;
+            document.getElementById("customerName").textContent = o.customerName;
+            document.getElementById("orderDate").textContent = new Date(o.createdAt).toLocaleDateString();
+            document.getElementById("orderAmount").textContent = `£${o.amount.toFixed(2)}`;
+            document.getElementById("orderStatus").textContent = o.status;
+            document.getElementById("orderDesc").textContent = o.description || "Event Staff Service";
+
+            // invoice buttons
+            document.getElementById("viewInvoiceBtn").onclick = () => {
+              const iframe = document.getElementById("invoiceFrame");
+              iframe.src = `invoice.html?orderId=${orderId}`;
+              iframe.style.display = "block";
+              window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            };
+
+            document.getElementById("downloadInvoiceBtn").onclick = () => {
+              window.open(`/api/invoices/${orderId}/download`, '_blank');
+            };
+          } else {
+            alert("Order not found!");
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Error loading order details!");
+        });
+    } else {
+      alert("No orderId specified!");
+    }
+  </script>
+
+</body>
+</html>

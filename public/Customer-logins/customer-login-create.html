@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer Registration | Black Eagle</title>
+  <style>
+    body {
+      font-family: "Poppins", Arial, sans-serif;
+      background: linear-gradient(145deg, #1a1a1a, #2c2c2c);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .form-container {
+      background: #fff;
+      width: 400px;
+      padding: 35px 40px;
+      border-radius: 15px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+    }
+
+    h1 {
+      text-align: center;
+      color: #000;
+      margin-bottom: 25px;
+      font-size: 22px;
+      font-weight: 600;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    label {
+      font-weight: 500;
+      color: #333;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    input {
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #d4af37;
+      box-shadow: 0 0 5px rgba(212, 175, 55, 0.4);
+    }
+
+    .btn {
+      background: #000;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 0;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 5px;
+      transition: all 0.3s ease;
+    }
+
+    .btn:hover {
+      background: #d4af37;
+      color: #000;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+    }
+
+    .btn-secondary {
+      background: #555;
+    }
+
+    .btn-secondary:hover {
+      background: #777;
+      color: #fff;
+    }
+
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: #777;
+      margin-top: 20px;
+    }
+
+    /* ===== Modal Styling ===== */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 10;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-content {
+      background: #fff;
+      padding: 35px 30px;
+      border-radius: 15px;
+      width: 90%;
+      max-width: 450px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      position: relative;
+    }
+
+    .modal-content h2 {
+      margin-bottom: 15px;
+      color: #000;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .modal-content p {
+      font-size: 15px;
+      color: #333;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    .modal-content a {
+      color: #d4af37;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .modal-content a:hover {
+      text-decoration: underline;
+    }
+
+    .agree-section {
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .agree-section input {
+      transform: scale(1.3);
+      cursor: pointer;
+    }
+
+    .modal-content button {
+      background: #000;
+      color: #fff;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      margin-top: 25px;
+      transition: 0.3s ease;
+    }
+
+    .modal-content button:disabled {
+      background: #999;
+      cursor: not-allowed;
+    }
+
+    .modal-content button:hover:enabled {
+      background: #d4af37;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="form-container">
+    <h1>Customer Registration</h1>
+    <form id="registerForm">
+      <label>Company Name *</label>
+      <input type="text" name="companyName" required>
+
+      <label>Company Address *</label>
+      <input type="text" name="companyAddress" required>
+
+      <label>Postcode *</label>
+      <input type="text" name="postcode" required>
+
+      <label>First Name *</label>
+      <input type="text" name="firstName" required>
+
+      <label>Last Name *</label>
+      <input type="text" name="lastName" required>
+
+      <label>Mobile Phone *</label>
+      <input type="tel" name="mobilePhone" required>
+
+      <label>Email *</label>
+      <input type="email" name="email" required>
+
+      <label>Website</label>
+      <input type="text" name="website">
+
+      <label>VAT Number (optional)</label>
+      <input type="text" name="vatNumber" pattern="^GB[0-9]{9,12}$" title="Format: GB followed by 9–12 digits" placeholder="e.g. GB123456789">
+
+      <label>Company House Number / UTR Number *</label>
+      <input type="text" name="companyNumber" required pattern="[A-Za-z0-9]+" title="Enter your Company House or UTR Number">
+
+      <button type="submit" class="btn">Submit</button>
+      <button type="button" class="btn btn-secondary" onclick="window.history.back()">Back</button>
+    </form>
+    <footer>© 2025 Black Eagle Services Ltd</footer>
+  </div>
+
+  <!-- ===== Modal Popup ===== -->
+  <div class="modal" id="termsModal">
+    <div class="modal-content">
+      <h2>Terms Agreement</h2>
+      <p>
+        Before completing your registration, please review and agree to our 
+        <a href="../terms.html" target="_blank">Terms & Conditions</a>.
+      </p>
+      <div class="agree-section">
+        <input type="checkbox" id="agreeBox">
+        <label for="agreeBox">I have read and agree to the Terms & Conditions.</label>
+      </div>
+
+      <!-- ✅ SADECE BURASI: type="button" eklendi -->
+      <button id="confirmSubmit" type="button" disabled>Confirm and Submit</button>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById("registerForm");
+    const modal = document.getElementById("termsModal");
+    const agreeBox = document.getElementById("agreeBox");
+    const confirmBtn = document.getElementById("confirmSubmit");
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      modal.style.display = "flex";
+    });
+
+    agreeBox.addEventListener("change", () => {
+      confirmBtn.disabled = !agreeBox.checked;
+    });
+
+    // ✅ FIX: JSON gelmezse patlamasın + success alanına bağlı kalmasın
+    async function handleConfirmSubmit() {
+      modal.style.display = "none";
+      const formData = new FormData(form);
+      const data = Object.fromEntries(formData.entries());
+      data.agreedTerms = true;
+      data.status = "pending";
+
+      try {
+        const res = await fetch("/register-customer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
+        });
+
+        // ✅ Önce text al, sonra JSON parse et (JSON değilse hata yakala)
+        const raw = await res.text();
+        let result = {};
+        try {
+          result = raw ? JSON.parse(raw) : {};
+        } catch (e) {
+          alert("❌ Server response not valid. Please contact support.");
+          console.log("Server response (not JSON):", raw);
+          return;
+        }
+
+        // ✅ En kritik düzeltme: result.success şartını kaldırdık (DB değişince format değişmiş olabilir)
+        if (res.ok) {
+          const appId = result.applicationId || result.id || "N/A";
+
+          document.body.innerHTML = `
+            <div style="background:#fff;padding:40px;border-radius:12px;text-align:center;max-width:500px;margin:100px auto;box-shadow:0 0 15px rgba(0,0,0,0.2)">
+              <h2>✅ Thank you!</h2>
+              <p>Your registration has been received and is now pending approval.<br><br>
+              <strong>Your Application ID:</strong> ${appId}<br>
+              Please keep this number safe.<br><br>
+              You will receive an email once your account is approved by the Black Eagle Team.</p>
+              <button id="okBtn" style="background:#000;color:#fff;border:none;padding:10px 18px;border-radius:6px;cursor:pointer;font-size:15px;">OK</button>
+            </div>`;
+
+          const okBtn = document.getElementById("okBtn");
+          okBtn.addEventListener("click", () => {
+            try {
+              window.close();
+              setTimeout(() => {
+                if (!window.closed) {
+                  window.location.href = "/Customer-logins/customer-login.html";
+                }
+              }, 300);
+            } catch (err) {
+              window.location.href = "/Customer-logins/customer-login.html";
+            }
+          });
+        } else {
+          alert("❌ " + (result.message || "Error submitting registration."));
+        }
+      } catch (err) {
+        alert("❌ Server error. Please try again later.");
+        console.error(err);
+      }
+    }
+
+    confirmBtn.addEventListener("click", handleConfirmSubmit);
+    
+  </script>
+</body>
+</html>

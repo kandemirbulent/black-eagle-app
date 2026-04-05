@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer Dashboard | Black Eagle</title>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 0;
+      color: #111;
+    }
+
+    header {
+      background: #111;
+      color: #fbc531;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 30px;
+    }
+
+    header h1 {
+      font-size: 22px;
+      margin: 0;
+    }
+
+    header button {
+      background: #fbc531;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    main {
+      max-width: 1380px;
+      margin: 30px auto;
+      padding: 0 15px 40px;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    .stat {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      text-align: center;
+      transition: 0.2s;
+    }
+
+    .stat:hover {
+      transform: translateY(-3px);
+    }
+
+    .stat h3 {
+      font-size: 16px;
+      color: #555;
+      margin: 0;
+    }
+
+    .stat p {
+      font-size: 22px;
+      font-weight: bold;
+      margin-top: 8px;
+      color: #111;
+    }
+
+    .tableWrap {
+      overflow-x: auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1350px;
+    }
+
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      background: #fbc531;
+      color: #111;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    tr:nth-child(even) {
+      background: #fafafa;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .status-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .status-deposit {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+
+    .status-paid {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .timing-note {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    .timing-ok {
+      color: #155724;
+    }
+
+    .timing-warning {
+      color: #856404;
+    }
+
+    .timing-danger {
+      color: #b02a37;
+    }
+
+    button.action {
+      background: #111;
+      color: #fff;
+      border: none;
+      padding: 7px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.2s;
+      font-weight: 600;
+    }
+
+    button.action:hover {
+      background: #333;
+    }
+
+    button.action[disabled] {
+      background: #ccc;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    .invoice-link-btn,
+    .details-link-btn {
+      display: inline-block;
+      background: #111;
+      color: #fff;
+      padding: 7px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .invoice-link-btn:hover,
+    .details-link-btn:hover {
+      background: #333;
+    }
+
+    .event-link {
+      color: #111;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .event-link:hover {
+      text-decoration: underline;
+    }
+
+    #newOrderBtn {
+      background: #fbc531;
+      color: #111;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      margin-top: 20px;
+      cursor: pointer;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      transition: 0.2s;
+    }
+
+    #newOrderBtn:hover {
+      background: #e0a800;
+    }
+
+    #financialSummary {
+      margin-top: 40px;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+
+    .summary-card {
+      background: #f9fafb;
+      border: 1px solid #ececec;
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .summary-card h4 {
+      margin: 0 0 8px;
+      color: #555;
+      font-size: 15px;
+    }
+
+    .summary-card p {
+      margin: 0;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .summary-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+
+    .summary-actions button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    #paySelectedBtn {
+      background: #111;
+      color: #fff;
+    }
+
+    #payAllBtn {
+      background: #fbc531;
+      color: #111;
+    }
+
+    .summary-actions button[disabled] {
+      background: #ccc !important;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    #feedbackModal,
+    #dueWarningModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    #feedbackContent,
+    #dueWarningContentWrap {
+      background: #fff;
+      width: 90%;
+      max-width: 800px;
+      border-radius: 10px;
+      padding: 20px;
+      position: relative;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    #feedbackContent h2,
+    #dueWarningContentWrap h2 {
+      margin-top: 0;
+    }
+
+    #feedbackContent button.close,
+    #dueWarningContentWrap button.close {
+      position: absolute;
+      right: 15px;
+      top: 15px;
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .staffCard {
+      display: flex;
+      gap: 15px;
+      align-items: flex-start;
+      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+    }
+
+    .staffCard img {
+      width: 70px;
+      height: 70px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .staffCard div {
+      flex: 1;
+    }
+
+    textarea {
+      width: 100%;
+      height: 60px;
+      margin-top: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+
+    select {
+      margin-top: 6px;
+      padding: 6px;
+      border-radius: 6px;
+    }
+
+    .section-note {
+      color: #666;
+      margin-top: 6px;
+      margin-bottom: 0;
+      font-size: 14px;
+    }
+
+    .muted {
+      color: #777;
+      font-size: 13px;
+    }
+
+    .warning-card {
+      border: 1px solid #f5c2c7;
+      background: #fff5f5;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .warning-card strong {
+      color: #842029;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🦅 Black Eagle Customer Dashboard</h1>
+    <button onclick="logout()">Logout</button>
+  </header>
+
+  <main>
+    <h2 id="welcome">Welcome!</h2>
+
+    <div class="stats">
+      <div class="stat">
+        <h3>Total Events</h3>
+        <p id="statOrders">0</p>
+      </div>
+      <div class="stat">
+        <h3>Total Event Value</h3>
+        <p id="statTotalValue">£0.00</p>
+      </div>
+      <div class="stat">
+        <h3>Total Paid</h3>
+        <p id="statPaid">£0.00</p>
+      </div>
+      <div class="stat">
+        <h3>Outstanding Balance</h3>
+        <p id="statOutstanding">£0.00</p>
+      </div>
+    </div>
+
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Select</th>
+            <th>Event Date</th>
+            <th>Event</th>
+            <th>Category</th>
+            <th>Total</th>
+            <th>Paid</th>
+            <th>Remaining</th>
+            <th>Payment Timing</th>
+            <th>Status</th>
+            <th>Invoice</th>
+            <th>Details</th>
+            <th>Feedback</th>
+            <th>Payment</th>
+          </tr>
+        </thead>
+        <tbody id="orderTable"></tbody>
+      </table>
+    </div>
+
+    <button id="newOrderBtn" onclick="newOrder()">+ Create New Order</button>
+
+    <section id="financialSummary">
+      <h2 style="margin-top:0;">💰 Financial Summary</h2>
+      <p class="section-note">
+        You can pay a single event, selected events, or your full outstanding balance.
+      </p>
+
+      <div class="summary-grid">
+        <div class="summary-card">
+          <h4>Total Event Value</h4>
+          <p>£<span id="totalAmount">0.00</span></p>
+        </div>
+        <div class="summary-card">
+          <h4>Amount Paid</h4>
+          <p>£<span id="amountPaid">0.00</span></p>
+        </div>
+        <div class="summary-card">
+          <h4>Remaining Balance</h4>
+          <p>£<span id="remainingBalance">0.00</span></p>
+        </div>
+      </div>
+
+      <div class="summary-actions">
+        <button id="paySelectedBtn">Pay Selected Events</button>
+        <button id="payAllBtn">Pay All Outstanding</button>
+      </div>
+      <p class="muted" id="selectionInfo">No events selected.</p>
+    </section>
+  </main>
+
+  <div id="feedbackModal">
+    <div id="feedbackContent">
+      <button class="close" onclick="closeFeedback()">×</button>
+      <h2>Rate Your Staff</h2>
+      <div id="staffList"></div>
+      <button id="submitFeedbackBtn" class="action" onclick="submitAllFeedback()">Submit All Feedback</button>
+    </div>
+  </div>
+
+  <div id="dueWarningModal">
+    <div id="dueWarningContentWrap">
+      <button class="close" onclick="closeDueWarning()">×</button>
+      <h2 style="color:#b02a37;">⚠ Payment Warning</h2>
+      <div id="dueWarningContent"></div>
+    </div>
+  </div>
+
+  <script>
+    let appId = new URLSearchParams(window.location.search).get("appId");
+    if (!appId || appId === "null") {
+      appId = localStorage.getItem("appId");
+    }
+
+    document.getElementById("welcome").textContent =
+      "Welcome, your Application ID: " + (appId || "Unknown");
+
+    let currentOrders = [];
+
+    function formatMoney(value) {
+      return "£" + Number(value || 0).toFixed(2);
+    }
+
+    function getOrderTotal(order) {
+      return Number(order.totalWithVat || order.totalAmount || 0);
+    }
+
+    function getOrderPaid(order) {
+      return Number(order.amountPaid || 0);
+    }
+
+    function getOrderRemaining(order) {
+      return Math.max(getOrderTotal(order) - getOrderPaid(order), 0);
+    }
+
+    function getDaysLeft(order) {
+      if (!order.eventDate) return null;
+
+      const now = new Date();
+      const todayObj = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      const eventDateObj = new Date(order.eventDate);
+      eventDateObj.setHours(0, 0, 0, 0);
+
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const diffMs = eventDateObj.getTime() - todayObj.getTime();
+      return Math.ceil(diffMs / msPerDay);
+    }
+
+    function canGiveFeedback(order) {
+      const daysLeft = getDaysLeft(order);
+      return daysLeft !== null && daysLeft < 0;
+    }
+
+    function getStatusInfo(order) {
+      const paid = getOrderPaid(order);
+      const remaining = getOrderRemaining(order);
+
+      if (remaining <= 0) {
+        return {
+          text: "Paid",
+          className: "status-paid"
+        };
+      }
+
+      if (paid > 0) {
+        return {
+          text: "Deposit Paid",
+          className: "status-deposit"
+        };
+      }
+
+      return {
+        text: "Pending",
+        className: "status-pending"
+      };
+    }
+
+    function getPaymentTiming(order) {
+      const remaining = getOrderRemaining(order);
+      const daysLeft = getDaysLeft(order);
+
+      if (daysLeft === null) {
+        return {
+          text: "Event date not set",
+          className: "timing-warning"
+        };
+      }
+
+      if (remaining <= 0) {
+        if (daysLeft > 0) {
+          return {
+            text: `Paid before event ✅ (${daysLeft} day(s) left)`,
+            className: "timing-ok"
+          };
+        }
+        return {
+          text: "Paid ✅",
+          className: "timing-ok"
+        };
+      }
+
+      if (daysLeft < 0) {
+        return {
+          text: "Event passed - balance still outstanding",
+          className: "timing-danger"
+        };
+      }
+
+      if (daysLeft === 0) {
+        return {
+          text: "Event is today - payment still due",
+          className: "timing-danger"
+        };
+      }
+
+      if (daysLeft <= 3) {
+        return {
+          text: `Urgent - ${daysLeft} day(s) left. Remaining balance should be fully paid.`,
+          className: "timing-danger"
+        };
+      }
+
+      return {
+        text: `${daysLeft} day(s) left before event`,
+        className: "timing-warning"
+      };
+    }
+
+    function updateSelectionInfo() {
+      const selected = [...document.querySelectorAll(".orderSelect:checked")];
+      const totalSelected = selected.reduce((sum, cb) => {
+        return sum + Number(cb.dataset.remaining || 0);
+      }, 0);
+
+      const info = document.getElementById("selectionInfo");
+      if (!selected.length) {
+        info.textContent = "No events selected.";
+      } else {
+        info.textContent = `${selected.length} event(s) selected — Total to pay: ${formatMoney(totalSelected)}`;
+      }
+    }
+
+    function updatePayButtons(remainingBalance) {
+      const paySelectedBtn = document.getElementById("paySelectedBtn");
+      const payAllBtn = document.getElementById("payAllBtn");
+
+      const anySelectable = currentOrders.some(order => {
+        return getOrderRemaining(order) > 0;
+      });
+
+      if (!anySelectable || remainingBalance <= 0) {
+        paySelectedBtn.disabled = true;
+        payAllBtn.disabled = true;
+        payAllBtn.textContent = "Fully Paid ✅";
+      } else {
+        paySelectedBtn.disabled = false;
+        payAllBtn.disabled = false;
+        payAllBtn.textContent = "Pay All Outstanding";
+      }
+    }
+
+    function closeDueWarning() {
+      document.getElementById("dueWarningModal").style.display = "none";
+    }
+
+    function checkUpcomingPaymentWarnings(orders) {
+      const urgentOrders = orders.filter(order => {
+        const remaining = getOrderRemaining(order);
+        const daysLeft = getDaysLeft(order);
+
+        return daysLeft !== null && daysLeft >= 0 && daysLeft <= 3 && remaining > 0;
+      });
+
+      if (!urgentOrders.length) return;
+
+      const content = urgentOrders.map(order => {
+        const remaining = getOrderRemaining(order);
+
+        return `
+          <div class="warning-card">
+            <strong>${order.eventName || "Untitled Event"}</strong><br>
+            <span>Event Date: ${order.eventDate ? new Date(order.eventDate).toLocaleDateString() : "N/A"}</span><br>
+            <span>Remaining Balance: ${formatMoney(remaining)}</span><br>
+            <span style="color:#842029; font-weight:700;">This balance should now be fully paid.</span>
+          </div>
+        `;
+      }).join("");
+
+      document.getElementById("dueWarningContent").innerHTML = content;
+      document.getElementById("dueWarningModal").style.display = "flex";
+    }
+
+    async function loadOrders() {
+      try {
+        const res = await fetch(`/get-customer-orders/${appId}`);
+        const orders = await res.json();
+
+        const tbody = document.getElementById("orderTable");
+        tbody.innerHTML = "";
+
+        if (!orders || !orders.length) {
+          currentOrders = [];
+
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="13" style="text-align:center;">No orders found for this account.</td>
+            </tr>
+          `;
+
+          document.getElementById("statOrders").textContent = "0";
+          document.getElementById("statTotalValue").textContent = "£0.00";
+          document.getElementById("statPaid").textContent = "£0.00";
+          document.getElementById("statOutstanding").textContent = "£0.00";
+
+          document.getElementById("totalAmount").textContent = "0.00";
+          document.getElementById("amountPaid").textContent = "0.00";
+          document.getElementById("remainingBalance").textContent = "0.00";
+
+          document.getElementById("paySelectedBtn").disabled = true;
+          document.getElementById("payAllBtn").disabled = true;
+          document.getElementById("payAllBtn").textContent = "Fully Paid ✅";
+          document.getElementById("selectionInfo").textContent = "No events selected.";
+          return;
+        }
+
+        orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        currentOrders = orders;
+
+        const totalOrders = orders.length;
+        const totalValue = orders.reduce((sum, o) => sum + getOrderTotal(o), 0);
+        const totalPaid = orders.reduce((sum, o) => sum + getOrderPaid(o), 0);
+        const totalOutstanding = orders.reduce((sum, o) => sum + getOrderRemaining(o), 0);
+
+        document.getElementById("statOrders").textContent = totalOrders;
+        document.getElementById("statTotalValue").textContent = formatMoney(totalValue);
+        document.getElementById("statPaid").textContent = formatMoney(totalPaid);
+        document.getElementById("statOutstanding").textContent = formatMoney(totalOutstanding);
+
+        document.getElementById("totalAmount").textContent = totalValue.toFixed(2);
+        document.getElementById("amountPaid").textContent = totalPaid.toFixed(2);
+        document.getElementById("remainingBalance").textContent = totalOutstanding.toFixed(2);
+
+        updatePayButtons(totalOutstanding);
+
+        orders.forEach(order => {
+          const total = getOrderTotal(order);
+          const paid = getOrderPaid(order);
+          const remaining = getOrderRemaining(order);
+          const statusInfo = getStatusInfo(order);
+          const timingInfo = getPaymentTiming(order);
+          const safeOrderId = encodeURIComponent(order.orderId || "");
+
+          const feedbackButton = order.feedbackGiven
+            ? `<button class="action" disabled>Submitted</button>`
+            : canGiveFeedback(order)
+              ? `<button class="action" onclick="openFeedback('${order._id}')">Give Feedback</button>`
+              : `<button class="action" disabled title="Feedback will be available after the event date">Available After Event</button>`;
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>
+              ${remaining > 0
+                ? `<input type="checkbox" class="orderSelect" value="${order.orderId}" data-remaining="${remaining.toFixed(2)}">`
+                : ""}
+            </td>
+
+            <td>${order.eventDate ? new Date(order.eventDate).toLocaleDateString() : "N/A"}</td>
+            <td>
+              ${order.orderId
+                ? `<a href="/event-detail.html?orderId=${safeOrderId}" class="event-link">${order.eventName || "Untitled"}</a>`
+                : (order.eventName || "Untitled")}
+            </td>
+            <td>${order.category || "-"}</td>
+            <td>${formatMoney(total)}</td>
+            <td>${formatMoney(paid)}</td>
+            <td>${formatMoney(remaining)}</td>
+            <td><span class="timing-note ${timingInfo.className}">${timingInfo.text}</span></td>
+            <td><span class="status-pill ${statusInfo.className}">${statusInfo.text}</span></td>
+            <td>
+              ${order.orderId
+                ? `<a href="/invoice.html?orderId=${safeOrderId}" target="_blank" class="invoice-link-btn">View</a>`
+                : "-"}
+            </td>
+            <td>
+              ${order.orderId
+                ? `<a href="/event-detail.html?orderId=${safeOrderId}" class="details-link-btn">Details</a>`
+                : "-"}
+            </td>
+            <td>${feedbackButton}</td>
+            <td>
+              ${remaining > 0
+                ? `<button class="action" onclick="paySingleOrder('${order.orderId}')">Pay This Event</button>`
+                : `<button class="action" disabled>Paid</button>`}
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll(".orderSelect").forEach(cb => {
+          cb.addEventListener("change", updateSelectionInfo);
+        });
+
+        updateSelectionInfo();
+        checkUpcomingPaymentWarnings(orders);
+
+      } catch (err) {
+        console.error("Error loading orders:", err);
+        document.getElementById("orderTable").innerHTML = `
+          <tr>
+            <td colspan="13" style="text-align:center; color:red;">Error loading orders</td>
+          </tr>
+        `;
+      }
+    }
+
+    async function startCheckout(payload) {
+      try {
+        console.log("Sending checkout payload:", payload);
+
+        const response = await fetch("/create-checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+        console.log("Checkout response:", data);
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to create checkout session");
+        }
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          alert("Payment session could not be started. Please try again.");
+        }
+      } catch (err) {
+        console.error("❌ Payment error:", err);
+        alert(err.message || "An error occurred while starting the payment.");
+      }
+    }
+
+    function paySingleOrder(orderId) {
+      startCheckout({
+        mode: "single",
+        orderIds: [orderId],
+        appId
+      });
+    }
+
+    document.getElementById("paySelectedBtn").addEventListener("click", () => {
+      const selectedOrderIds = [...document.querySelectorAll(".orderSelect:checked")].map(cb => cb.value);
+
+      if (!selectedOrderIds.length) {
+        alert("Please select at least one event to pay.");
+        return;
+      }
+
+      startCheckout({
+        mode: "selected",
+        orderIds: selectedOrderIds,
+        appId
+      });
+    });
+
+    document.getElementById("payAllBtn").addEventListener("click", () => {
+      const payableOrderIds = currentOrders
+        .filter(order => getOrderRemaining(order) > 0)
+        .map(order => order.orderId);
+
+      if (!payableOrderIds.length) {
+        alert("There is no remaining balance to pay. ✅");
+        return;
+      }
+
+      startCheckout({
+        mode: "all",
+        orderIds: payableOrderIds,
+        appId
+      });
+    });
+
+    function openFeedback(orderId) {
+      document.getElementById("feedbackModal").style.display = "flex";
+
+      const staff = [
+        { id: "EMP001", name: "John Doe", role: "Bartender", photo: "https://randomuser.me/api/portraits/men/32.jpg" },
+        { id: "EMP002", name: "Sarah Lee", role: "Waiter", photo: "https://randomuser.me/api/portraits/women/45.jpg" }
+      ];
+
+      const container = document.getElementById("staffList");
+      container.innerHTML = "";
+
+      staff.forEach(emp => {
+        const div = document.createElement("div");
+        div.className = "staffCard";
+        div.innerHTML = `
+          <img src="${emp.photo}" alt="">
+          <div>
+            <strong>${emp.name}</strong>
+            <span style="color:#666">(${emp.role})</span><br>
+            <label>Rating:</label>
+            <select id="rating-${emp.id}">
+              <option value="">--</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+            <textarea id="note-${emp.id}" placeholder="Leave a short note..."></textarea>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function closeFeedback() {
+      document.getElementById("feedbackModal").style.display = "none";
+    }
+
+    function submitAllFeedback() {
+      alert("Feedback submitted!");
+      closeFeedback();
+    }
+
+    function logout() {
+      window.location.href = "/Customer-logins/customer-login.html";
+    }
+
+    function newOrder() {
+      window.location.href = `/Customer-logins/create-order.html?appId=${encodeURIComponent(appId)}`;
+    }
+
+    loadOrders();
+  </script>
+</body>
+</html>

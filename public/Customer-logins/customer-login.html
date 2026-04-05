@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    form {
+      background: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+    h1 {
+      text-align: center;
+      color: #222;
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: bold;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+    .buttons {
+      display: flex;
+      justify-content: space-between;
+    }
+    button {
+      padding: 12px;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      flex: 1;
+      margin: 0 5px;
+    }
+    button:hover {
+      background: #555;
+    }
+    .error {
+      color: red;
+      font-size: 14px;
+      margin-top: 10px;
+      text-align: center;
+    }
+    a.forgot {
+      display: block;
+      margin-top: 10px;
+      text-align: right;
+      color: #0066cc;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <form id="customerLoginForm">
+    <h1>Customer Login</h1>
+    
+    <label for="email">Email Address</label>
+    <input type="email" id="email" name="email" required>
+    
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required>
+    
+    <div class="buttons">
+      <button type="submit">Login</button>
+      <button type="button" onclick="window.history.back()">Back</button>
+    </div>
+    
+    <a class="forgot" href="../forgot/forgot.html">Forgot password?</a>
+    <div id="errorMessage" class="error"></div>
+  </form>
+
+  <script>
+    document.getElementById("customerLoginForm").addEventListener("submit", async function(e) {
+      e.preventDefault();
+      
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      const errorDiv = document.getElementById("errorMessage");
+      errorDiv.textContent = "";
+
+      if (!email || !password) {
+        errorDiv.textContent = "⚠️ Please enter both email and password.";
+        return;
+      }
+
+      try {
+        const res = await fetch("/customer-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+
+        if (!res.ok) {
+          throw new Error("Network response was not ok");
+        }
+
+        const data = await res.json();
+
+        if (data.success && data.customer) {
+  localStorage.setItem("appId", data.customer.applicationId);
+  localStorage.setItem("customerCode", data.customer.customerCode);
+  window.location.href = data.redirect;
+}
+ else {
+          errorDiv.textContent = data.message || "❌ Login failed. Please check your credentials.";
+        }
+      } catch (err) {
+        console.error("Login error:", err);
+        errorDiv.textContent = "❌ Server error. Please try again later.";
+      }
+    });
+  </script>
+</body>
+</html>

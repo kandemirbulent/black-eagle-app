@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Event Details | Black Eagle</title>
+  <style>
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 0;
+      color: #111;
+    }
+
+    header {
+      background: #111;
+      color: #fbc531;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 24px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .back-btn {
+      background: #fbc531;
+      color: #111;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 30px auto;
+      padding: 0 16px 40px;
+    }
+
+    .hero {
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      margin-bottom: 20px;
+    }
+
+    .hero-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .hero h2 {
+      margin: 0 0 8px;
+      font-size: 28px;
+    }
+
+    .sub {
+      color: #666;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .status-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .status-deposit {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+
+    .status-paid {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+      margin-top: 20px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .card h3 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 18px;
+    }
+
+    .detail-row {
+      margin-bottom: 10px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .detail-row strong {
+      display: inline-block;
+      min-width: 120px;
+    }
+
+    .money-big {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 4px 0;
+    }
+
+    .money-sub {
+      color: #666;
+      font-size: 14px;
+      margin: 4px 0;
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .action-btn {
+      background: #111;
+      color: #fff;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .action-btn.yellow {
+      background: #fbc531;
+      color: #111;
+    }
+
+    .action-btn.gray {
+      background: #ccc;
+      color: #555;
+      cursor: not-allowed;
+    }
+
+    .note-box {
+      background: #fafafa;
+      border: 1px solid #e4e4e4;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .section-title {
+      margin-top: 0;
+    }
+
+    .mini-badge {
+      display: inline-block;
+      background: #f5f5f5;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 13px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 700px) {
+      .hero h2 {
+        font-size: 24px;
+      }
+      .money-big {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🦅 Event Details</h1>
+    <button class="back-btn" onclick="goBack()">← Back</button>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-top">
+        <div>
+          <h2 id="eventName">Loading...</h2>
+          <div class="sub" id="eventMeta">Please wait while event details load.</div>
+        </div>
+        <div>
+          <span id="paymentStatus" class="status-pill status-pending">Pending</span>
+        </div>
+      </div>
+
+      <div class="action-row">
+        <button class="action-btn yellow" id="payNowBtn">Pay This Event</button>
+        <a href="#" class="action-btn" id="invoiceBtn" target="_blank">View Invoice</a>
+        <button class="action-btn" id="directionsBtn">Get Directions</button>
+        <button class="action-btn" id="callBtn">Call Contact</button>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h3 class="section-title">Event Information</h3>
+        <div class="detail-row"><strong>Event Date:</strong> <span id="eventDate">-</span></div>
+        <div class="detail-row"><strong>Start Time:</strong> <span id="startTime">-</span></div>
+        <div class="detail-row"><strong>End Time:</strong> <span id="endTime">-</span></div>
+        <div class="detail-row"><strong>Category:</strong> <span id="category">-</span></div>
+        <div class="detail-row"><strong>Venue:</strong> <span id="venueName">-</span></div>
+        <div class="detail-row"><strong>Address:</strong> <span id="address">-</span></div>
+      </section>
+
+      <section class="card">
+        <h3 class="section-title">Payment Summary</h3>
+        <div class="money-sub">Total (ex VAT)</div>
+        <div class="money-big" id="totalExVat">£0.00</div>
+
+        <div class="money-sub">VAT 20%</div>
+        <div class="money-big" id="vatAmount">£0.00</div>
+
+        <div class="money-sub">Total incl. VAT</div>
+        <div class="money-big" id="totalInclVat">£0.00</div>
+
+        <div class="money-sub">Amount Paid</div>
+        <div class="money-big" id="amountPaid">£0.00</div>
+
+        <div class="money-sub">Remaining Balance</div>
+        <div class="money-big" id="remainingBalance">£0.00</div>
+
+        <div class="sub" id="timingInfo">-</div>
+      </section>
+
+      <section class="card">
+        <h3 class="section-title">Contact & Requirements</h3>
+        <div class="detail-row"><strong>Contact Person:</strong> <span id="contactPerson">-</span></div>
+        <div class="detail-row"><strong>Phone:</strong> <span id="contactPhone">-</span></div>
+        <div class="detail-row"><strong>Dress Code:</strong> <span id="dressCode">-</span></div>
+        <div class="detail-row"><strong>Staff Needed:</strong> <span id="staffNeeded">-</span></div>
+      </section>
+
+      <section class="card">
+        <h3 class="section-title">Notes</h3>
+        <div class="note-box" id="notes">No notes added for this event.</div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get("orderId");
+
+    let currentOrder = null;
+
+    function money(value) {
+      return "£" + Number(value || 0).toFixed(2);
+    }
+
+    function goBack() {
+      window.history.back();
+    }
+
+    function getStatusInfo(order) {
+      const subTotal = Number(order.totalAmount || order.amount || 0);
+      const vat = subTotal * 0.20;
+      const totalWithVat = subTotal + vat;
+      const paid = Number(order.amountPaid || 0);
+      const remaining = Math.max(totalWithVat - paid, 0);
+
+      if (remaining <= 0) {
+        return { text: "Paid", className: "status-paid" };
+      }
+
+      if (paid > 0) {
+        return { text: "Deposit Paid", className: "status-deposit" };
+      }
+
+      return { text: "Pending", className: "status-pending" };
+    }
+
+    function getTimingText(order, remaining) {
+      if (!order.eventDate) return "Event date not set";
+
+      const today = new Date();
+      const eventDate = new Date(order.eventDate);
+
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const eventOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+
+      const diffMs = eventOnly - todayOnly;
+      const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+      if (remaining <= 0 && daysLeft > 0) {
+        return `Paid before event ✅ (${daysLeft} day(s) left)`;
+      }
+
+      if (remaining <= 0) {
+        return "Paid ✅";
+      }
+
+      if (daysLeft < 0) {
+        return "Event date passed - payment still outstanding";
+      }
+
+      if (daysLeft === 0) {
+        return "Event is today - payment still due";
+      }
+
+      if (daysLeft <= 3) {
+        return `Urgent - ${daysLeft} day(s) left before event`;
+      }
+
+      return `${daysLeft} day(s) left before event`;
+    }
+
+    function openDirections() {
+      if (!currentOrder) return;
+
+      const address =
+        currentOrder.address ||
+        currentOrder.venueAddress ||
+        currentOrder.location ||
+        "";
+
+      if (!address.trim()) {
+        alert("No address available for this event.");
+        return;
+      }
+
+      const encoded = encodeURIComponent(address);
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encoded}`, "_blank");
+    }
+
+    function callContact() {
+      if (!currentOrder) return;
+
+      const phone =
+        currentOrder.contactPhone ||
+        currentOrder.phone ||
+        currentOrder.customerPhone ||
+        "";
+
+      if (!phone.trim()) {
+        alert("No contact phone available for this event.");
+        return;
+      }
+
+      window.location.href = `tel:${phone}`;
+    }
+
+    async function payThisEvent() {
+      if (!currentOrder) return;
+
+      const subTotal = Number(currentOrder.totalAmount || currentOrder.amount || 0);
+      const vat = subTotal * 0.20;
+      const totalWithVat = subTotal + vat;
+      const paid = Number(currentOrder.amountPaid || 0);
+      const remaining = Math.max(totalWithVat - paid, 0);
+
+      if (remaining <= 0) {
+        alert("This event is already fully paid.");
+        return;
+      }
+
+      try {
+        const response = await fetch("/create-checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mode: "single",
+            orderIds: [currentOrder.orderId]
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to create checkout session");
+        }
+
+        const data = await response.json();
+
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          alert("Payment session could not be started.");
+        }
+      } catch (err) {
+        console.error("❌ Payment error:", err);
+        alert("An error occurred while starting payment.");
+      }
+    }
+
+    async function loadEventDetails() {
+      if (!orderId) {
+        document.getElementById("eventName").textContent = "No order selected";
+        document.getElementById("eventMeta").textContent = "Missing orderId in URL.";
+        return;
+      }
+
+      try {
+        const res = await fetch(`/get-order/${encodeURIComponent(orderId)}`);
+        const data = await res.json();
+
+        if (!data.success || !data.order) {
+          document.getElementById("eventName").textContent = "Event not found";
+          document.getElementById("eventMeta").textContent = "The selected event could not be loaded.";
+          return;
+        }
+
+        const order = data.order;
+        currentOrder = order;
+
+        const subTotal = Number(order.totalAmount || order.amount || 0);
+        const vat = subTotal * 0.20;
+        const totalWithVat = subTotal + vat;
+        const paid = Number(order.amountPaid || 0);
+        const remaining = Math.max(totalWithVat - paid, 0);
+
+        const statusInfo = getStatusInfo(order);
+
+        document.getElementById("eventName").textContent = order.eventName || order.description || "Untitled Event";
+        document.getElementById("eventMeta").textContent =
+          `${order.orderId || "-"} • ${order.eventDate ? new Date(order.eventDate).toLocaleDateString() : "No event date"}`;
+
+        const statusEl = document.getElementById("paymentStatus");
+        statusEl.textContent = statusInfo.text;
+        statusEl.className = `status-pill ${statusInfo.className}`;
+
+        document.getElementById("eventDate").textContent =
+          order.eventDate ? new Date(order.eventDate).toLocaleDateString() : "-";
+
+        document.getElementById("startTime").textContent =
+          order.startTime || order.eventTime || "-";
+
+        document.getElementById("endTime").textContent =
+          order.endTime || "-";
+
+        document.getElementById("category").textContent =
+          order.category || "-";
+
+        document.getElementById("venueName").textContent =
+          order.venueName || order.locationName || order.eventName || "-";
+
+        document.getElementById("address").textContent =
+          order.address || order.venueAddress || order.location || "-";
+
+        document.getElementById("contactPerson").textContent =
+          order.contactPerson || order.customerName || "-";
+
+        document.getElementById("contactPhone").textContent =
+          order.contactPhone || order.phone || order.customerPhone || "-";
+
+        document.getElementById("dressCode").textContent =
+          order.dressCode || "-";
+
+        document.getElementById("staffNeeded").textContent =
+          order.staffNeeded || order.requiredStaff || "-";
+
+        document.getElementById("notes").textContent =
+          order.notes || order.specialInstructions || "No notes added for this event.";
+
+        document.getElementById("totalExVat").textContent = money(subTotal);
+        document.getElementById("vatAmount").textContent = money(vat);
+        document.getElementById("totalInclVat").textContent = money(totalWithVat);
+        document.getElementById("amountPaid").textContent = money(paid);
+        document.getElementById("remainingBalance").textContent = money(remaining);
+
+        document.getElementById("timingInfo").textContent = getTimingText(order, remaining);
+
+        document.getElementById("invoiceBtn").href =
+          `/invoice.html?orderId=${encodeURIComponent(order.orderId)}`;
+
+        const payBtn = document.getElementById("payNowBtn");
+        if (remaining <= 0) {
+          payBtn.textContent = "Fully Paid ✅";
+          payBtn.disabled = true;
+          payBtn.classList.remove("yellow");
+          payBtn.classList.add("gray");
+        }
+
+      } catch (err) {
+        console.error("❌ Error loading event details:", err);
+        document.getElementById("eventName").textContent = "Error loading event";
+        document.getElementById("eventMeta").textContent = "Please try again later.";
+      }
+    }
+
+    document.getElementById("directionsBtn").addEventListener("click", openDirections);
+    document.getElementById("callBtn").addEventListener("click", callContact);
+    document.getElementById("payNowBtn").addEventListener("click", payThisEvent);
+
+    loadEventDetails();
+  </script>
+</body>
+</html>

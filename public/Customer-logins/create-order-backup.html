@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create Order | Black Eagle</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+    form {
+      background: #fff;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 700px;
+      margin-top: 30px;
+    }
+    h1 { text-align: center; color: #222; margin-bottom: 20px; }
+    label { display: block; margin-top: 10px; font-weight: bold; color: #333; }
+    input, select, textarea, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+    }
+    input[readonly] {
+      background: #f1f1f1;
+      color: #666;
+      cursor: not-allowed;
+    }
+    button {
+      background: #222;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.3s;
+      margin-top: 15px;
+    }
+    button:hover { background: #444; }
+
+    .staff-list {
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 10px;
+      background: #fafafa;
+      overflow-x: auto;
+    }
+    .staff-list h3 { margin-top: 0; text-align: center; }
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th, td { border: 1px solid #ccc; padding: 6px; text-align: center; }
+    th { background-color: #333; color: #fff; white-space: nowrap; }
+    .remove-btn {
+      background: crimson; color: #fff; border: none; padding: 5px 8px;
+      border-radius: 4px; cursor: pointer;
+    }
+    .remove-btn:hover { background: darkred; }
+    .success-message { display: none; text-align: center; color: green; margin-top: 15px; font-weight: bold; }
+    .total-sum { text-align: right; margin-top: 10px; font-weight: bold; }
+    .deposit-info { text-align: right; font-size: 15px; color: #444; margin-top: 5px; }
+
+  </style>
+
+ <!-- ✅ SweetAlert2 -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<!-- ✅ (isteğe bağlı) animasyonlar -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css">
+
+</head>
+
+<body>
+  <form id="orderForm" novalidate>
+    <h1>Create New Order</h1>
+
+    <!-- CUSTOMER DETAILS -->
+    <label for="customerName">Customer Name</label>
+    <input type="text" id="customerName" name="customerName" readonly>
+
+    <label for="companyName">Company / Event Name</label>
+    <input type="text" id="companyName" name="companyName" readonly>
+
+    <label for="phone">Contact Number</label>
+    <input type="tel" id="phone" name="phone" readonly>
+
+    <label for="email">Email Address</label>
+    <input type="email" id="email" name="email" readonly>
+
+    <!-- hidden fields -->
+    <input type="hidden" id="customerCode" name="customerCode">
+    <input type="hidden" id="applicationId" name="applicationId">
+
+    <label for="location">Event Location</label>
+    <input type="text" id="location" name="location" placeholder="Venue address or postcode" required>
+
+    <hr style="margin:20px 0;">
+
+    <!-- STAFF SECTION -->
+    <label for="service">Service Type</label>
+    <select id="service" name="service">
+      <option value="">-- Select Service --</option>
+      <option value="Bartender">Bartender</option>
+      <option value="Waiter">Waiter</option>
+      <option value="Barback">Barback</option>
+      <option value="Chef">Chef</option>
+    </select>
+
+    <label for="quantity">Number of Staff</label>
+    <input type="number" id="quantity" min="1" placeholder="e.g. 2">
+
+    <label for="hours">Number of Hours</label>
+    <input type="number" id="hours" min="1" placeholder="e.g. 6">
+
+    <label for="date">Event Date</label>
+    <input type="date" id="date" name="date">
+
+    <label for="startTime">Start Time</label>
+    <input type="time" id="startTime" name="startTime">
+
+    <button type="button" id="addStaffBtn">+ Add to List</button>
+
+    <div class="staff-list">
+      <h3>Requested Staff</h3>
+      <table id="staffTable">
+        <thead>
+          <tr>
+            <th>Service</th><th>Qty</th><th>Hours</th><th>Rate (£/hr)</th>
+            <th>Total (£)</th><th>Date</th><th>Start</th><th>End</th><th>Action</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="total-sum" id="overallTotal">Total: £0</div>
+      <div class="deposit-info" id="depositInfo">Minimum payment required (33%): £0</div>
+    </div>
+
+    <label for="notes">Additional Notes</label>
+    <textarea id="notes" name="notes" placeholder="Example: Outdoor event, formal attire required..."></textarea>
+
+    <button type="submit">Submit Order</button>
+    <div class="success-message" id="successMessage">✅ Order submitted! Redirecting to payment page...</div>
+  </form>
+
+  <!-- ✅ SweetAlert2 fonksiyonu -->
+  <script>
+    function showAlert(type, title, message) {
+      let iconColor = "#000";
+      let bgColor = "#fff";
+
+      if (type === "error") {
+        iconColor = "#e74c3c";
+        bgColor = "#fff5f5";
+      } else if (type === "success") {
+        iconColor = "#27ae60";
+        bgColor = "#f5fff8";
+      } else if (type === "warning") {
+        iconColor = "#f1c40f";
+        bgColor = "#fffdf5";
+      }
+
+      Swal.fire({
+        icon: type,
+        title: title,
+        text: message,
+        background: bgColor,
+        color: "#111",
+        confirmButtonColor: "#000",
+        confirmButtonText: "OK",
+        iconColor: iconColor,
+        showClass: { popup: "animate__animated animate__fadeInDown" },
+        hideClass: { popup: "animate__animated animate__fadeOutUp" }
+      });
+    }
+  </script>
+
+  <script>
+    const addBtn = document.getElementById('addStaffBtn');
+    const tableBody = document.querySelector('#staffTable tbody');
+    const overallTotal = document.getElementById('overallTotal');
+    const depositInfo = document.getElementById('depositInfo');
+    const form = document.getElementById('orderForm');
+    const successMessage = document.getElementById('successMessage');
+    const hourlyRates = { "Bartender": 25, "Waiter": 17, "Barback": 17, "Chef": 28 };
+    let staffList = [];
+
+    // 🔧 URL'den appId al ve müşteri bilgilerini yükle
+    const appId = new URLSearchParams(window.location.search).get("appId");
+
+    async function loadCustomer() {
+      if (!appId) return alert("Missing application ID parameter.");
+      try {
+        const res = await fetch(`/get-customer-details/${encodeURIComponent(appId)}`);
+        const customer = await res.json();
+        if (!customer || !customer._id) throw new Error("Customer not found");
+
+        document.getElementById('applicationId').value = customer.applicationId || "";
+        document.getElementById('customerCode').value = customer.customerCode || "";
+        document.getElementById('customerName').value = `${customer.firstName || ""} ${customer.lastName || ""}`.trim();
+        document.getElementById('companyName').value = customer.companyName || "";
+        document.getElementById('phone').value = customer.mobilePhone || "";
+        document.getElementById('email').value = customer.email || "";
+      } catch (err) {
+        console.error("❌ Error loading customer:", err);
+        alert("Failed to load customer info: " + err.message);
+      }
+    }
+    loadCustomer();
+
+    // 🧾 Staff ekleme
+    addBtn.addEventListener('click', () => {
+      const dateInput = document.getElementById("date").value;
+      const selectedDate = new Date(dateInput);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (selectedDate <= today) {
+        showAlert("warning", "Invalid Date", "Event date must be in the future.");
+        return;
+      }
+
+      const minAllowed = new Date();
+      minAllowed.setDate(today.getDate() + 2);
+      if (selectedDate < minAllowed) {
+        showAlert("warning", "Too Soon ⏳", "Please select a date at least 2 days in advance.");
+        return;
+      }
+
+      const service = document.getElementById('service').value;
+      const quantity = Number(document.getElementById('quantity').value);
+      const hours = Number(document.getElementById('hours').value);
+      const date = document.getElementById('date').value;
+      const startTime = document.getElementById('startTime').value;
+
+      if (!service || !quantity || !hours || !date || !startTime) {
+        showAlert("warning", "Missing Fields ⚠️", "Please fill all fields before adding to list.");
+        return;
+      }
+
+      const rate = hourlyRates[service] || 0;
+const billableHours = Math.max(hours, 6); // minimum 6 saat uygulanır
+const total = rate * billableHours * quantity;
+staffList.push({ service, quantity, hours: billableHours, rate, total, date, startTime });
+updateTable();
+
+// ekranda kullanıcıya bilgi verelim (isteğe bağlı)
+if (hours < 6) {
+  // showAlert("warning", "Minimum 6-hour Booking Applied ⚖️", "Bookings shorter than 6 hours are billed as 6 hours per staff."); ihtiyaca gore alti saati topap yapabiliriz
+}
+
+updateTable();
+
+      document.querySelectorAll('#service, #quantity, #hours, #date, #startTime').forEach(el => el.value = '');
+    });
+
+    function updateTable() {
+      tableBody.innerHTML = '';
+      let overall = 0;
+      staffList.forEach((item, index) => {
+        overall += item.total;
+        tableBody.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td>${item.service}</td>
+            <td>${item.quantity}</td>
+            <td>${item.hours}</td>
+            <td>£${item.rate}</td>
+            <td><strong>£${item.total}</strong></td>
+            <td>${item.date}</td>
+            <td>${item.startTime}</td>
+            <td><button type="button" class="remove-btn" onclick="removeStaff(${index})">Remove</button></td>
+          </tr>`);
+      });
+      const minimumPayment = (overall / 3).toFixed(2);
+      overallTotal.textContent = `Total: £${overall.toFixed(2)}`;
+      depositInfo.textContent = `Minimum payment required (33%): £${minimumPayment}`;
+    }
+
+    window.removeStaff = i => { staffList.splice(i, 1); updateTable(); };
+
+    // 🧾 Submit order
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (staffList.length === 0) {
+        showAlert("warning", "Hold up ⚠️", "Please add at least one staff item before submitting.");
+        return;
+      }
+
+      const totalAmount = staffList.reduce((sum, i) => sum + i.total, 0);
+      const minimumPaymentAmount = Number((totalAmount / 3).toFixed(2));
+
+      const orderData = {
+        customerApplicationId: document.getElementById('applicationId').value,
+        customerCode: document.getElementById('customerCode').value,
+        customerName: form.customerName.value,
+        companyName: form.companyName.value,
+        phone: form.phone.value,
+        email: form.email.value,
+        location: form.location.value,
+        staff: staffList,
+        notes: form.notes.value,
+        totalAmount,
+        minimumPaymentAmount,
+        paymentStatus: "Pending",
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        const res = await fetch('/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderData)
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || "Order save failed");
+
+        showAlert("success", "✅ Order Submitted!", "Redirecting you to payment page...");
+        setTimeout(() => {
+          window.location.href = `/payment.html?minimum=${minimumPaymentAmount}&total=${totalAmount}`;
+        }, 1500);
+      } catch (err) {
+        showAlert("error", "Submission Failed ❌", "Could not submit order: " + err.message);
+      }
+    });
+  </script>
+
+</body>
+</html>
+

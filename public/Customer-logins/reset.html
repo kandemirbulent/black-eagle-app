@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Customer Reset Password</title>
+</head>
+<body>
+  <h2>Set a New Password</h2>
+  <form id="resetForm">
+    <input type="hidden" id="token">
+    <input type="hidden" id="email">
+
+    <label for="newPassword">New Password:</label><br>
+    <input type="password" id="newPassword" required minlength="6"><br><br>
+
+    <button type="submit">Update Password</button>
+  </form>
+
+  <p id="msg"></p>
+
+  <script>
+    // URL'den token ve email al
+    const params = new URLSearchParams(window.location.search);
+    document.getElementById("token").value = params.get("token");
+    document.getElementById("email").value = params.get("email");
+
+    document.getElementById("resetForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const token = document.getElementById("token").value;
+      const email = document.getElementById("email").value;
+      const newPassword = document.getElementById("newPassword").value;
+
+      const res = await fetch("/customer-reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, email, newPassword })
+      });
+
+      const text = await res.text();
+      document.getElementById("msg").innerText = text;
+    });
+  </script>
+</body>
+</html>
+

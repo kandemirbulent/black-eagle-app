@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Payment Successful | Black Eagle</title>
+  <style>
+    body {
+      background-color: #f7f9fb;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .success-box {
+      background: #fff;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      text-align: center;
+      max-width: 400px;
+    }
+
+    h1 {
+      color: #2ecc71;
+      margin-bottom: 10px;
+    }
+
+    p {
+      color: #333;
+      font-size: 16px;
+    }
+
+    a, button {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 25px;
+      background-color: #000;
+      color: #fff;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: bold;
+      transition: 0.3s;
+      border: none;
+      cursor: pointer;
+    }
+
+    a:hover, button:hover {
+      background-color: #333;
+    }
+  </style>
+</head>
+<body>
+<div class="success-box">
+  <h1>✅ Payment Successful!</h1>
+  <p>Thank you for your payment. Your booking is now confirmed.</p>
+  <a href="/index.html">Return to Home</a>
+  <br>
+  <button id="dashboardBtn">Go to Dashboard</button>
+</div>
+
+<script>
+  const appId = new URLSearchParams(window.location.search).get("appId");
+  document.getElementById("dashboardBtn").addEventListener("click", () => {
+    if (appId) {
+      window.location.href = `/Customer-logins/customer-dashboard.html?appId=${encodeURIComponent(appId)}`;
+    } else {
+      alert("No Application ID found. Returning to home page.");
+      window.location.href = "/index.html";
+    }
+  });
+</script>
+</body>
+</html>
