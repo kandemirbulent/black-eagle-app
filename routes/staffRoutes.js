@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const Staff = require("../models/Staff");
+const Staff = require("../models/staff");
 
 // 🔹 CREATE STAFF (register)
 router.post("/create", async (req, res) => {

@@ -14,7 +14,7 @@ const crypto = require("crypto");
 
 const Order = require("./models/order");
 const Customer = require("./models/customer");
-const Staff = require("./models/Staff");
+const Staff = require("./models/staff");
 
 const app = express();
 
