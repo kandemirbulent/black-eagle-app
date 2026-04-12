@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Black Eagle App</title>
+
   <style>
     body {
       font-family: "Poppins", Arial, sans-serif;
       background: linear-gradient(145deg, #1a1a1a, #2c2c2c);
       margin: 0;
-      padding: 0;
       height: 100vh;
       display: flex;
       justify-content: center;
@@ -18,105 +18,149 @@
 
     .container {
       background: #fff;
-      width: 360px;
-      padding: 45px 40px;
+      width: 380px;
+      padding: 50px 40px;
       border-radius: 18px;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
       text-align: center;
-      transition: transform 0.25s ease, box-shadow 0.25s ease;
     }
 
-    .container:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.3);
-    }
-
+    /* 🔥 LOGO BÜYÜTÜLDÜ */
     img.logo {
-      width: 80px;
-      height: 80px;
-      object-fit: contain;
-      margin-bottom: 12px;
+      width: 130px;
+      margin-bottom: 20px;
     }
 
     h1 {
-      color: #111;
       font-size: 22px;
       margin-bottom: 25px;
-      font-weight: 600;
+      color: #111;
     }
 
-    .section-title {
-      color: #444;
-      font-size: 15px;
-      font-weight: 600;
-      margin-top: 30px;
-      margin-bottom: 10px;
-      border-top: 1px solid #ddd;
-      padding-top: 12px;
-      letter-spacing: 0.4px;
-    }
-
-    .btn {
+    input {
       width: 100%;
-      padding: 12px 0;
-      background-color: #000;
+      padding: 13px;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    button {
+      width: 100%;
+      padding: 13px;
+      background: #000;
       color: #fff;
       border: none;
       border-radius: 8px;
-      margin: 8px 0;
-      font-size: 15px;
+      margin-top: 12px;
       cursor: pointer;
-      transition: all 0.3s ease;
-      font-weight: 500;
+      font-weight: bold;
+      font-size: 15px;
+      transition: 0.3s;
     }
 
-    .btn:hover {
-      background-color: #d4af37;
+    button:hover {
+      background: #d4af37;
       color: #000;
-      box-shadow: 0 3px 12px rgba(0, 0, 0, 0.25);
-      transform: scale(1.02);
     }
 
-    footer {
-      margin-top: 30px;
-      font-size: 12px;
-      color: #777;
+    .links {
+      margin-top: 20px;
     }
 
-    @media (max-width: 450px) {
-      .container {
-        width: 90%;
-        padding: 35px 25px;
-      }
+    /* 🔥 REGISTER LINKLERİ GÜÇLENDİRİLDİ */
+    .links a {
+      display: block;
+      margin-top: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      padding: 10px;
+      border-radius: 8px;
+      transition: 0.3s;
     }
+
+    /* Customer kayıt */
+    .customer-link {
+      color: #111;
+      background: #fbc531;
+    }
+
+    .customer-link:hover {
+      background: #e0a800;
+    }
+
+    /* Staff kayıt */
+    .staff-link {
+      color: #fff;
+      background: #333;
+    }
+
+    .staff-link:hover {
+      background: #000;
+    }
+
   </style>
 </head>
+
 <body>
   <div class="container">
-    <!-- LOGO -->
-    <img src="public/img/logo.png" alt="Black Eagle Logo" class="logo" onerror="this.style.display='none'">
 
-    <h1>Welcome to Black Eagle App</h1>
+    <!-- 🔥 LOGO (PATH DÜZELT) -->
+    <img src="/img/blackeaglelogo.png" class="logo" alt="Black Eagle Logo">
 
-    <!-- CUSTOMER SECTION -->
-    <div class="section-title">Customer</div>
-    <button class="btn" onclick="window.location.href='Customer-logins/customer-login.html'">
-      Customer Login
-    </button>
-    <button class="btn" onclick="window.location.href='Customer-logins/customer-login-create.html'">
-      Create Customer Account
-    </button>
+    <h1>Login to Black Eagle</h1>
 
-    <!-- STAFF SECTION -->
-    <div class="section-title">Staff</div>
-    <button class="btn" onclick="window.location.href='Staff-logins/staff-login.html'">
-      Staff Login
-    </button>
-    <button class="btn" onclick="window.location.href='Staff-logins/staff-login-create.html'">
-      Create Staff Account
-    </button>
+    <input type="email" id="email" placeholder="Email" />
+    <input type="password" id="password" placeholder="Password" />
 
-    <footer>© 2025 Black Eagle Services Ltd</footer>
+    <button onclick="login()">Login</button>
+
+    <div class="links">
+      <a href="/Customer-logins/customer-login-create.html" class="customer-link">
+        Create Customer Account
+      </a>
+
+      <a href="/Staff-logins/staff-login-create.html" class="staff-link">
+        Create Staff Account
+      </a>
+    </div>
+
   </div>
+
+  <script>
+    async function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      if (!email || !password) {
+        alert("Enter email and password");
+        return;
+      }
+
+      try {
+        const res = await fetch("/customer-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+          alert(data.message || "Login failed");
+          return;
+        }
+
+        window.location.href =
+          `/Customer-logins/customer-dashboard.html?appId=${data.customer.applicationId}`;
+
+      } catch (err) {
+        console.error(err);
+        alert("Server error");
+      }
+    }
+  </script>
 </body>
 </html>

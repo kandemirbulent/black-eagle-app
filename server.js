@@ -14,6 +14,7 @@ const crypto = require("crypto");
 
 const Order = require("./models/order");
 const Customer = require("./models/customer");
+const Staff = require("./models/Staff");
 
 const app = express();
 
@@ -93,9 +94,12 @@ app.post("/stripe-webhook", express.raw({ type: "application/json" }), async (re
       console.log("🧾 singleOrderId:", singleOrderId);
       console.log("🧾 paymentType:", paymentType);
 
+      // ✅ KRİTİK FIX
       const orderIds = orderIdsRaw
         ? orderIdsRaw.split(",").map((id) => id.trim()).filter(Boolean)
         : [];
+
+      console.log("🧾 parsed orderIds:", orderIds);
 
       // 🟢 DASHBOARD ÖDEMELERİ
       // Pay This Event / Pay Selected / Pay All
@@ -207,6 +211,11 @@ const users = [
   { id: 3, name: "Sarah Lee", email: "sarah@blackeagle.co.uk", role: "staff" },
   { id: 4, name: "Michael Brown", email: "michael@customer.com", role: "customer" },
 ];
+
+// ✅ Basit role endpoint (dashboard için)
+app.get("/get-user-role", (req, res) => {
+  res.json({ role: "admin" });
+});
 
 // ✅ Get pending customers (for dashboard)
 app.get("/get-pending-customers", async (req, res) => {
@@ -411,7 +420,8 @@ app.get("/getApprovedCustomers", async (req, res) => {
   }
 });
 
-// 🔍 Get customer details by applicationId
+// 🔍 Eski çalışan route: applicationId ile customer details
+// ORDER FLOW bunu kullanıyorsa bozulmasın diye aynen bırakıldı
 app.get("/get-customer-details/:appId", async (req, res) => {
   try {
     const customer = await Customer.findOne({ applicationId: req.params.appId });
@@ -422,6 +432,47 @@ app.get("/get-customer-details/:appId", async (req, res) => {
   } catch (err) {
     console.error("❌ Error fetching customer details:", err);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// 🔍 Yeni route: dashboard View butonu için _id ile customer details
+app.get("/get-customer-details-by-id/:id", async (req, res) => {
+  try {
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "Customer not found" });
+    }
+    res.json(customer);
+  } catch (err) {
+    console.error("❌ Error fetching customer details by id:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// 🗑️ Delete customer by Mongo _id
+app.delete("/delete-customer/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedCustomer = await Customer.findByIdAndDelete(id);
+
+    if (!deletedCustomer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found.",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Customer deleted successfully.",
+    });
+  } catch (err) {
+    console.error("❌ Error deleting customer:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error while deleting customer.",
+    });
   }
 });
 
@@ -436,6 +487,292 @@ app.get("/get-order/:orderId", async (req, res) => {
   } catch (err) {
     console.error("❌ Error fetching order:", err);
     res.status(500).json({ success: false, message: "Error fetching order" });
+  }
+});
+
+// ✅ STAFF Registration (multi-step form -> email verification)
+app.post("/api/staff/create", async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      dob,
+      mobile,
+      email,
+      postcode,
+      address,
+      niNumber,
+      experience,
+      availability,
+      positions,
+      emergencyContact,
+      selfieData,
+    } = req.body;
+
+    if (
+      !firstName ||
+      !lastName ||
+      !dob ||
+      !email ||
+      !postcode ||
+      !address ||
+      !niNumber ||
+      !availability ||
+      !selfieData
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Please fill all required staff fields.",
+      });
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+
+    const existingStaff = await Staff.findOne({ email: normalizedEmail });
+
+    if (existingStaff) {
+      return res.status(409).json({
+        success: false,
+        message: "This email is already registered.",
+      });
+    }
+
+    const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const newStaff = new Staff({
+      firstName,
+      lastName,
+      dob,
+      mobile: mobile || "",
+      email: normalizedEmail,
+      postcode,
+      address,
+      niNumber,
+      experience: Number(experience || 0),
+      availability: availability || "",
+      positions: Array.isArray(positions) ? positions : [],
+      emergencyContact: {
+        name: emergencyContact?.name || "",
+        phone: emergencyContact?.phone || "",
+      },
+      selfieData,
+      verifyCode,
+      verifyCodeExpires: Date.now() + 1000 * 60 * 15,
+      isVerified: false,
+      isPasswordSet: false,
+      status: "pending",
+      role: "staff",
+    });
+
+    await newStaff.save();
+
+    try {
+      await mailer.sendMail({
+        from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+        to: newStaff.email,
+        subject: "Verify your staff account",
+        html: `
+          <div style="font-family:Arial,sans-serif;padding:20px;">
+            <h2>Hello ${newStaff.firstName},</h2>
+            <p>Your staff account request has been received.</p>
+            <p>Please use the verification code below to verify your email:</p>
+            <div style="font-size:28px;font-weight:bold;letter-spacing:4px;margin:20px 0;">
+              ${verifyCode}
+            </div>
+            <p>This code will expire in 15 minutes.</p>
+          </div>
+        `,
+      });
+    } catch (mailErr) {
+      console.error("❌ Staff verification email send failed:", mailErr);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Staff registered successfully. Please verify your email.",
+    });
+  } catch (err) {
+    if (err && err.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "This email is already registered.",
+      });
+    }
+
+    console.error("❌ Error creating staff:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while creating staff.",
+    });
+  }
+});
+
+// ✅ STAFF Email Verification
+app.post("/api/staff/verify-email", async (req, res) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and verification code are required.",
+      });
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+
+    const staff = await Staff.findOne({ email: normalizedEmail });
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff account not found.",
+      });
+    }
+
+    if (!staff.verifyCode || staff.verifyCode !== String(code).trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid verification code.",
+      });
+    }
+
+    if (!staff.verifyCodeExpires || staff.verifyCodeExpires < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: "Verification code has expired.",
+      });
+    }
+
+    staff.isVerified = true;
+    staff.verifyCode = "";
+    staff.verifyCodeExpires = null;
+
+    await staff.save();
+
+    return res.json({
+      success: true,
+      message: "Email verified successfully.",
+    });
+  } catch (err) {
+    console.error("❌ Error verifying staff email:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while verifying email.",
+    });
+  }
+});
+
+// ✅ STAFF Set Password
+app.post("/api/staff/set-password", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required.",
+      });
+    }
+
+    const normalizedEmail = String(email).toLowerCase().trim();
+
+    const staff = await Staff.findOne({ email: normalizedEmail });
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff account not found.",
+      });
+    }
+
+    if (!staff.isVerified) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email first.",
+      });
+    }
+
+    staff.password = password;
+    staff.isPasswordSet = true;
+    staff.status = "active";
+
+    await staff.save();
+
+    return res.json({
+      success: true,
+      message: "Password created successfully.",
+    });
+  } catch (err) {
+    console.error("❌ Error setting staff password:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while setting password.",
+    });
+  }
+});
+
+// ✅ STAFF Login
+app.post("/api/staff/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const normalizedEmail = String(email || "").toLowerCase().trim();
+
+    const staff = await Staff.findOne({ email: normalizedEmail });
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found.",
+      });
+    }
+
+    if (!staff.isVerified) {
+      return res.status(403).json({
+        success: false,
+        message: "Please verify your email first.",
+      });
+    }
+
+    if (!staff.isPasswordSet || !staff.password) {
+      return res.status(403).json({
+        success: false,
+        message: "Please create your password first.",
+      });
+    }
+
+    const isMatch = await staff.comparePassword(password);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Wrong password.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Login successful",
+      redirect: "/Staff-logins/staff-dashboard.html",
+      staff: {
+        id: staff._id,
+        name: staff.name,
+        email: staff.email,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
+        role: staff.role,
+        status: staff.status,
+        positions: staff.positions,
+        availability: staff.availability,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error during staff login:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while logging in.",
+    });
   }
 });
 
@@ -630,7 +967,16 @@ app.post("/customer-login", async (req, res) => {
 // 💳 Stripe Checkout oturumu oluştur
 app.post("/create-checkout-session", async (req, res) => {
   try {
-    const { appId, totalAmount, orderId, email, mode, orderIds, paymentType } = req.body;
+    const {
+      appId,
+      totalAmount,
+      orderId,
+      email,
+      mode,
+      orderIds,
+      paymentType,
+      orderDraft,
+    } = req.body;
 
     let amountToCharge = 0;
     let paymentTitle = "Black Eagle Payment";
@@ -638,15 +984,65 @@ app.post("/create-checkout-session", async (req, res) => {
 
     console.log("📦 Incoming checkout payload:", req.body);
 
-    if (typeof totalAmount !== "undefined" && totalAmount !== null) {
+    // 🟡 CREATE ORDER / PAYMENT.HTML DEPOSIT FLOW
+    if (
+      typeof totalAmount !== "undefined" &&
+      totalAmount !== null &&
+      paymentType === "deposit" &&
+      orderDraft
+    ) {
       amountToCharge = Number(totalAmount);
 
-      if (paymentType === "deposit") {
-        paymentTitle = `Deposit for Order ${orderId || "BlackEagle"}`;
+      paymentTitle = `Deposit for Order ${orderId || "BlackEagle"}`;
+      paymentDescription = `Application ID: ${appId || "N/A"} | New Booking Deposit`;
+
+      const existingDraftOrder = await Order.findOne({
+        customerApplicationId: orderDraft.customerApplicationId || appId,
+        orderId: orderId,
+      });
+
+      if (!existingDraftOrder) {
+        const firstStaffItem = Array.isArray(orderDraft.staff) && orderDraft.staff.length
+          ? orderDraft.staff[0]
+          : null;
+
+        const newOrder = new Order({
+          orderId: orderId,
+          customerApplicationId: orderDraft.customerApplicationId || appId || "",
+          customerCode: orderDraft.customerCode || "",
+          customerName: orderDraft.customerName || "",
+          companyName: orderDraft.companyName || "",
+          eventName: orderDraft.companyName || "Untitled Event",
+          category: firstStaffItem?.service || "-",
+          eventDate: firstStaffItem?.date || null,
+          phone: orderDraft.phone || "",
+          email: orderDraft.email || email || "",
+          location: orderDraft.location || "",
+          staff: Array.isArray(orderDraft.staff) ? orderDraft.staff : [],
+          notes: orderDraft.notes || "",
+          subtotalAmount: Number(orderDraft.subtotalAmount || 0),
+          vatRate: Number(orderDraft.vatRate || 0),
+          vatAmount: Number(orderDraft.vatAmount || 0),
+          totalAmount: Number(orderDraft.totalAmount || 0),
+          totalWithVat: Number(orderDraft.totalWithVat || orderDraft.totalAmount || 0),
+          minimumPaymentAmount: Number(orderDraft.minimumPaymentAmount || 0),
+          amountPaid: 0,
+          status: "Pending",
+          paymentStatus: orderDraft.paymentStatus || "Awaiting Deposit",
+          orderStatus: orderDraft.orderStatus || "Draft - Awaiting Payment",
+          isVisibleToCustomer: false,
+          createdAt: orderDraft.createdAt ? new Date(orderDraft.createdAt) : new Date(),
+        });
+
+        await newOrder.save();
+        console.log(`✅ New order created before Stripe checkout: ${newOrder.orderId}`);
       } else {
-        paymentTitle = `Payment for Order ${orderId || "BlackEagle"}`;
+        console.log(`ℹ️ Draft order already exists, not duplicating: ${orderId}`);
       }
-    } else if (mode && Array.isArray(orderIds) && orderIds.length && appId) {
+    }
+
+    // 🟢 DASHBOARD ÖDEMELERİ
+    else if (mode && Array.isArray(orderIds) && orderIds.length && appId) {
       const orders = await Order.find({
         customerApplicationId: appId,
         orderId: { $in: orderIds },
@@ -688,7 +1084,7 @@ app.post("/create-checkout-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
-      customer_email: email || undefined,
+      customer_email: email || orderDraft?.email || undefined,
       line_items: [
         {
           price_data: {
@@ -745,6 +1141,7 @@ app.get("/", (req, res) => {
 });
 
 // 💰 Ödeme bilgisi güncelleme
+// NOT: Ana ödeme kaynağı webhook olmalı. Bu endpoint'e dokunmuyoruz ama duruyor.
 app.post("/update-payment-status", async (req, res) => {
   try {
     const { appId, amountPaid, orderId } = req.body;

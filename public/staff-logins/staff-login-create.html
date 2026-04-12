@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Create Staff Account</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+    }
+
+    form {
+      background: #ffffff;
+      padding: 28px;
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      width: 100%;
+      max-width: 760px;
+      margin: 30px 0;
+      border: 1px solid #e5e7eb;
+    }
+
+    h1 {
+      font-size: 24px;
+      color: #1f2937;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    .step-indicator {
+      font-size: 14px;
+      color: #6b7280;
+      margin-bottom: 20px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    .step {
+      display: none;
+    }
+
+    .step.active {
+      display: block;
+    }
+
+    label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin-top: 8px;
+      display: block;
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      background: #f9fafb;
+      font-size: 14px;
+      transition: 0.2s;
+      box-sizing: border-box;
+    }
+
+    input:focus,
+    select:focus {
+      outline: none;
+      border-color: #f4c430;
+      box-shadow: 0 0 0 2px rgba(244,196,48,0.25);
+      background: #fff;
+    }
+
+    .positions {
+      margin-top: 6px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px;
+      background: #f9fafb;
+    }
+
+    .positions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .pos-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #1f2937;
+      cursor: pointer;
+      padding: 6px 4px;
+      border-radius: 8px;
+      transition: 0.2s;
+    }
+
+    .pos-item:hover {
+      background: rgba(244,196,48,0.10);
+    }
+
+    .pos-item input {
+      width: auto;
+      margin: 0;
+      accent-color: #f4c430;
+    }
+
+    .camera-box {
+      margin-top: 6px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 14px;
+      background: #f9fafb;
+    }
+
+    .camera-note {
+      margin-top: 0;
+      margin-bottom: 12px;
+      color: #6b7280;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .camera-stage {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+
+    .preview-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    video,
+    canvas,
+    .selfie-preview {
+      width: 100%;
+      max-width: 100%;
+      aspect-ratio: 4 / 3;
+      border-radius: 12px;
+      border: 1px solid #d1d5db;
+      background: #111;
+      object-fit: cover;
+    }
+
+    canvas {
+      display: none;
+    }
+
+    .selfie-preview {
+      display: none;
+      background: #e5e7eb;
+    }
+
+    .camera-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    button {
+      padding: 11px 14px;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: 0.2s;
+    }
+
+    .camera-btn {
+      background: #111;
+      color: #fff;
+    }
+
+    .camera-btn:hover {
+      background: #f4c430;
+      color: #000;
+    }
+
+    .secondary-btn {
+      background: #6b7280;
+      color: #fff;
+    }
+
+    .secondary-btn:hover {
+      background: #4b5563;
+    }
+
+    .submit-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .next-btn,
+    .submit-btn {
+      flex: 1;
+      background: #111;
+      color: #fff;
+    }
+
+    .next-btn:hover,
+    .submit-btn:hover {
+      background: #f4c430;
+      color: #000;
+    }
+
+    .back-btn {
+      flex: 1;
+      background: #6b7280;
+      color: #fff;
+    }
+
+    .back-btn:hover {
+      background: #4b5563;
+    }
+
+    .status {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #6b7280;
+    }
+
+    .status.error {
+      color: #b91c1c;
+    }
+
+    .status.ok {
+      color: #166534;
+    }
+
+    @media (max-width: 700px) {
+      .form-grid,
+      .positions-grid,
+      .camera-stage {
+        grid-template-columns: 1fr;
+      }
+
+      .submit-row {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<form id="staffForm">
+  <h1>Create Staff Account</h1>
+  <div class="step-indicator" id="stepIndicator">Step 1 of 4</div>
+
+  <!-- STEP 1 -->
+  <div class="step active" id="step1">
+    <div class="form-grid">
+      <div>
+        <label for="firstName">First Name</label>
+        <input id="firstName" type="text" required>
+      </div>
+
+      <div>
+        <label for="lastName">Last Name</label>
+        <input id="lastName" type="text" required>
+      </div>
+
+      <div>
+        <label for="dob">Date of Birth</label>
+        <input id="dob" type="date" required>
+      </div>
+
+      <div>
+        <label for="mobile">Mobile Phone</label>
+        <input id="mobile" type="tel">
+      </div>
+
+      <div class="full">
+        <label for="email">Email</label>
+        <input id="email" type="email" required>
+      </div>
+    </div>
+
+    <div class="submit-row">
+      <button type="button" class="next-btn" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step" id="step2">
+    <div class="form-grid">
+      <div>
+        <label for="postcode">Postcode</label>
+        <input id="postcode" type="text" required>
+      </div>
+
+      <div>
+        <label for="niNumber">National Insurance No</label>
+        <input id="niNumber" type="text" required>
+      </div>
+
+      <div class="full">
+        <label for="address">Address</label>
+        <input id="address" type="text" required>
+      </div>
+    </div>
+
+    <div class="submit-row">
+      <button type="button" class="back-btn" onclick="prevStep()">Back</button>
+      <button type="button" class="next-btn" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step" id="step3">
+    <div class="form-grid">
+      <div>
+        <label for="experience">Experience (Years)</label>
+        <input id="experience" type="number" min="0">
+      </div>
+
+      <div>
+        <label for="availability">Availability</label>
+        <select id="availability" required>
+          <option value="">Select availability</option>
+          <option value="Full-time">Full-time</option>
+          <option value="Part-time">Part-time</option>
+          <option value="Weekends">Weekends</option>
+          <option value="Night Shift">Night Shift</option>
+          <option value="Flexible">Flexible</option>
+        </select>
+      </div>
+
+      <div class="full">
+        <label>Position(s)</label>
+        <div class="positions">
+          <div class="positions-grid">
+            <label class="pos-item"><input type="checkbox" name="position" value="Bartender"> Bartender</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Waiter"> Waiter</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Chef"> Chef</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Kitchen Assistant"> Kitchen Assistant</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Event Staff"> Event Staff</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="House Cleaning"> House Cleaning</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Office Cleaning"> Office Cleaning</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Deep Cleaning"> Deep Cleaning</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Window Cleaner"> Window Cleaner</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Construction Worker"> Construction Worker</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Electrician"> Electrician</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Plumber"> Plumber</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Painter"> Painter</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Handyman"> Handyman</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Security"> Security</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Door Supervisor"> Door Supervisor</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Delivery Driver"> Delivery Driver</label>
+            <label class="pos-item"><input type="checkbox" name="position" value="Warehouse Staff"> Warehouse Staff</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="submit-row">
+      <button type="button" class="back-btn" onclick="prevStep()">Back</button>
+      <button type="button" class="next-btn" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step" id="step4">
+    <div class="form-grid">
+      <div>
+        <label for="emergencyName">Emergency Contact Name</label>
+        <input id="emergencyName" type="text" required>
+      </div>
+
+      <div>
+        <label for="emergencyPhone">Emergency Contact Phone</label>
+        <input id="emergencyPhone" type="tel" required>
+      </div>
+
+      <div class="full">
+        <label>Staff Selfie</label>
+        <div class="camera-box">
+          <p class="camera-note">
+            Use the front camera to take a selfie for staff identification. This helps make sure the correct staff member is assigned to the customer.
+          </p>
+
+          <div class="camera-stage">
+            <div class="preview-panel">
+              <video id="camera" autoplay playsinline muted></video>
+              <canvas id="snapshot"></canvas>
+              <img id="selfiePreview" class="selfie-preview" alt="Captured selfie preview">
+            </div>
+
+            <div>
+              <div class="camera-buttons">
+                <button type="button" class="camera-btn" id="startCameraBtn">Open Front Camera</button>
+                <button type="button" class="camera-btn" id="takePhotoBtn">Take Selfie</button>
+                <button type="button" class="secondary-btn" id="retakeBtn">Retake</button>
+              </div>
+
+              <div id="cameraStatus" class="status">
+                Camera is not active yet.
+              </div>
+            </div>
+          </div>
+
+          <input type="hidden" id="selfieData" name="selfieData">
+        </div>
+      </div>
+    </div>
+
+    <div class="submit-row">
+      <button type="button" class="back-btn" onclick="prevStep()">Back</button>
+      <button type="submit" class="submit-btn">Submit</button>
+    </div>
+  </div>
+</form>
+
+<script>
+  const totalSteps = 4;
+  let currentStep = 1;
+
+  const camera = document.getElementById("camera");
+  const canvas = document.getElementById("snapshot");
+  const selfiePreview = document.getElementById("selfiePreview");
+  const selfieData = document.getElementById("selfieData");
+  const cameraStatus = document.getElementById("cameraStatus");
+
+  const startCameraBtn = document.getElementById("startCameraBtn");
+  const takePhotoBtn = document.getElementById("takePhotoBtn");
+  const retakeBtn = document.getElementById("retakeBtn");
+  const staffForm = document.getElementById("staffForm");
+  const stepIndicator = document.getElementById("stepIndicator");
+
+  let stream = null;
+
+  function showStep(step) {
+    document.querySelectorAll(".step").forEach(el => el.classList.remove("active"));
+    document.getElementById(`step${step}`).classList.add("active");
+    stepIndicator.textContent = `Step ${step} of ${totalSteps}`;
+  }
+
+  function validateStep(step) {
+    const stepEl = document.getElementById(`step${step}`);
+    const requiredFields = stepEl.querySelectorAll("input[required], select[required]");
+
+    for (const field of requiredFields) {
+      if (!field.value.trim()) {
+        field.focus();
+        return false;
+      }
+    }
+
+    if (step === 3) {
+      const selectedPositions = document.querySelectorAll('input[name="position"]:checked');
+      if (selectedPositions.length === 0) {
+        alert("Please select at least one position.");
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function nextStep() {
+    if (!validateStep(currentStep)) return;
+    if (currentStep < totalSteps) {
+      currentStep++;
+      showStep(currentStep);
+    }
+  }
+
+  function prevStep() {
+    if (currentStep > 1) {
+      currentStep--;
+      showStep(currentStep);
+    }
+  }
+
+  async function startFrontCamera() {
+    try {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false
+      });
+
+      camera.srcObject = stream;
+      camera.style.display = "block";
+      selfiePreview.style.display = "none";
+      cameraStatus.textContent = "Front camera is active.";
+      cameraStatus.className = "status ok";
+    } catch (error) {
+      cameraStatus.textContent = "Camera could not be opened. Check browser permission, HTTPS, or device support.";
+      cameraStatus.className = "status error";
+      console.error(error);
+    }
+  }
+
+  function takeSelfie() {
+    if (!stream) {
+      cameraStatus.textContent = "Open the front camera first.";
+      cameraStatus.className = "status error";
+      return;
+    }
+
+    const width = camera.videoWidth;
+    const height = camera.videoHeight;
+
+    if (!width || !height) {
+      cameraStatus.textContent = "Camera is not ready yet. Try again in a moment.";
+      cameraStatus.className = "status error";
+      return;
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    ctx.translate(width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(camera, 0, 0, width, height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const imageData = canvas.toDataURL("image/png");
+    selfiePreview.src = imageData;
+    selfiePreview.style.display = "block";
+    selfieData.value = imageData;
+
+    cameraStatus.textContent = "Selfie captured successfully.";
+    cameraStatus.className = "status ok";
+  }
+
+  function retakeSelfie() {
+    selfiePreview.src = "";
+    selfiePreview.style.display = "none";
+    selfieData.value = "";
+    cameraStatus.textContent = "Ready to take a new selfie.";
+    cameraStatus.className = "status";
+  }
+
+  startCameraBtn.addEventListener("click", startFrontCamera);
+  takePhotoBtn.addEventListener("click", takeSelfie);
+  retakeBtn.addEventListener("click", retakeSelfie);
+
+  staffForm.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    if (!validateStep(4)) return;
+
+    if (!selfieData.value) {
+      cameraStatus.textContent = "Please take a staff selfie before submitting the form.";
+      cameraStatus.className = "status error";
+      return;
+    }
+
+    const selectedPositions = Array.from(
+      document.querySelectorAll('input[name="position"]:checked')
+    ).map(item => item.value);
+
+    const payload = {
+      firstName: document.getElementById("firstName").value.trim(),
+      lastName: document.getElementById("lastName").value.trim(),
+      dob: document.getElementById("dob").value,
+      mobile: document.getElementById("mobile").value.trim(),
+      email: document.getElementById("email").value.trim().toLowerCase(),
+      postcode: document.getElementById("postcode").value.trim(),
+      address: document.getElementById("address").value.trim(),
+      niNumber: document.getElementById("niNumber").value.trim(),
+      experience: Number(document.getElementById("experience").value || 0),
+      availability: document.getElementById("availability").value,
+      positions: selectedPositions,
+      emergencyContact: {
+        name: document.getElementById("emergencyName").value.trim(),
+        phone: document.getElementById("emergencyPhone").value.trim()
+      },
+      selfieData: document.getElementById("selfieData").value
+    };
+
+    try {
+      const res = await fetch("http://localhost:5000/api/staff/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        cameraStatus.textContent = data.message || "Failed to create staff account.";
+        cameraStatus.className = "status error";
+        return;
+      }
+
+      cameraStatus.textContent = data.message || "Staff account created successfully.";
+      cameraStatus.className = "status ok";
+
+      alert(data.message || "Staff account created successfully.");
+
+      staffForm.reset();
+      selfiePreview.src = "";
+      selfiePreview.style.display = "none";
+      selfieData.value = "";
+      currentStep = 1;
+      showStep(currentStep);
+
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+        camera.srcObject = null;
+      }
+
+      cameraStatus.textContent = "Camera is not active yet.";
+      cameraStatus.className = "status";
+
+    } catch (error) {
+      console.error(error);
+      cameraStatus.textContent = "Server connection failed.";
+      cameraStatus.className = "status error";
+    }
+  });
+
+  window.addEventListener("beforeunload", () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+    }
+  });
+
+  showStep(currentStep);
+</script>
+
+</body>
+</html>

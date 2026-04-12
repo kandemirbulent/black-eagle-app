@@ -484,25 +484,45 @@
 
   <script>
     let appId = new URLSearchParams(window.location.search).get("appId");
-    if (!appId || appId === "null") {
+    if (!appId || appId === "null" || appId === "undefined") {
       appId = localStorage.getItem("appId");
+    }
+
+    const storedCustomerRaw = localStorage.getItem("customer");
+    let customer = null;
+
+    try {
+      customer = storedCustomerRaw ? JSON.parse(storedCustomerRaw) : null;
+    } catch (e) {
+      customer = null;
+    }
+
+    const customerEmail =
+      (customer && customer.email) ||
+      localStorage.getItem("customerEmail") ||
+      "";
+
+    if (appId) {
+      localStorage.setItem("appId", appId);
     }
 
     document.getElementById("welcome").textContent =
       "Welcome, your Application ID: " + (appId || "Unknown");
 
     let currentOrders = [];
+    let isCheckoutStarting = false;
 
     function formatMoney(value) {
-      return "£" + Number(value || 0).toFixed(2);
+      const num = Number(value || 0);
+      return "£" + num.toFixed(2);
     }
 
     function getOrderTotal(order) {
-      return Number(order.totalWithVat || order.totalAmount || 0);
+      return Number(order?.totalWithVat || order?.totalAmount || 0);
     }
 
     function getOrderPaid(order) {
-      return Number(order.amountPaid || 0);
+      return Number(order?.amountPaid || 0);
     }
 
     function getOrderRemaining(order) {
@@ -510,12 +530,14 @@
     }
 
     function getDaysLeft(order) {
-      if (!order.eventDate) return null;
+      if (!order || !order.eventDate) return null;
 
       const now = new Date();
       const todayObj = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
       const eventDateObj = new Date(order.eventDate);
+      if (Number.isNaN(eventDateObj.getTime())) return null;
+
       eventDateObj.setHours(0, 0, 0, 0);
 
       const msPerDay = 1000 * 60 * 60 * 24;
@@ -621,9 +643,7 @@
       const paySelectedBtn = document.getElementById("paySelectedBtn");
       const payAllBtn = document.getElementById("payAllBtn");
 
-      const anySelectable = currentOrders.some(order => {
-        return getOrderRemaining(order) > 0;
-      });
+      const anySelectable = currentOrders.some(order => getOrderRemaining(order) > 0);
 
       if (!anySelectable || remainingBalance <= 0) {
         paySelectedBtn.disabled = true;
@@ -636,6 +656,15 @@
       }
     }
 
+    function setCheckoutButtonsDisabled(disabled) {
+      document.getElementById("paySelectedBtn").disabled = disabled;
+      document.getElementById("payAllBtn").disabled = disabled;
+
+      document.querySelectorAll("button[data-pay-single='true']").forEach(btn => {
+        btn.disabled = disabled;
+      });
+    }
+
     function closeDueWarning() {
       document.getElementById("dueWarningModal").style.display = "none";
     }
@@ -644,7 +673,6 @@
       const urgentOrders = orders.filter(order => {
         const remaining = getOrderRemaining(order);
         const daysLeft = getDaysLeft(order);
-
         return daysLeft !== null && daysLeft >= 0 && daysLeft <= 3 && remaining > 0;
       });
 
@@ -668,14 +696,29 @@
     }
 
     async function loadOrders() {
-      try {
-        const res = await fetch(`/get-customer-orders/${appId}`);
-        const orders = await res.json();
+      const tbody = document.getElementById("orderTable");
 
-        const tbody = document.getElementById("orderTable");
+      if (!appId) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="13" style="text-align:center; color:red;">
+              Missing customer application ID. Please log in again.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      try {
+        const res = await fetch(`/get-customer-orders/${encodeURIComponent(appId)}`);
+        if (!res.ok) {
+          throw new Error("Failed to load customer orders");
+        }
+
+        const orders = await res.json();
         tbody.innerHTML = "";
 
-        if (!orders || !orders.length) {
+        if (!Array.isArray(orders) || !orders.length) {
           currentOrders = [];
 
           tbody.innerHTML = `
@@ -730,13 +773,13 @@
           const feedbackButton = order.feedbackGiven
             ? `<button class="action" disabled>Submitted</button>`
             : canGiveFeedback(order)
-              ? `<button class="action" onclick="openFeedback('${order._id}')">Give Feedback</button>`
+              ? `<button class="action" onclick="openFeedback('${order._id || ""}')">Give Feedback</button>`
               : `<button class="action" disabled title="Feedback will be available after the event date">Available After Event</button>`;
 
           const tr = document.createElement("tr");
           tr.innerHTML = `
             <td>
-              ${remaining > 0
+              ${remaining > 0 && order.orderId
                 ? `<input type="checkbox" class="orderSelect" value="${order.orderId}" data-remaining="${remaining.toFixed(2)}">`
                 : ""}
             </td>
@@ -765,8 +808,8 @@
             </td>
             <td>${feedbackButton}</td>
             <td>
-              ${remaining > 0
-                ? `<button class="action" onclick="paySingleOrder('${order.orderId}')">Pay This Event</button>`
+              ${remaining > 0 && order.orderId
+                ? `<button class="action" data-pay-single="true" onclick="paySingleOrder('${order.orderId}')">Pay This Event</button>`
                 : `<button class="action" disabled>Paid</button>`}
             </td>
           `;
@@ -779,10 +822,9 @@
 
         updateSelectionInfo();
         checkUpcomingPaymentWarnings(orders);
-
       } catch (err) {
         console.error("Error loading orders:", err);
-        document.getElementById("orderTable").innerHTML = `
+        tbody.innerHTML = `
           <tr>
             <td colspan="13" style="text-align:center; color:red;">Error loading orders</td>
           </tr>
@@ -791,13 +833,29 @@
     }
 
     async function startCheckout(payload) {
+      if (!appId) {
+        alert("Missing application ID. Please log in again.");
+        return;
+      }
+
+      if (isCheckoutStarting) return;
+
       try {
-        console.log("Sending checkout payload:", payload);
+        isCheckoutStarting = true;
+        setCheckoutButtonsDisabled(true);
+
+        const finalPayload = {
+          ...payload,
+          appId,
+          email: customerEmail || undefined
+        };
+
+        console.log("Sending checkout payload:", finalPayload);
 
         const response = await fetch("/create-checkout-session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(finalPayload),
         });
 
         const data = await response.json();
@@ -809,25 +867,35 @@
 
         if (data.url) {
           window.location.href = data.url;
-        } else {
-          alert("Payment session could not be started. Please try again.");
+          return;
         }
+
+        throw new Error("Payment session could not be started.");
       } catch (err) {
         console.error("❌ Payment error:", err);
         alert(err.message || "An error occurred while starting the payment.");
+        isCheckoutStarting = false;
+        setCheckoutButtonsDisabled(false);
+        updatePayButtons(currentOrders.reduce((sum, o) => sum + getOrderRemaining(o), 0));
       }
     }
 
     function paySingleOrder(orderId) {
+      if (!orderId) {
+        alert("Invalid order ID.");
+        return;
+      }
+
       startCheckout({
         mode: "single",
-        orderIds: [orderId],
-        appId
+        orderIds: [orderId]
       });
     }
 
     document.getElementById("paySelectedBtn").addEventListener("click", () => {
-      const selectedOrderIds = [...document.querySelectorAll(".orderSelect:checked")].map(cb => cb.value);
+      const selectedOrderIds = [...document.querySelectorAll(".orderSelect:checked")]
+        .map(cb => cb.value)
+        .filter(Boolean);
 
       if (!selectedOrderIds.length) {
         alert("Please select at least one event to pay.");
@@ -836,14 +904,13 @@
 
       startCheckout({
         mode: "selected",
-        orderIds: selectedOrderIds,
-        appId
+        orderIds: selectedOrderIds
       });
     });
 
     document.getElementById("payAllBtn").addEventListener("click", () => {
       const payableOrderIds = currentOrders
-        .filter(order => getOrderRemaining(order) > 0)
+        .filter(order => getOrderRemaining(order) > 0 && order.orderId)
         .map(order => order.orderId);
 
       if (!payableOrderIds.length) {
@@ -853,8 +920,7 @@
 
       startCheckout({
         mode: "all",
-        orderIds: payableOrderIds,
-        appId
+        orderIds: payableOrderIds
       });
     });
 
@@ -903,10 +969,15 @@
     }
 
     function logout() {
+      localStorage.removeItem("appId");
       window.location.href = "/Customer-logins/customer-login.html";
     }
 
     function newOrder() {
+      if (!appId) {
+        alert("Missing application ID. Please log in again.");
+        return;
+      }
       window.location.href = `/Customer-logins/create-order.html?appId=${encodeURIComponent(appId)}`;
     }
 

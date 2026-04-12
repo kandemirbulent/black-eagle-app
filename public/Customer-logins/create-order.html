@@ -214,10 +214,50 @@
     <label for="service">Service Type</label>
     <select id="service" name="service">
       <option value="">-- Select Service --</option>
-      <option value="Bartender">Bartender</option>
-      <option value="Waiter">Waiter</option>
-      <option value="Barback">Barback</option>
-      <option value="Chef">Chef</option>
+
+      <!-- Existing -->
+      <option value="Bartender">Bartender — £27/hr</option>
+      <option value="Waiter">Waiter — £18/hr</option>
+      <option value="Barback">Barback — £18/hr</option>
+      <option value="Chef">Chef — £30/hr</option>
+
+      <!-- Hospitality -->
+      <option value="Kitchen Assistant">Kitchen Assistant — £19/hr</option>
+      <option value="Event Staff">Event Staff — £20/hr</option>
+
+      <!-- Cleaning -->
+      <option value="House Cleaning">House Cleaning — £19/hr</option>
+      <option value="Office Cleaning">Office Cleaning — £20/hr</option>
+      <option value="Deep Cleaning">Deep Cleaning — £24/hr</option>
+      <option value="End of Tenancy Cleaning">End of Tenancy Cleaning — £26/hr</option>
+      <option value="Window Cleaner">Window Cleaner — £25/hr</option>
+
+      <!-- Security -->
+      <option value="Security">Security — £24/hr</option>
+      <option value="Door Supervisor">Door Supervisor — £26/hr</option>
+      <option value="Event Security">Event Security — £25/hr</option>
+
+      <!-- Construction / Trade -->
+      <option value="Construction Worker">Construction Worker — £28/hr</option>
+      <option value="General Labourer">General Labourer — £25/hr</option>
+      <option value="Handyman">Handyman — £35/hr</option>
+      <option value="Painter">Painter — £30/hr</option>
+      <option value="Electrician">Electrician — £42/hr</option>
+      <option value="Plumber">Plumber — £42/hr</option>
+
+      <!-- Logistics -->
+      <option value="Delivery Driver">Delivery Driver — £20/hr</option>
+      <option value="Warehouse Staff">Warehouse Staff — £19/hr</option>
+      <option value="Picker/Packer">Picker/Packer — £18/hr</option>
+
+      <!-- Care / Support -->
+      <option value="Care Assistant">Care Assistant — £22/hr</option>
+      <option value="Support Worker">Support Worker — £23/hr</option>
+
+      <!-- Office -->
+      <option value="Admin Assistant">Admin Assistant — £21/hr</option>
+      <option value="Receptionist">Receptionist — £20/hr</option>
+      <option value="Customer Service">Customer Service — £20/hr</option>
     </select>
 
     <label for="quantity">Number of Staff</label>
@@ -332,10 +372,41 @@
     const depositAmountEl = document.getElementById('depositAmount');
 
     const hourlyRates = {
-      "Bartender": 25,
-      "Waiter": 17,
-      "Barback": 17,
-      "Chef": 28
+      "Bartender": 27,
+      "Waiter": 18,
+      "Barback": 18,
+      "Chef": 30,
+
+      "Kitchen Assistant": 19,
+      "Event Staff": 20,
+
+      "House Cleaning": 19,
+      "Office Cleaning": 20,
+      "Deep Cleaning": 24,
+      "End of Tenancy Cleaning": 26,
+      "Window Cleaner": 25,
+
+      "Security": 24,
+      "Door Supervisor": 26,
+      "Event Security": 25,
+
+      "Construction Worker": 28,
+      "General Labourer": 25,
+      "Handyman": 35,
+      "Painter": 30,
+      "Electrician": 42,
+      "Plumber": 42,
+
+      "Delivery Driver": 20,
+      "Warehouse Staff": 19,
+      "Picker/Packer": 18,
+
+      "Care Assistant": 22,
+      "Support Worker": 23,
+
+      "Admin Assistant": 21,
+      "Receptionist": 20,
+      "Customer Service": 20
     };
 
     const VAT_RATE = 0.20;

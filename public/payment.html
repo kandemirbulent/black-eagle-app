@@ -26,6 +26,7 @@
       margin-top: 40px;
       border-top: 6px solid #000;
       border: 1px solid #ddd;
+      box-sizing: border-box;
     }
 
     h1 {
@@ -204,7 +205,7 @@
     </div>
 
     <div class="warning">
-      The subtotal is shown before VAT. The total amount includes VAT.  
+      The subtotal is shown before VAT. The total amount includes VAT.
       Your deposit payment today is 33% of the total including VAT.
     </div>
 
@@ -237,14 +238,11 @@
     </p>
   </div>
 
-  <script src="https://js.stripe.com/v3/"></script>
   <script>
-    const stripe = Stripe("pk_test_51TCJh2KH345suikctBTxvgCKuCUtF7RkTEsQUDwIVBR6n274hlbF5iCy9XsBEoUWGWPso7biVMRYrIMkl0ynoPcR00VNu8zFjI");
-
     const urlParams = new URLSearchParams(window.location.search);
 
     let appId = urlParams.get("appId");
-    if (!appId || appId === "null") {
+    if (!appId || appId === "null" || appId === "undefined") {
       appId = localStorage.getItem("appId");
     }
 
@@ -254,7 +252,28 @@
     const deposit = parseFloat(urlParams.get("minimum") || "0");
 
     const pendingOrderDraft = sessionStorage.getItem("pendingOrderDraft");
-    const draftOrder = pendingOrderDraft ? JSON.parse(pendingOrderDraft) : null;
+    let draftOrder = null;
+
+    try {
+      draftOrder = pendingOrderDraft ? JSON.parse(pendingOrderDraft) : null;
+    } catch (err) {
+      draftOrder = null;
+    }
+
+    const storedCustomerRaw = localStorage.getItem("customer");
+    let customer = null;
+
+    try {
+      customer = storedCustomerRaw ? JSON.parse(storedCustomerRaw) : null;
+    } catch (e) {
+      customer = null;
+    }
+
+    const customerEmail =
+      (draftOrder && draftOrder.email) ||
+      (customer && customer.email) ||
+      localStorage.getItem("customerEmail") ||
+      "";
 
     if (appId) {
       localStorage.setItem("appId", appId);
@@ -268,9 +287,10 @@
 
     const agreeTerms = document.getElementById("agreeTerms");
     const payButton = document.getElementById("payButton");
+    let isStartingPayment = false;
 
     agreeTerms.addEventListener("change", () => {
-      payButton.disabled = !agreeTerms.checked;
+      payButton.disabled = !agreeTerms.checked || isStartingPayment;
     });
 
     document.getElementById("backToOrderBtn").addEventListener("click", () => {
@@ -285,8 +305,15 @@
     });
 
     payButton.addEventListener("click", async () => {
+      if (isStartingPayment) return;
+
       if (!agreeTerms.checked) {
         alert("Please accept the Terms & Conditions before proceeding.");
+        return;
+      }
+
+      if (!appId) {
+        alert("Missing application ID. Please log in again.");
         return;
       }
 
@@ -301,15 +328,28 @@
       }
 
       try {
+        isStartingPayment = true;
+        payButton.disabled = true;
+
+        const safeOrderId =
+          draftOrder.orderId ||
+          ("Deposit-" + Date.now() + "-" + Math.floor(1000 + Math.random() * 9000));
+
         const payload = {
           appId,
+          email: customerEmail || undefined,
           totalAmount: Number(deposit.toFixed(2)),
           subtotalAmount: Number(subtotal.toFixed(2)),
           vatAmount: Number(vat.toFixed(2)),
           fullTotalAmount: Number(total.toFixed(2)),
           paymentType: "deposit",
-          orderId: "Deposit-" + Math.floor(Math.random() * 100000),
-          orderDraft: draftOrder
+          orderId: safeOrderId,
+          orderDraft: {
+            ...draftOrder,
+            orderId: safeOrderId,
+            customerApplicationId: draftOrder.customerApplicationId || appId,
+            email: draftOrder.email || customerEmail || ""
+          }
         };
 
         console.log("Sending payment payload:", payload);
@@ -329,12 +369,15 @@
 
         if (data.url) {
           window.location.href = data.url;
-        } else {
-          throw new Error("No Stripe checkout URL returned.");
+          return;
         }
+
+        throw new Error("No Stripe checkout URL returned.");
       } catch (err) {
         console.error("❌ Payment error:", err);
         alert(err.message || "There was a problem starting the payment. Please try again.");
+        isStartingPayment = false;
+        payButton.disabled = !agreeTerms.checked;
       }
     });
   </script>

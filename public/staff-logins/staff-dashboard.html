@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff Dashboard | Black Eagle</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      display: flex;
+      min-height: 100vh;
+      background: #f4f6f8;
+      color: #111;
+    }
+
+    .sidebar {
+      width: 250px;
+      background: #111;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      padding-top: 20px;
+    }
+
+    .sidebar h2 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 22px;
+      letter-spacing: 1px;
+      color: #fbc531;
+    }
+
+    .sidebar a {
+      color: #ccc;
+      text-decoration: none;
+      padding: 15px 20px;
+      display: block;
+      transition: 0.25s;
+      font-size: 15px;
+    }
+
+    .sidebar a:hover,
+    .sidebar a.active {
+      background: #fbc531;
+      color: #111;
+    }
+
+    .main {
+      flex: 1;
+      padding: 25px 35px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      gap: 20px;
+    }
+
+    .topbar-left h1 {
+      font-size: 28px;
+      margin-bottom: 6px;
+      color: #222;
+    }
+
+    .topbar-left p {
+      color: #666;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .role-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      background: #111;
+      color: #fff;
+      border-radius: 20px;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      margin-top: 8px;
+    }
+
+    .dashboard-logo {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 3px solid #111;
+      background: #fff;
+    }
+
+    .alert-strip {
+      margin-bottom: 20px;
+    }
+
+    .alert-box {
+      border: 1px solid #f5c2c7;
+      background: #fff5f5;
+      color: #842029;
+      border-radius: 12px;
+      padding: 14px;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .ok-box {
+      border: 1px solid #b7ebc6;
+      background: #f0fff4;
+      color: #155724;
+      border-radius: 12px;
+      padding: 14px;
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 18px;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      transition: 0.25s;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+    }
+
+    .card h3 {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 10px;
+    }
+
+    .card p {
+      font-size: 24px;
+      font-weight: 700;
+      color: #111;
+    }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      background: #e9ecef;
+      color: #333;
+      transition: 0.2s;
+    }
+
+    .tab-btn.active {
+      background: #111;
+      color: #fff;
+    }
+
+    .panel {
+      display: none;
+      background: #fff;
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .panel h2 {
+      margin-bottom: 10px;
+      font-size: 21px;
+      color: #222;
+    }
+
+    .section-note {
+      color: #666;
+      font-size: 13px;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    .mini-card {
+      border: 1px solid #eee;
+      background: #fafafa;
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .mini-card h4 {
+      margin-bottom: 8px;
+      font-size: 15px;
+      color: #111;
+    }
+
+    .mini-card p {
+      margin: 4px 0;
+      font-size: 13px;
+      color: #555;
+      line-height: 1.45;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      min-width: 1000px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+      vertical-align: middle;
+    }
+
+    th {
+      background: #fbc531;
+      color: #111;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    tr:hover {
+      background: #fafafa;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .badge-approved {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .badge-rejected {
+      background: #ffd6d6;
+      color: #8a1c1c;
+    }
+
+    .badge-upcoming {
+      background: #d6f5d6;
+      color: #155724;
+    }
+
+    .badge-history {
+      background: #e2e8f0;
+      color: #334155;
+    }
+
+    .badge-paid {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .badge-pay-pending {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .badge-estimated {
+      background: #e7f1ff;
+      color: #0b4f8a;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: 0.2s;
+      margin-right: 6px;
+      margin-bottom: 4px;
+    }
+
+    .btn:hover {
+      opacity: 0.92;
+    }
+
+    .btn-primary {
+      background: #111;
+      color: #fff;
+    }
+
+    .btn-apply {
+      background: #111;
+      color: #fff;
+    }
+
+    .btn-disabled {
+      background: #ccc;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    .btn-view {
+      background: #3498db;
+      color: #fff;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #666;
+      padding: 18px;
+      font-size: 14px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+
+    .modal-content {
+      background: #fff;
+      width: 100%;
+      max-width: 950px;
+      border-radius: 14px;
+      padding: 24px;
+      position: relative;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    }
+
+    .close-btn {
+      position: absolute;
+      right: 14px;
+      top: 12px;
+      border: none;
+      background: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #666;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin: 18px 0;
+    }
+
+    .detail-card {
+      background: #f9fafb;
+      border: 1px solid #ececec;
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    .detail-card h4 {
+      margin-bottom: 8px;
+      color: #555;
+      font-size: 14px;
+    }
+
+    .detail-card p {
+      margin: 0;
+      color: #111;
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    .detail-notes {
+      background: #fffdf5;
+      border: 1px solid #f5e8a3;
+      border-radius: 10px;
+      padding: 14px;
+      margin-top: 16px;
+    }
+
+    .detail-notes h4 {
+      margin-bottom: 8px;
+      color: #8a5800;
+    }
+
+    .detail-notes p {
+      color: #5c4b00;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    @media (max-width: 980px) {
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .mini-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>🦅 Black Eagle</h2>
+    <a href="#" class="active" onclick="switchTab('dashboard')">Dashboard</a>
+    <a href="#" onclick="switchTab('available')">Available Events</a>
+    <a href="#" onclick="switchTab('applications')">My Applications</a>
+    <a href="#" onclick="switchTab('events')">My Events</a>
+    <a href="#" onclick="switchTab('reports')">Reports</a>
+    <a href="#" onclick="switchTab('earnings')">Earnings</a>
+    <a href="#" onclick="logout()">Logout</a>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <h1 id="welcomeText">Welcome back</h1>
+        <p>Your event applications, approved shifts, history, and earnings are all here.</p>
+        <span class="role-badge">STAFF DASHBOARD</span>
+      </div>
+
+      <div class="topbar-right">
+        <img src="/img/blackeaglelogo.png" class="dashboard-logo" alt="Black Eagle Logo">
+      </div>
+    </div>
+
+    <div id="alertStrip" class="alert-strip"></div>
+
+    <div class="stats">
+      <div class="card">
+        <h3>Available Events</h3>
+        <p id="statAvailable">0</p>
+      </div>
+      <div class="card">
+        <h3>Pending Review</h3>
+        <p id="statPending">0</p>
+      </div>
+      <div class="card">
+        <h3>Approved Upcoming</h3>
+        <p id="statApproved">0</p>
+      </div>
+      <div class="card">
+        <h3>Estimated Earnings</h3>
+        <p id="statEstimated">£0.00</p>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">Dashboard</button>
+      <button class="tab-btn" data-tab="available" onclick="switchTab('available')">Available Events</button>
+      <button class="tab-btn" data-tab="applications" onclick="switchTab('applications')">My Applications</button>
+      <button class="tab-btn" data-tab="events" onclick="switchTab('events')">My Events</button>
+      <button class="tab-btn" data-tab="reports" onclick="switchTab('reports')">Reports</button>
+      <button class="tab-btn" data-tab="earnings" onclick="switchTab('earnings')">Earnings</button>
+    </div>
+
+    <div id="dashboard" class="panel active">
+      <h2>Quick Overview</h2>
+      <p class="section-note">Your pending reviews, upcoming approved shifts, and recent activity at a glance.</p>
+      <div id="dashboardCards" class="mini-grid"></div>
+    </div>
+
+    <div id="available" class="panel">
+      <h2>Available Events</h2>
+      <p class="section-note">These are customer-created events open for staff applications. Applying does not mean automatic approval.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Event Date</th>
+              <th>Event</th>
+              <th>Company</th>
+              <th>Role</th>
+              <th>Location</th>
+              <th>Time</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="availableTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="applications" class="panel">
+      <h2>My Applications</h2>
+      <p class="section-note">Track all your applications. Pending is yellow, approved is green, and not approved is red.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Event Date</th>
+              <th>Event</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Detail Access</th>
+            </tr>
+          </thead>
+          <tbody id="applicationsTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="events" class="panel">
+      <h2>My Approved Events</h2>
+      <p class="section-note">These are the shifts you were approved for and can fully view.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Event Date</th>
+              <th>Event</th>
+              <th>Company</th>
+              <th>Role</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="myEventsTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="reports" class="panel">
+      <h2>Reports / History</h2>
+      <p class="section-note">See what you worked, what was not approved, and your completed event history.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Event Date</th>
+              <th>Event</th>
+              <th>Role</th>
+              <th>Result</th>
+              <th>Type</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="reportsTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="earnings" class="panel">
+      <h2>Earnings / Payments</h2>
+      <p class="section-note">Track estimated earnings, pending payroll, and paid events.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Event Date</th>
+              <th>Event</th>
+              <th>Role</th>
+              <th>Amount</th>
+              <th>Payment Status</th>
+            </tr>
+          </thead>
+          <tbody id="earningsTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="eventModal" class="modal">
+    <div class="modal-content">
+      <button class="close-btn" onclick="closeModal()">✖</button>
+      <h2 id="modalTitle">Event Details</h2>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script>
+    let staffName = localStorage.getItem("staffName") || "Team Member";
+
+    // MOCK DATA - sonraki aşamada DB bağlanacak
+    let availableEvents = [
+      {
+        _id: "A1",
+        eventName: "Luxury Wedding Bar Service",
+        companyName: "White Orchid Events",
+        role: "Bartender",
+        location: "Chelsea Harbour Hotel, London",
+        eventDate: "2026-04-10",
+        startTime: "16:00",
+        endTime: "23:00",
+        notes: "Premium cocktail menu. Arrive 30 minutes early.",
+        dressCode: "Black shirt, black trousers, polished shoes",
+        supervisor: "James Walker",
+        rate: 120,
+        applicationStatus: null
+      },
+      {
+        _id: "A2",
+        eventName: "Corporate Drinks Reception",
+        companyName: "Northpoint Capital",
+        role: "Waiter",
+        location: "Canary Wharf, London",
+        eventDate: "2026-04-11",
+        startTime: "17:30",
+        endTime: "22:00",
+        notes: "Tray service and guest greeting.",
+        dressCode: "White shirt, black tie, black trousers",
+        supervisor: "Sarah Lee",
+        rate: 95,
+        applicationStatus: "Pending Review"
+      },
+      {
+        _id: "A3",
+        eventName: "Private Garden Party",
+        companyName: "Private Client",
+        role: "Barback",
+        location: "Richmond, London",
+        eventDate: "2026-04-12",
+        startTime: "14:00",
+        endTime: "21:00",
+        notes: "Outdoor setup, loading support required.",
+        dressCode: "Black polo and black trousers",
+        supervisor: "Michael Brown",
+        rate: 90,
+        applicationStatus: "Not Approved"
+      },
+      {
+        _id: "A4",
+        eventName: "Luxury Brand Launch",
+        companyName: "Veloura",
+        role: "Bartender",
+        location: "Central London",
+        eventDate: "2026-04-14",
+        startTime: "15:00",
+        endTime: "22:30",
+        notes: "Champagne welcome service and cocktails.",
+        dressCode: "All black formal",
+        supervisor: "James Walker",
+        rate: 135,
+        applicationStatus: "Approved"
+      }
+    ];
+
+    let completedEvents = [
+      {
+        _id: "H1",
+        eventName: "Corporate Dinner",
+        companyName: "Atlas Group",
+        role: "Waiter",
+        location: "London Bridge",
+        eventDate: "2026-04-02",
+        startTime: "18:00",
+        endTime: "23:00",
+        notes: "Completed successfully.",
+        dressCode: "White shirt, black tie",
+        supervisor: "Sarah Lee",
+        rate: 100,
+        applicationStatus: "Approved",
+        workStatus: "Completed",
+        paymentStatus: "Paid"
+      },
+      {
+        _id: "H2",
+        eventName: "Rooftop Summer Launch",
+        companyName: "Bloom Social",
+        role: "Bartender",
+        location: "Shoreditch",
+        eventDate: "2026-03-28",
+        startTime: "16:00",
+        endTime: "23:30",
+        notes: "Completed successfully.",
+        dressCode: "All black",
+        supervisor: "James Walker",
+        rate: 130,
+        applicationStatus: "Approved",
+        workStatus: "Completed",
+        paymentStatus: "Pending Payment"
+      }
+    ];
+
+    function formatMoney(value) {
+      return "£" + Number(value || 0).toFixed(2);
+    }
+
+    function formatDate(dateValue) {
+      if (!dateValue) return "N/A";
+      const d = new Date(dateValue);
+      if (isNaN(d.getTime())) return "N/A";
+      return d.toLocaleDateString();
+    }
+
+    function getDaysLeft(dateValue) {
+      if (!dateValue) return null;
+
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      const eventDate = new Date(dateValue);
+      if (isNaN(eventDate.getTime())) return null;
+
+      eventDate.setHours(0, 0, 0, 0);
+      return Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+    function getStatusBadge(status) {
+      const value = (status || "").toLowerCase();
+
+      if (value.includes("approved")) return `<span class="badge badge-approved">Approved</span>`;
+      if (value.includes("pending")) return `<span class="badge badge-pending">Pending Review</span>`;
+      if (value.includes("not approved") || value.includes("rejected")) return `<span class="badge badge-rejected">Not Approved</span>`;
+      if (value.includes("upcoming")) return `<span class="badge badge-upcoming">Upcoming</span>`;
+      return `<span class="badge badge-history">${status || "N/A"}</span>`;
+    }
+
+    function getPaymentBadge(status) {
+      const value = (status || "").toLowerCase();
+
+      if (value.includes("paid")) return `<span class="badge badge-paid">Paid</span>`;
+      if (value.includes("pending")) return `<span class="badge badge-pay-pending">Pending Payment</span>`;
+      return `<span class="badge badge-estimated">Estimated</span>`;
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll(".panel").forEach(panel => panel.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+
+      const panel = document.getElementById(tabName);
+      if (panel) panel.classList.add("active");
+
+      const btn = document.querySelector(`.tab-btn[data-tab="${tabName}"]`);
+      if (btn) btn.classList.add("active");
+    }
+
+    function openDetails(eventId) {
+      const all = [...availableEvents, ...completedEvents];
+      const event = all.find(e => e._id === eventId);
+      if (!event) return;
+
+      // Not approved eventlerde detay yok
+      if (event.applicationStatus === "Not Approved") {
+        alert("This event was not approved for you. Only the event name is visible.");
+        return;
+      }
+
+      document.getElementById("modalTitle").textContent = event.eventName || "Event Details";
+      document.getElementById("modalBody").innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-card">
+            <h4>Company</h4>
+            <p>${event.companyName || "N/A"}</p>
+          </div>
+          <div class="detail-card">
+            <h4>Role</h4>
+            <p>${event.role || "N/A"}</p>
+          </div>
+          <div class="detail-card">
+            <h4>Event Date</h4>
+            <p>${formatDate(event.eventDate)}</p>
+          </div>
+          <div class="detail-card">
+            <h4>Shift Time</h4>
+            <p>${event.startTime || "-"} - ${event.endTime || "-"}</p>
+          </div>
+          <div class="detail-card">
+            <h4>Location</h4>
+            <p>${event.location || "N/A"}</p>
+          </div>
+          <div class="detail-card">
+            <h4>Supervisor</h4>
+            <p>${event.supervisor || "N/A"}</p>
+          </div>
+          <div class="detail-card">
+            <h4>Application Status</h4>
+            <p>${event.applicationStatus || "Available to Apply"}</p>
+          </div>
+          <div class="detail-card">
+            <h4>Estimated Rate</h4>
+            <p>${formatMoney(event.rate || 0)}</p>
+          </div>
+          <div class="detail-card">
+            <h4>Dress Code</h4>
+            <p>${event.dressCode || "Standard Uniform"}</p>
+          </div>
+        </div>
+
+        <div class="detail-notes">
+          <h4>Special Notes</h4>
+          <p>${event.notes || "No special notes for this event."}</p>
+        </div>
+      `;
+
+      document.getElementById("eventModal").style.display = "flex";
+    }
+
+    function closeModal() {
+      document.getElementById("eventModal").style.display = "none";
+    }
+
+    function applyForEvent(eventId) {
+      const target = availableEvents.find(e => e._id === eventId);
+      if (!target) return;
+
+      if (target.applicationStatus) {
+        alert("You have already applied or received a decision for this event.");
+        return;
+      }
+
+      target.applicationStatus = "Pending Review";
+      renderAll();
+      alert("✅ Application submitted. Status is now Pending Review.");
+    }
+
+    function renderAlertStrip() {
+      const strip = document.getElementById("alertStrip");
+
+      const pendingCount = availableEvents.filter(e => e.applicationStatus === "Pending Review").length;
+      const approvedUpcoming = availableEvents.filter(e => e.applicationStatus === "Approved").length;
+
+      if (pendingCount || approvedUpcoming) {
+        strip.innerHTML = `
+          <div class="alert-box">
+            <strong>Heads up:</strong>
+            ${pendingCount ? `${pendingCount} application(s) are still pending review. ` : ""}
+            ${approvedUpcoming ? `${approvedUpcoming} upcoming approved event(s) are waiting for you.` : ""}
+          </div>
+        `;
+      } else {
+        strip.innerHTML = `
+          <div class="ok-box">
+            ✅ No urgent application updates right now.
+          </div>
+        `;
+      }
+    }
+
+    function renderStats() {
+      const availableCount = availableEvents.filter(e => !e.applicationStatus).length;
+      const pendingCount = availableEvents.filter(e => e.applicationStatus === "Pending Review").length;
+      const approvedCount = availableEvents.filter(e => e.applicationStatus === "Approved").length;
+
+      const estimated = availableEvents
+        .filter(e => e.applicationStatus === "Approved")
+        .reduce((sum, e) => sum + Number(e.rate || 0), 0);
+
+      document.getElementById("statAvailable").textContent = availableCount;
+      document.getElementById("statPending").textContent = pendingCount;
+      document.getElementById("statApproved").textContent = approvedCount;
+      document.getElementById("statEstimated").textContent = formatMoney(estimated);
+    }
+
+    function renderDashboard() {
+      const dashboardCards = document.getElementById("dashboardCards");
+
+      const pending = availableEvents.filter(e => e.applicationStatus === "Pending Review");
+      const approved = availableEvents.filter(e => e.applicationStatus === "Approved");
+      const upcomingApproved = approved
+        .sort((a, b) => new Date(a.eventDate) - new Date(b.eventDate))
+        .slice(0, 3);
+
+      const completed = completedEvents
+        .filter(e => e.workStatus === "Completed")
+        .sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate))
+        .slice(0, 2);
+
+      let html = "";
+
+      pending.forEach(event => {
+        html += `
+          <div class="mini-card">
+            <h4>🟡 Pending Review</h4>
+            <p><strong>${event.eventName}</strong></p>
+            <p>${formatDate(event.eventDate)} • ${event.role}</p>
+            <p>${event.companyName}</p>
+          </div>
+        `;
+      });
+
+      upcomingApproved.forEach(event => {
+        html += `
+          <div class="mini-card">
+            <h4>🟢 Approved Upcoming</h4>
+            <p><strong>${event.eventName}</strong></p>
+            <p>${formatDate(event.eventDate)} • ${event.role}</p>
+            <p>${event.location}</p>
+          </div>
+        `;
+      });
+
+      completed.forEach(event => {
+        html += `
+          <div class="mini-card">
+            <h4>📋 Recent Completed</h4>
+            <p><strong>${event.eventName}</strong></p>
+            <p>${formatDate(event.eventDate)} • ${event.role}</p>
+            <p>Payment: ${event.paymentStatus}</p>
+          </div>
+        `;
+      });
+
+      if (!html) {
+        html = `<div class="empty-state">No activity to show right now.</div>`;
+      }
+
+      dashboardCards.innerHTML = html;
+    }
+
+    function renderAvailableEvents() {
+      const tbody = document.getElementById("availableTable");
+
+      const rows = availableEvents.filter(e => !e.applicationStatus);
+
+      if (!rows.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" class="empty-state">No open events available right now.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(event => `
+        <tr>
+          <td>${formatDate(event.eventDate)}</td>
+          <td>${event.eventName}</td>
+          <td>${event.companyName}</td>
+          <td>${event.role}</td>
+          <td>${event.location}</td>
+          <td>${event.startTime} - ${event.endTime}</td>
+          <td><span class="badge badge-history">Open for Applications</span></td>
+          <td>
+            <button class="btn btn-view" onclick="openDetails('${event._id}')">View</button>
+            <button class="btn btn-apply" onclick="applyForEvent('${event._id}')">Apply for Event</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    function renderApplications() {
+      const tbody = document.getElementById("applicationsTable");
+
+      const rows = availableEvents.filter(e => e.applicationStatus);
+
+      if (!rows.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="empty-state">You have not applied for any events yet.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(event => {
+        const canView = event.applicationStatus === "Approved" || event.applicationStatus === "Pending Review";
+
+        return `
+          <tr>
+            <td>${formatDate(event.eventDate)}</td>
+            <td>${event.eventName}</td>
+            <td>${event.role}</td>
+            <td>${getStatusBadge(event.applicationStatus)}</td>
+            <td>
+              ${
+                canView
+                  ? `<button class="btn btn-view" onclick="openDetails('${event._id}')">View</button>`
+                  : `<span style="color:#666; font-size:13px;">Only event name visible</span>`
+              }
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function renderMyEvents() {
+      const tbody = document.getElementById("myEventsTable");
+
+      const rows = availableEvents.filter(e => e.applicationStatus === "Approved");
+
+      if (!rows.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="empty-state">No approved upcoming events yet.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(event => `
+        <tr>
+          <td>${formatDate(event.eventDate)}</td>
+          <td>${event.eventName}</td>
+          <td>${event.companyName}</td>
+          <td>${event.role}</td>
+          <td>${event.location}</td>
+          <td>${getStatusBadge("Approved")}</td>
+          <td><button class="btn btn-view" onclick="openDetails('${event._id}')">View</button></td>
+        </tr>
+      `).join("");
+    }
+
+    function renderReports() {
+      const tbody = document.getElementById("reportsTable");
+
+      const reportRows = [
+        ...availableEvents
+          .filter(e => e.applicationStatus)
+          .map(e => ({
+            ...e,
+            type: "Application"
+          })),
+        ...completedEvents.map(e => ({
+          ...e,
+          type: "Completed Work"
+        }))
+      ];
+
+      if (!reportRows.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="6" class="empty-state">No report history available yet.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = reportRows
+        .sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate))
+        .map(event => {
+          const isRejected = event.applicationStatus === "Not Approved";
+
+          return `
+            <tr>
+              <td>${formatDate(event.eventDate)}</td>
+              <td>${event.eventName}</td>
+              <td>${event.role || "-"}</td>
+              <td>${getStatusBadge(event.applicationStatus || event.workStatus || "Completed")}</td>
+              <td>${event.type}</td>
+              <td>
+                ${
+                  isRejected
+                    ? `<span style="color:#666; font-size:13px;">Name only</span>`
+                    : `<button class="btn btn-view" onclick="openDetails('${event._id}')">View</button>`
+                }
+              </td>
+            </tr>
+          `;
+        }).join("");
+    }
+
+    function renderEarnings() {
+      const tbody = document.getElementById("earningsTable");
+
+      const earningsRows = [
+        ...availableEvents
+          .filter(e => e.applicationStatus === "Approved")
+          .map(e => ({
+            ...e,
+            paymentStatus: "Estimated"
+          })),
+        ...completedEvents
+      ];
+
+      if (!earningsRows.length) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="5" class="empty-state">No earnings or payment records yet.</td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = earningsRows
+        .sort((a, b) => new Date(b.eventDate) - new Date(a.eventDate))
+        .map(event => `
+          <tr>
+            <td>${formatDate(event.eventDate)}</td>
+            <td>${event.eventName}</td>
+            <td>${event.role || "-"}</td>
+            <td>${formatMoney(event.rate || 0)}</td>
+            <td>${getPaymentBadge(event.paymentStatus || "Estimated")}</td>
+          </tr>
+        `).join("");
+    }
+
+    function renderAll() {
+      document.getElementById("welcomeText").textContent = `Welcome back, ${staffName}`;
+      renderAlertStrip();
+      renderStats();
+      renderDashboard();
+      renderAvailableEvents();
+      renderApplications();
+      renderMyEvents();
+      renderReports();
+      renderEarnings();
+    }
+
+    function logout() {
+      window.location.href = "/Staff-logins/staff-login.html";
+    }
+
+    window.addEventListener("click", function (e) {
+      const modal = document.getElementById("eventModal");
+      if (e.target === modal) {
+        closeModal();
+      }
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>
