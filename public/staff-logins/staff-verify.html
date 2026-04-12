@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verify Staff Email</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 500px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 30px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    p {
+      font-size: 14px;
+      color: #6b7280;
+    }
+
+    label {
+      display: block;
+      margin-top: 14px;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .verify-btn {
+      background: #111;
+      color: #fff;
+    }
+
+    .resend-btn {
+      background: #6b7280;
+      color: #fff;
+    }
+
+    .verify-btn:hover {
+      background: #f4c430;
+      color: #000;
+    }
+
+    .resend-btn:hover {
+      background: #4b5563;
+    }
+
+    .status {
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    .ok { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+  <h1>Email Verification</h1>
+  <p>Enter the code sent to your email.</p>
+
+  <form id="verifyForm">
+    <label>Email</label>
+    <input id="email" type="email" required>
+
+    <label>Verification Code</label>
+    <input id="code" type="text" maxlength="6" required>
+
+    <div class="btn-row">
+      <button type="submit" class="verify-btn" id="verifyBtn">Verify</button>
+      <button type="button" class="resend-btn" id="resendBtn">Resend Code</button>
+    </div>
+
+    <div id="status" class="status"></div>
+  </form>
+</div>
+
+<script>
+  const emailInput = document.getElementById("email");
+  const codeInput = document.getElementById("code");
+  const statusBox = document.getElementById("status");
+  const verifyBtn = document.getElementById("verifyBtn");
+  const resendBtn = document.getElementById("resendBtn");
+
+  // URL'den email al
+  const params = new URLSearchParams(window.location.search);
+  const emailParam = params.get("email");
+  if (emailParam) emailInput.value = emailParam;
+
+  function setStatus(msg, type="") {
+    statusBox.textContent = msg;
+    statusBox.className = "status " + type;
+  }
+
+  function setLoading(btn, loading, loadingText, defaultText) {
+    btn.disabled = loading;
+    btn.textContent = loading ? loadingText : defaultText;
+  }
+
+  // VERIFY
+  document.getElementById("verifyForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const email = emailInput.value.trim().toLowerCase();
+    const code = codeInput.value.trim();
+
+    try {
+      setLoading(verifyBtn, true, "Verifying...", "Verify");
+
+      const res = await fetch("/api/staff/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setStatus(data.message || "Verification failed", "error");
+        setLoading(verifyBtn, false, "", "Verify");
+        return;
+      }
+
+      setStatus("Verified successfully!", "ok");
+
+      setTimeout(() => {
+        window.location.href = `/staff-logins/staff-set-password.html?email=${encodeURIComponent(email)}`;
+      }, 1000);
+
+    } catch (err) {
+      console.error(err);
+      setStatus("Server error", "error");
+      setLoading(verifyBtn, false, "", "Verify");
+    }
+  });
+
+  // RESEND CODE
+  resendBtn.addEventListener("click", async () => {
+    const email = emailInput.value.trim().toLowerCase();
+
+    if (!email) {
+      setStatus("Enter email first", "error");
+      return;
+    }
+
+    try {
+      setLoading(resendBtn, true, "Sending...", "Resend Code");
+
+      const res = await fetch("/api/staff/resend-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setStatus(data.message || "Failed to resend code", "error");
+        setLoading(resendBtn, false, "", "Resend Code");
+        return;
+      }
+
+      setStatus("New code sent to your email", "ok");
+      setLoading(resendBtn, false, "", "Resend Code");
+
+    } catch (err) {
+      console.error(err);
+      setStatus("Server error", "error");
+      setLoading(resendBtn, false, "", "Resend Code");
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -229,6 +229,11 @@
       color: #000;
     }
 
+    .submit-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
     .back-btn {
       flex: 1;
       background: #6b7280;
@@ -432,7 +437,7 @@
 
     <div class="submit-row">
       <button type="button" class="back-btn" onclick="prevStep()">Back</button>
-      <button type="submit" class="submit-btn">Submit</button>
+      <button type="submit" class="submit-btn" id="submitBtn">Submit</button>
     </div>
   </div>
 </form>
@@ -452,6 +457,7 @@
   const retakeBtn = document.getElementById("retakeBtn");
   const staffForm = document.getElementById("staffForm");
   const stepIndicator = document.getElementById("stepIndicator");
+  const submitBtn = document.getElementById("submitBtn");
 
   let stream = null;
 
@@ -563,6 +569,11 @@
     cameraStatus.className = "status";
   }
 
+  function setSubmitState(isLoading, text = "Submit") {
+    submitBtn.disabled = isLoading;
+    submitBtn.textContent = text;
+  }
+
   startCameraBtn.addEventListener("click", startFrontCamera);
   takePhotoBtn.addEventListener("click", takeSelfie);
   retakeBtn.addEventListener("click", retakeSelfie);
@@ -602,7 +613,9 @@
     };
 
     try {
-      const res = await fetch("http://localhost:5000/api/staff/create", {
+      setSubmitState(true, "Submitting...");
+
+      const res = await fetch("/api/staff/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -610,18 +623,19 @@
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         cameraStatus.textContent = data.message || "Failed to create staff account.";
         cameraStatus.className = "status error";
+        setSubmitState(false, "Submit");
         return;
       }
 
-      cameraStatus.textContent = data.message || "Staff account created successfully.";
+      cameraStatus.textContent = data.message || "Staff account created successfully. Please check your email for verification.";
       cameraStatus.className = "status ok";
 
-      alert(data.message || "Staff account created successfully.");
+      alert(data.message || "Staff account created successfully. Please check your email for verification.");
 
       staffForm.reset();
       selfiePreview.src = "";
@@ -638,11 +652,12 @@
 
       cameraStatus.textContent = "Camera is not active yet.";
       cameraStatus.className = "status";
-
+      setSubmitState(false, "Submit");
     } catch (error) {
       console.error(error);
       cameraStatus.textContent = "Server connection failed.";
       cameraStatus.className = "status error";
+      setSubmitState(false, "Submit");
     }
   });
 

@@ -88,6 +88,34 @@ const staffSchema = new mongoose.Schema(
       },
     },
 
+    bankDetails: {
+      accountHolder: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+      bankName: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+      sortCode: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+      accountNumber: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+      iban: {
+        type: String,
+        default: "",
+        trim: true,
+      },
+    },
+
     selfieData: {
       type: String,
       required: true,
