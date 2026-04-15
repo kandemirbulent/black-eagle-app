@@ -574,6 +574,14 @@
     submitBtn.textContent = text;
   }
 
+  function stopCamera() {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+      camera.srcObject = null;
+    }
+  }
+
   startCameraBtn.addEventListener("click", startFrontCamera);
   takePhotoBtn.addEventListener("click", takeSelfie);
   retakeBtn.addEventListener("click", retakeSelfie);
@@ -632,27 +640,15 @@
         return;
       }
 
-      cameraStatus.textContent = data.message || "Staff account created successfully. Please check your email for verification.";
+      cameraStatus.textContent = data.message || "Staff account created successfully. Redirecting to verification page...";
       cameraStatus.className = "status ok";
 
-      alert(data.message || "Staff account created successfully. Please check your email for verification.");
+      stopCamera();
 
-      staffForm.reset();
-      selfiePreview.src = "";
-      selfiePreview.style.display = "none";
-      selfieData.value = "";
-      currentStep = 1;
-      showStep(currentStep);
+      setTimeout(() => {
+        window.location.href ="/staff-logins/staff-verify.html?email="+encodeURIComponent(payload.email); 
+      }, 800);
 
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        stream = null;
-        camera.srcObject = null;
-      }
-
-      cameraStatus.textContent = "Camera is not active yet.";
-      cameraStatus.className = "status";
-      setSubmitState(false, "Submit");
     } catch (error) {
       console.error(error);
       cameraStatus.textContent = "Server connection failed.";
@@ -662,9 +658,7 @@
   });
 
   window.addEventListener("beforeunload", () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-    }
+    stopCamera();
   });
 
   showStep(currentStep);

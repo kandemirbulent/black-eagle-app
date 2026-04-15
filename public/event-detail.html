@@ -19,63 +19,118 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 15px 24px;
+      padding: 15px 30px;
     }
 
     header h1 {
-      margin: 0;
       font-size: 22px;
+      margin: 0;
     }
 
-    .back-btn {
-      background: #fbc531;
-      color: #111;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    main {
-      max-width: 1100px;
-      margin: 30px auto;
-      padding: 0 16px 40px;
-    }
-
-    .hero {
-      background: #fff;
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      margin-bottom: 20px;
-    }
-
-    .hero-top {
+    .header-actions {
       display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 20px;
+      gap: 10px;
       flex-wrap: wrap;
     }
 
-    .hero h2 {
-      margin: 0 0 8px;
-      font-size: 28px;
+    header button {
+      background: #fbc531;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      color: #111;
     }
 
-    .sub {
-      color: #666;
-      font-size: 14px;
-      margin-top: 6px;
+    main {
+      max-width: 1380px;
+      margin: 30px auto;
+      padding: 0 15px 40px;
+    }
+
+    h2 {
+      margin-top: 0;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    .stat {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      text-align: center;
+      transition: 0.2s;
+    }
+
+    .stat:hover {
+      transform: translateY(-3px);
+    }
+
+    .stat h3 {
+      font-size: 16px;
+      color: #555;
+      margin: 0;
+    }
+
+    .stat p {
+      font-size: 22px;
+      font-weight: bold;
+      margin-top: 8px;
+      color: #111;
+    }
+
+    .tableWrap {
+      overflow-x: auto;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1350px;
+    }
+
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    th {
+      background: #fbc531;
+      color: #111;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    tr:nth-child(even) {
+      background: #fafafa;
     }
 
     .status-pill {
       display: inline-block;
-      padding: 8px 14px;
+      padding: 6px 12px;
       border-radius: 999px;
       font-size: 13px;
       font-weight: 700;
+      text-transform: capitalize;
     }
 
     .status-pending {
@@ -93,428 +148,1261 @@
       color: #155724;
     }
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 18px;
-      margin-top: 20px;
+    .status-approved {
+      background: #d4edda;
+      color: #155724;
     }
 
-    .card {
-      background: #fff;
-      border-radius: 14px;
-      padding: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    .status-rejected {
+      background: #f8d7da;
+      color: #721c24;
     }
 
-    .card h3 {
-      margin-top: 0;
-      margin-bottom: 12px;
-      font-size: 18px;
+    .timing-note {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.4;
     }
 
-    .detail-row {
-      margin-bottom: 10px;
-      font-size: 14px;
-      line-height: 1.5;
+    .timing-ok {
+      color: #155724;
     }
 
-    .detail-row strong {
-      display: inline-block;
-      min-width: 120px;
+    .timing-warning {
+      color: #856404;
     }
 
-    .money-big {
-      font-size: 28px;
-      font-weight: 700;
-      margin: 4px 0;
+    .timing-danger {
+      color: #b02a37;
     }
 
-    .money-sub {
-      color: #666;
-      font-size: 14px;
-      margin: 4px 0;
-    }
-
-    .action-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 18px;
-    }
-
-    .action-btn {
+    button.action {
       background: #111;
       color: #fff;
       border: none;
-      padding: 10px 16px;
-      border-radius: 8px;
+      padding: 7px 12px;
+      border-radius: 6px;
       cursor: pointer;
+      transition: 0.2s;
       font-weight: 600;
-      text-decoration: none;
-      display: inline-block;
     }
 
-    .action-btn.yellow {
+    button.action:hover {
+      background: #333;
+    }
+
+    button.action[disabled] {
+      background: #ccc;
+      color: #666;
+      cursor: not-allowed;
+    }
+
+    .invoice-link-btn,
+    .details-link-btn {
+      display: inline-block;
+      background: #111;
+      color: #fff;
+      padding: 7px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+    }
+
+    .invoice-link-btn:hover,
+    .details-link-btn:hover {
+      background: #333;
+    }
+
+    .event-link {
+      color: #111;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .event-link:hover {
+      text-decoration: underline;
+    }
+
+    #newOrderBtn {
+      background: #fbc531;
+      color: #111;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: bold;
+      margin-top: 20px;
+      cursor: pointer;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      transition: 0.2s;
+    }
+
+    #newOrderBtn:hover {
+      background: #e0a800;
+    }
+
+    #financialSummary {
+      margin-top: 40px;
+      background: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+
+    .summary-grid.compact {
+      margin-top: 10px;
+      margin-bottom: 8px;
+    }
+
+    .summary-grid.compact .summary-card {
+      padding: 14px;
+    }
+
+    .summary-grid.compact .summary-card h4 {
+      font-size: 14px;
+    }
+
+    .summary-grid.compact .summary-card p {
+      font-size: 18px;
+    }
+
+    .summary-card {
+      background: #f9fafb;
+      border: 1px solid #ececec;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .summary-card h4 {
+      margin: 0 0 8px;
+      color: #555;
+      font-size: 15px;
+    }
+
+    .summary-card p {
+      margin: 0;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    .summary-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 15px;
+    }
+
+    .summary-actions button {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    #paySelectedBtn {
+      background: #111;
+      color: #fff;
+    }
+
+    #payAllBtn {
       background: #fbc531;
       color: #111;
     }
 
-    .action-btn.gray {
-      background: #ccc;
-      color: #555;
+    .summary-actions button[disabled] {
+      background: #ccc !important;
+      color: #666;
       cursor: not-allowed;
     }
 
-    .note-box {
-      background: #fafafa;
-      border: 1px solid #e4e4e4;
-      border-radius: 10px;
-      padding: 14px;
-      font-size: 14px;
-      line-height: 1.6;
-      white-space: pre-wrap;
+    #feedbackModal,
+    #dueWarningModal,
+    #applicantsModal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
     }
 
-    .section-title {
+    #feedbackContent,
+    #dueWarningContentWrap,
+    #applicantsContentWrap {
+      background: #fff;
+      width: 92%;
+      max-width: 1100px;
+      border-radius: 14px;
+      padding: 24px;
+      position: relative;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    }
+
+    #feedbackContent h2,
+    #dueWarningContentWrap h2,
+    #applicantsContentWrap h2 {
       margin-top: 0;
     }
 
-    .mini-badge {
-      display: inline-block;
-      background: #f5f5f5;
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 13px;
-      margin-right: 8px;
-      margin-bottom: 8px;
+    #feedbackContent button.close,
+    #dueWarningContentWrap button.close,
+    #applicantsContentWrap button.close {
+      position: absolute;
+      right: 15px;
+      top: 15px;
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #111;
     }
 
-    @media (max-width: 700px) {
-      .hero h2 {
-        font-size: 24px;
+    .modal-section-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 22px 0 10px;
+      color: #111;
+    }
+
+    .staffCard {
+      display: flex;
+      gap: 15px;
+      align-items: flex-start;
+      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+    }
+
+    .staffCard img {
+      width: 70px;
+      height: 70px;
+      border-radius: 8px;
+      object-fit: cover;
+    }
+
+    .staffCard div {
+      flex: 1;
+    }
+
+    .applicantCard {
+      display: grid;
+      grid-template-columns: 88px 1fr auto;
+      gap: 16px;
+      align-items: start;
+      border: 1px solid #e8e8e8;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+      background: #fafafa;
+    }
+
+    .applicantCard img {
+      width: 88px;
+      height: 88px;
+      border-radius: 12px;
+      object-fit: cover;
+      background: #eee;
+      border: 1px solid #ddd;
+    }
+
+    .applicantInfo {
+      min-width: 0;
+    }
+
+    .applicantName {
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 4px;
+      text-transform: capitalize;
+    }
+
+    .applicantRole {
+      color: #666;
+      font-size: 15px;
+      margin-bottom: 12px;
+      text-transform: capitalize;
+    }
+
+    .applicantMeta {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .applicantMeta div {
+      background: #fff;
+      border: 1px solid #ececec;
+      border-radius: 10px;
+      padding: 8px 12px;
+    }
+
+    .applicantStatusWrap {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+    }
+
+    .applicantStatusWrap .status-pill {
+      white-space: nowrap;
+    }
+
+    textarea {
+      width: 100%;
+      height: 60px;
+      margin-top: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+
+    select {
+      margin-top: 6px;
+      padding: 6px;
+      border-radius: 6px;
+    }
+
+    .section-note {
+      color: #666;
+      margin-top: 6px;
+      margin-bottom: 0;
+      font-size: 14px;
+    }
+
+    .muted {
+      color: #777;
+      font-size: 13px;
+    }
+
+    .warning-card {
+      border: 1px solid #f5c2c7;
+      background: #fff5f5;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+
+    .warning-card strong {
+      color: #842029;
+    }
+
+    .empty-card {
+      border: 1px solid #ddd;
+      background: #f9f9f9;
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    @media (max-width: 900px) {
+      table {
+        min-width: 1100px;
       }
-      .money-big {
-        font-size: 24px;
+
+      .applicantCard {
+        grid-template-columns: 80px 1fr;
+      }
+
+      .applicantStatusWrap {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+      }
+
+      .applicantCard img {
+        width: 80px;
+        height: 80px;
+      }
+
+      .applicantName {
+        font-size: 21px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      header {
+        padding: 14px 16px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .header-actions {
+        width: 100%;
+      }
+
+      main {
+        margin: 20px auto;
+        padding: 0 12px 30px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .applicantCard {
+        grid-template-columns: 1fr;
+      }
+
+      .applicantCard img {
+        width: 84px;
+        height: 84px;
+      }
+
+      .applicantName {
+        font-size: 19px;
+      }
+
+      .applicantMeta {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .applicantMeta div {
+        width: 100%;
+        box-sizing: border-box;
       }
     }
   </style>
 </head>
 <body>
   <header>
-    <h1>🦅 Event Details</h1>
-    <button class="back-btn" onclick="goBack()">← Back</button>
+    <h1>🦅 Black Eagle Event Details</h1>
+    <div class="header-actions">
+      <button onclick="goBack()">← Back</button>
+      <button onclick="logout()">Logout</button>
+    </div>
   </header>
 
   <main>
-    <section class="hero">
-      <div class="hero-top">
-        <div>
-          <h2 id="eventName">Loading...</h2>
-          <div class="sub" id="eventMeta">Please wait while event details load.</div>
-        </div>
-        <div>
-          <span id="paymentStatus" class="status-pill status-pending">Pending</span>
-        </div>
-      </div>
+    <h2 id="welcome">Event Details</h2>
 
-      <div class="action-row">
-        <button class="action-btn yellow" id="payNowBtn">Pay This Event</button>
-        <a href="#" class="action-btn" id="invoiceBtn" target="_blank">View Invoice</a>
-        <button class="action-btn" id="directionsBtn">Get Directions</button>
-        <button class="action-btn" id="callBtn">Call Contact</button>
-      </div>
-    </section>
-
-    <div class="grid">
-      <section class="card">
-        <h3 class="section-title">Event Information</h3>
-        <div class="detail-row"><strong>Event Date:</strong> <span id="eventDate">-</span></div>
-        <div class="detail-row"><strong>Start Time:</strong> <span id="startTime">-</span></div>
-        <div class="detail-row"><strong>End Time:</strong> <span id="endTime">-</span></div>
-        <div class="detail-row"><strong>Category:</strong> <span id="category">-</span></div>
-        <div class="detail-row"><strong>Venue:</strong> <span id="venueName">-</span></div>
-        <div class="detail-row"><strong>Address:</strong> <span id="address">-</span></div>
-      </section>
-
-      <section class="card">
-        <h3 class="section-title">Payment Summary</h3>
-        <div class="money-sub">Total (ex VAT)</div>
-        <div class="money-big" id="totalExVat">£0.00</div>
-
-        <div class="money-sub">VAT 20%</div>
-        <div class="money-big" id="vatAmount">£0.00</div>
-
-        <div class="money-sub">Total incl. VAT</div>
-        <div class="money-big" id="totalInclVat">£0.00</div>
-
-        <div class="money-sub">Amount Paid</div>
-        <div class="money-big" id="amountPaid">£0.00</div>
-
-        <div class="money-sub">Remaining Balance</div>
-        <div class="money-big" id="remainingBalance">£0.00</div>
-
-        <div class="sub" id="timingInfo">-</div>
-      </section>
-
-      <section class="card">
-        <h3 class="section-title">Contact & Requirements</h3>
-        <div class="detail-row"><strong>Contact Person:</strong> <span id="contactPerson">-</span></div>
-        <div class="detail-row"><strong>Phone:</strong> <span id="contactPhone">-</span></div>
-        <div class="detail-row"><strong>Dress Code:</strong> <span id="dressCode">-</span></div>
-        <div class="detail-row"><strong>Staff Needed:</strong> <span id="staffNeeded">-</span></div>
-      </section>
-
-      <section class="card">
-        <h3 class="section-title">Notes</h3>
-        <div class="note-box" id="notes">No notes added for this event.</div>
-      </section>
+    <div class="top-actions">
+      <button class="action" onclick="openApplicantsModal()">View Staff Applicants</button>
     </div>
+
+    <div class="stats">
+      <div class="stat">
+        <h3>Total Events</h3>
+        <p id="statOrders">0</p>
+      </div>
+      <div class="stat">
+        <h3>Total Event Value</h3>
+        <p id="statTotalValue">£0.00</p>
+      </div>
+      <div class="stat">
+        <h3>Total Paid</h3>
+        <p id="statPaid">£0.00</p>
+      </div>
+      <div class="stat">
+        <h3>Outstanding Balance</h3>
+        <p id="statOutstanding">£0.00</p>
+      </div>
+    </div>
+
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Select</th>
+            <th>Event Date</th>
+            <th>Event</th>
+            <th>Category</th>
+            <th>Total</th>
+            <th>Paid</th>
+            <th>Remaining</th>
+            <th>Payment Timing</th>
+            <th>Status</th>
+            <th>Invoice</th>
+            <th>Details</th>
+            <th>Feedback</th>
+            <th>Payment</th>
+          </tr>
+        </thead>
+        <tbody id="orderTable"></tbody>
+      </table>
+    </div>
+
+    <button id="newOrderBtn" onclick="newOrder()">+ Create New Order</button>
+
+    <section id="financialSummary">
+      <h2 style="margin-top:0;">💰 Financial Summary</h2>
+      <p class="section-note">
+        You can pay a single event, selected events, or your full outstanding balance.
+      </p>
+
+      <div class="summary-grid">
+        <div class="summary-card">
+          <h4>Total Event Value</h4>
+          <p>£<span id="totalAmount">0.00</span></p>
+        </div>
+        <div class="summary-card">
+          <h4>Amount Paid</h4>
+          <p>£<span id="amountPaid">0.00</span></p>
+        </div>
+        <div class="summary-card">
+          <h4>Remaining Balance</h4>
+          <p>£<span id="remainingBalance">0.00</span></p>
+        </div>
+      </div>
+
+      <div class="summary-actions">
+        <button id="paySelectedBtn">Pay Selected Events</button>
+        <button id="payAllBtn">Pay All Outstanding</button>
+      </div>
+      <p class="muted" id="selectionInfo">No events selected.</p>
+    </section>
   </main>
+
+  <div id="feedbackModal">
+    <div id="feedbackContent">
+      <button class="close" onclick="closeFeedback()">×</button>
+      <h2>Rate Your Staff</h2>
+      <div id="staffList"></div>
+      <button id="submitFeedbackBtn" class="action" onclick="submitAllFeedback()">Submit All Feedback</button>
+    </div>
+  </div>
+
+  <div id="dueWarningModal">
+    <div id="dueWarningContentWrap">
+      <button class="close" onclick="closeDueWarning()">×</button>
+      <h2 style="color:#b02a37;">⚠ Payment Warning</h2>
+      <div id="dueWarningContent"></div>
+    </div>
+  </div>
+
+  <div id="applicantsModal">
+    <div id="applicantsContentWrap">
+      <button class="close" onclick="closeApplicantsModal()">×</button>
+
+      <h2 id="applicantsModalTitle">Applicants for this Event</h2>
+      <p id="applicantsModalMeta" class="muted"></p>
+
+      <div class="modal-section-title">Event Summary</div>
+      <div id="applicantsOrderSummary" class="summary-grid compact"></div>
+
+      <div class="modal-section-title">Applicants Summary</div>
+      <div class="summary-grid compact">
+        <div class="summary-card">
+          <h4>Total Applicants</h4>
+          <p id="modalTotalApplicants">0</p>
+        </div>
+        <div class="summary-card">
+          <h4>Approved</h4>
+          <p id="modalApprovedCount">0</p>
+        </div>
+        <div class="summary-card">
+          <h4>Pending</h4>
+          <p id="modalPendingCount">0</p>
+        </div>
+      </div>
+
+      <div class="modal-section-title">Staff Applicants</div>
+      <div id="applicantsList" style="margin-top:12px;"></div>
+    </div>
+  </div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
+
+    let appId = params.get("appId");
     const orderId = params.get("orderId");
 
-    let currentOrder = null;
-
-    function money(value) {
-      return "£" + Number(value || 0).toFixed(2);
+    if (!appId || appId === "null" || appId === "undefined") {
+      appId = localStorage.getItem("appId");
     }
 
-    function goBack() {
-      window.history.back();
+    const storedCustomerRaw = localStorage.getItem("customer");
+    let customer = null;
+
+    try {
+      customer = storedCustomerRaw ? JSON.parse(storedCustomerRaw) : null;
+    } catch (e) {
+      customer = null;
+    }
+
+    const customerEmail =
+      (customer && customer.email) ||
+      localStorage.getItem("customerEmail") ||
+      "";
+
+    if (appId) {
+      localStorage.setItem("appId", appId);
+    }
+
+    document.getElementById("welcome").textContent =
+      "Event Details" + (orderId ? " — Order ID: " + orderId : "");
+
+    let currentOrders = [];
+    let isCheckoutStarting = false;
+
+    function formatMoney(value) {
+      const num = Number(value || 0);
+      return "£" + num.toFixed(2);
+    }
+
+    function getOrderTotal(order) {
+      return Number(order?.totalWithVat || order?.totalAmount || 0);
+    }
+
+    function getOrderPaid(order) {
+      return Number(order?.amountPaid || 0);
+    }
+
+    function getOrderRemaining(order) {
+      return Math.max(getOrderTotal(order) - getOrderPaid(order), 0);
+    }
+
+    function getDaysLeft(order) {
+      if (!order || !order.eventDate) return null;
+
+      const now = new Date();
+      const todayObj = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      const eventDateObj = new Date(order.eventDate);
+      if (Number.isNaN(eventDateObj.getTime())) return null;
+
+      eventDateObj.setHours(0, 0, 0, 0);
+
+      const msPerDay = 1000 * 60 * 60 * 24;
+      const diffMs = eventDateObj.getTime() - todayObj.getTime();
+      return Math.ceil(diffMs / msPerDay);
+    }
+
+    function canGiveFeedback(order) {
+      const daysLeft = getDaysLeft(order);
+      return daysLeft !== null && daysLeft < 0;
     }
 
     function getStatusInfo(order) {
-      const subTotal = Number(order.totalAmount || order.amount || 0);
-      const vat = subTotal * 0.20;
-      const totalWithVat = subTotal + vat;
-      const paid = Number(order.amountPaid || 0);
-      const remaining = Math.max(totalWithVat - paid, 0);
+      const paid = getOrderPaid(order);
+      const remaining = getOrderRemaining(order);
 
       if (remaining <= 0) {
-        return { text: "Paid", className: "status-paid" };
+        return {
+          text: "Paid",
+          className: "status-paid"
+        };
       }
 
       if (paid > 0) {
-        return { text: "Deposit Paid", className: "status-deposit" };
+        return {
+          text: "Deposit Paid",
+          className: "status-deposit"
+        };
       }
 
-      return { text: "Pending", className: "status-pending" };
+      return {
+        text: "Pending",
+        className: "status-pending"
+      };
     }
 
-    function getTimingText(order, remaining) {
-      if (!order.eventDate) return "Event date not set";
+    function getPaymentTiming(order) {
+      const remaining = getOrderRemaining(order);
+      const daysLeft = getDaysLeft(order);
 
-      const today = new Date();
-      const eventDate = new Date(order.eventDate);
-
-      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const eventOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-
-      const diffMs = eventOnly - todayOnly;
-      const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-      if (remaining <= 0 && daysLeft > 0) {
-        return `Paid before event ✅ (${daysLeft} day(s) left)`;
+      if (daysLeft === null) {
+        return {
+          text: "Event date not set",
+          className: "timing-warning"
+        };
       }
 
       if (remaining <= 0) {
-        return "Paid ✅";
+        if (daysLeft > 0) {
+          return {
+            text: `Paid before event ✅ (${daysLeft} day(s) left)`,
+            className: "timing-ok"
+          };
+        }
+        return {
+          text: "Paid ✅",
+          className: "timing-ok"
+        };
       }
 
       if (daysLeft < 0) {
-        return "Event date passed - payment still outstanding";
+        return {
+          text: "Event passed - balance still outstanding",
+          className: "timing-danger"
+        };
       }
 
       if (daysLeft === 0) {
-        return "Event is today - payment still due";
+        return {
+          text: "Event is today - payment still due",
+          className: "timing-danger"
+        };
       }
 
       if (daysLeft <= 3) {
-        return `Urgent - ${daysLeft} day(s) left before event`;
+        return {
+          text: `Urgent - ${daysLeft} day(s) left. Remaining balance should be fully paid.`,
+          className: "timing-danger"
+        };
       }
 
-      return `${daysLeft} day(s) left before event`;
+      return {
+        text: `${daysLeft} day(s) left before event`,
+        className: "timing-warning"
+      };
     }
 
-    function openDirections() {
-      if (!currentOrder) return;
+    function updateSelectionInfo() {
+      const selected = [...document.querySelectorAll(".orderSelect:checked")];
+      const totalSelected = selected.reduce((sum, cb) => {
+        return sum + Number(cb.dataset.remaining || 0);
+      }, 0);
 
-      const address =
-        currentOrder.address ||
-        currentOrder.venueAddress ||
-        currentOrder.location ||
-        "";
-
-      if (!address.trim()) {
-        alert("No address available for this event.");
-        return;
+      const info = document.getElementById("selectionInfo");
+      if (!selected.length) {
+        info.textContent = "No events selected.";
+      } else {
+        info.textContent = `${selected.length} event(s) selected — Total to pay: ${formatMoney(totalSelected)}`;
       }
-
-      const encoded = encodeURIComponent(address);
-      window.open(`https://www.google.com/maps/search/?api=1&query=${encoded}`, "_blank");
     }
 
-    function callContact() {
-      if (!currentOrder) return;
+    function updatePayButtons(remainingBalance) {
+      const paySelectedBtn = document.getElementById("paySelectedBtn");
+      const payAllBtn = document.getElementById("payAllBtn");
 
-      const phone =
-        currentOrder.contactPhone ||
-        currentOrder.phone ||
-        currentOrder.customerPhone ||
-        "";
+      const anySelectable = currentOrders.some(order => getOrderRemaining(order) > 0);
 
-      if (!phone.trim()) {
-        alert("No contact phone available for this event.");
-        return;
+      if (!anySelectable || remainingBalance <= 0) {
+        paySelectedBtn.disabled = true;
+        payAllBtn.disabled = true;
+        payAllBtn.textContent = "Fully Paid ✅";
+      } else {
+        paySelectedBtn.disabled = false;
+        payAllBtn.disabled = false;
+        payAllBtn.textContent = "Pay All Outstanding";
       }
-
-      window.location.href = `tel:${phone}`;
     }
 
-    async function payThisEvent() {
-      if (!currentOrder) return;
+    function setCheckoutButtonsDisabled(disabled) {
+      document.getElementById("paySelectedBtn").disabled = disabled;
+      document.getElementById("payAllBtn").disabled = disabled;
 
-      const subTotal = Number(currentOrder.totalAmount || currentOrder.amount || 0);
-      const vat = subTotal * 0.20;
-      const totalWithVat = subTotal + vat;
-      const paid = Number(currentOrder.amountPaid || 0);
-      const remaining = Math.max(totalWithVat - paid, 0);
+      document.querySelectorAll("button[data-pay-single='true']").forEach(btn => {
+        btn.disabled = disabled;
+      });
+    }
 
-      if (remaining <= 0) {
-        alert("This event is already fully paid.");
+    function closeDueWarning() {
+      document.getElementById("dueWarningModal").style.display = "none";
+    }
+
+    function closeApplicantsModal() {
+      document.getElementById("applicantsModal").style.display = "none";
+    }
+
+    function goBack() {
+      window.location.href = "/Customer-logins/customer-dashboard.html";
+    }
+
+    function checkUpcomingPaymentWarnings(orders) {
+      const urgentOrders = orders.filter(order => {
+        const remaining = getOrderRemaining(order);
+        const daysLeft = getDaysLeft(order);
+        return daysLeft !== null && daysLeft >= 0 && daysLeft <= 3 && remaining > 0;
+      });
+
+      if (!urgentOrders.length) return;
+
+      const content = urgentOrders.map(order => {
+        const remaining = getOrderRemaining(order);
+
+        return `
+          <div class="warning-card">
+            <strong>${order.eventName || "Untitled Event"}</strong><br>
+            <span>Event Date: ${order.eventDate ? new Date(order.eventDate).toLocaleDateString() : "N/A"}</span><br>
+            <span>Remaining Balance: ${formatMoney(remaining)}</span><br>
+            <span style="color:#842029; font-weight:700;">This balance should now be fully paid.</span>
+          </div>
+        `;
+      }).join("");
+
+      document.getElementById("dueWarningContent").innerHTML = content;
+      document.getElementById("dueWarningModal").style.display = "flex";
+    }
+
+    async function loadOrders() {
+      const tbody = document.getElementById("orderTable");
+
+      if (!appId) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="13" style="text-align:center; color:red;">
+              Missing customer application ID. Please log in again.
+            </td>
+          </tr>
+        `;
         return;
       }
 
       try {
-        const response = await fetch("/create-checkout-session", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            mode: "single",
-            orderIds: [currentOrder.orderId]
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to create checkout session");
+        const res = await fetch(`/get-customer-orders/${encodeURIComponent(appId)}`);
+        if (!res.ok) {
+          throw new Error("Failed to load customer orders");
         }
 
-        const data = await response.json();
+        const orders = await res.json();
+        tbody.innerHTML = "";
 
-        if (data.url) {
-          window.location.href = data.url;
-        } else {
-          alert("Payment session could not be started.");
-        }
-      } catch (err) {
-        console.error("❌ Payment error:", err);
-        alert("An error occurred while starting payment.");
-      }
-    }
+        if (!Array.isArray(orders) || !orders.length) {
+          currentOrders = [];
 
-    async function loadEventDetails() {
-      if (!orderId) {
-        document.getElementById("eventName").textContent = "No order selected";
-        document.getElementById("eventMeta").textContent = "Missing orderId in URL.";
-        return;
-      }
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="13" style="text-align:center;">No orders found for this account.</td>
+            </tr>
+          `;
 
-      try {
-        const res = await fetch(`/get-order/${encodeURIComponent(orderId)}`);
-        const data = await res.json();
+          document.getElementById("statOrders").textContent = "0";
+          document.getElementById("statTotalValue").textContent = "£0.00";
+          document.getElementById("statPaid").textContent = "£0.00";
+          document.getElementById("statOutstanding").textContent = "£0.00";
 
-        if (!data.success || !data.order) {
-          document.getElementById("eventName").textContent = "Event not found";
-          document.getElementById("eventMeta").textContent = "The selected event could not be loaded.";
+          document.getElementById("totalAmount").textContent = "0.00";
+          document.getElementById("amountPaid").textContent = "0.00";
+          document.getElementById("remainingBalance").textContent = "0.00";
+
+          document.getElementById("paySelectedBtn").disabled = true;
+          document.getElementById("payAllBtn").disabled = true;
+          document.getElementById("payAllBtn").textContent = "Fully Paid ✅";
+          document.getElementById("selectionInfo").textContent = "No events selected.";
           return;
         }
 
-        const order = data.order;
-        currentOrder = order;
+        orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        const subTotal = Number(order.totalAmount || order.amount || 0);
-        const vat = subTotal * 0.20;
-        const totalWithVat = subTotal + vat;
-        const paid = Number(order.amountPaid || 0);
-        const remaining = Math.max(totalWithVat - paid, 0);
-
-        const statusInfo = getStatusInfo(order);
-
-        document.getElementById("eventName").textContent = order.eventName || order.description || "Untitled Event";
-        document.getElementById("eventMeta").textContent =
-          `${order.orderId || "-"} • ${order.eventDate ? new Date(order.eventDate).toLocaleDateString() : "No event date"}`;
-
-        const statusEl = document.getElementById("paymentStatus");
-        statusEl.textContent = statusInfo.text;
-        statusEl.className = `status-pill ${statusInfo.className}`;
-
-        document.getElementById("eventDate").textContent =
-          order.eventDate ? new Date(order.eventDate).toLocaleDateString() : "-";
-
-        document.getElementById("startTime").textContent =
-          order.startTime || order.eventTime || "-";
-
-        document.getElementById("endTime").textContent =
-          order.endTime || "-";
-
-        document.getElementById("category").textContent =
-          order.category || "-";
-
-        document.getElementById("venueName").textContent =
-          order.venueName || order.locationName || order.eventName || "-";
-
-        document.getElementById("address").textContent =
-          order.address || order.venueAddress || order.location || "-";
-
-        document.getElementById("contactPerson").textContent =
-          order.contactPerson || order.customerName || "-";
-
-        document.getElementById("contactPhone").textContent =
-          order.contactPhone || order.phone || order.customerPhone || "-";
-
-        document.getElementById("dressCode").textContent =
-          order.dressCode || "-";
-
-        document.getElementById("staffNeeded").textContent =
-          order.staffNeeded || order.requiredStaff || "-";
-
-        document.getElementById("notes").textContent =
-          order.notes || order.specialInstructions || "No notes added for this event.";
-
-        document.getElementById("totalExVat").textContent = money(subTotal);
-        document.getElementById("vatAmount").textContent = money(vat);
-        document.getElementById("totalInclVat").textContent = money(totalWithVat);
-        document.getElementById("amountPaid").textContent = money(paid);
-        document.getElementById("remainingBalance").textContent = money(remaining);
-
-        document.getElementById("timingInfo").textContent = getTimingText(order, remaining);
-
-        document.getElementById("invoiceBtn").href =
-          `/invoice.html?orderId=${encodeURIComponent(order.orderId)}`;
-
-        const payBtn = document.getElementById("payNowBtn");
-        if (remaining <= 0) {
-          payBtn.textContent = "Fully Paid ✅";
-          payBtn.disabled = true;
-          payBtn.classList.remove("yellow");
-          payBtn.classList.add("gray");
+        let filteredOrders = orders;
+        if (orderId) {
+          filteredOrders = orders.filter(order => String(order.orderId) === String(orderId));
         }
 
+        currentOrders = filteredOrders;
+
+        if (!filteredOrders.length) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="13" style="text-align:center; color:red;">
+                No event found for this order ID.
+              </td>
+            </tr>
+          `;
+
+          document.getElementById("statOrders").textContent = "0";
+          document.getElementById("statTotalValue").textContent = "£0.00";
+          document.getElementById("statPaid").textContent = "£0.00";
+          document.getElementById("statOutstanding").textContent = "£0.00";
+
+          document.getElementById("totalAmount").textContent = "0.00";
+          document.getElementById("amountPaid").textContent = "0.00";
+          document.getElementById("remainingBalance").textContent = "0.00";
+
+          document.getElementById("paySelectedBtn").disabled = true;
+          document.getElementById("payAllBtn").disabled = true;
+          document.getElementById("selectionInfo").textContent = "No events selected.";
+          return;
+        }
+
+        const totalOrders = filteredOrders.length;
+        const totalValue = filteredOrders.reduce((sum, o) => sum + getOrderTotal(o), 0);
+        const totalPaid = filteredOrders.reduce((sum, o) => sum + getOrderPaid(o), 0);
+        const totalOutstanding = filteredOrders.reduce((sum, o) => sum + getOrderRemaining(o), 0);
+
+        document.getElementById("statOrders").textContent = totalOrders;
+        document.getElementById("statTotalValue").textContent = formatMoney(totalValue);
+        document.getElementById("statPaid").textContent = formatMoney(totalPaid);
+        document.getElementById("statOutstanding").textContent = formatMoney(totalOutstanding);
+
+        document.getElementById("totalAmount").textContent = totalValue.toFixed(2);
+        document.getElementById("amountPaid").textContent = totalPaid.toFixed(2);
+        document.getElementById("remainingBalance").textContent = totalOutstanding.toFixed(2);
+
+        updatePayButtons(totalOutstanding);
+
+        const pageTitleOrder = filteredOrders[0];
+        if (pageTitleOrder) {
+          document.getElementById("welcome").textContent =
+            `${pageTitleOrder.eventName || "Event Details"}${pageTitleOrder.eventDate ? " — " + new Date(pageTitleOrder.eventDate).toLocaleDateString() : ""}`;
+        }
+
+        filteredOrders.forEach(order => {
+          const total = getOrderTotal(order);
+          const paid = getOrderPaid(order);
+          const remaining = getOrderRemaining(order);
+          const statusInfo = getStatusInfo(order);
+          const timingInfo = getPaymentTiming(order);
+          const safeOrderId = encodeURIComponent(order.orderId || "");
+
+          const feedbackButton = order.feedbackGiven
+            ? `<button class="action" disabled>Submitted</button>`
+            : canGiveFeedback(order)
+              ? `<button class="action" onclick="openFeedback('${order._id || ""}')">Give Feedback</button>`
+              : `<button class="action" disabled title="Feedback will be available after the event date">Available After Event</button>`;
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>
+              ${remaining > 0 && order.orderId
+                ? `<input type="checkbox" class="orderSelect" value="${order.orderId}" data-remaining="${remaining.toFixed(2)}">`
+                : ""}
+            </td>
+
+            <td>${order.eventDate ? new Date(order.eventDate).toLocaleDateString() : "N/A"}</td>
+            <td>
+              ${order.orderId
+                ? `<a href="/event-detail.html?orderId=${safeOrderId}" class="event-link">${order.eventName || "Untitled"}</a>`
+                : (order.eventName || "Untitled")}
+            </td>
+            <td>${order.category || "-"}</td>
+            <td>${formatMoney(total)}</td>
+            <td>${formatMoney(paid)}</td>
+            <td>${formatMoney(remaining)}</td>
+            <td><span class="timing-note ${timingInfo.className}">${timingInfo.text}</span></td>
+            <td><span class="status-pill ${statusInfo.className}">${statusInfo.text}</span></td>
+            <td>
+              ${order.orderId
+                ? `<a href="/invoice.html?orderId=${safeOrderId}" target="_blank" class="invoice-link-btn">View</a>`
+                : "-"}
+            </td>
+            <td>
+              ${order.orderId
+                ? `<button class="details-link-btn" onclick="openApplicantsModal()">View Applicants</button>`
+                : "-"}
+            </td>
+            <td>${feedbackButton}</td>
+            <td>
+              ${remaining > 0 && order.orderId
+                ? `<button class="action" data-pay-single="true" onclick="paySingleOrder('${order.orderId}')">Pay This Event</button>`
+                : `<button class="action" disabled>Paid</button>`}
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        document.querySelectorAll(".orderSelect").forEach(cb => {
+          cb.addEventListener("change", updateSelectionInfo);
+        });
+
+        updateSelectionInfo();
+        checkUpcomingPaymentWarnings(filteredOrders);
       } catch (err) {
-        console.error("❌ Error loading event details:", err);
-        document.getElementById("eventName").textContent = "Error loading event";
-        document.getElementById("eventMeta").textContent = "Please try again later.";
+        console.error("Error loading orders:", err);
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="13" style="text-align:center; color:red;">Error loading event details</td>
+          </tr>
+        `;
       }
     }
 
-    document.getElementById("directionsBtn").addEventListener("click", openDirections);
-    document.getElementById("callBtn").addEventListener("click", callContact);
-    document.getElementById("payNowBtn").addEventListener("click", payThisEvent);
+    async function startCheckout(payload) {
+      if (!appId) {
+        alert("Missing application ID. Please log in again.");
+        return;
+      }
 
-    loadEventDetails();
+      if (isCheckoutStarting) return;
+
+      try {
+        isCheckoutStarting = true;
+        setCheckoutButtonsDisabled(true);
+
+        const finalPayload = {
+          ...payload,
+          appId,
+          email: customerEmail || undefined
+        };
+
+        const response = await fetch("/create-checkout-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(finalPayload),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to create checkout session");
+        }
+
+        if (data.url) {
+          window.location.href = data.url;
+          return;
+        }
+
+        throw new Error("Payment session could not be started.");
+      } catch (err) {
+        console.error("❌ Payment error:", err);
+        alert(err.message || "An error occurred while starting the payment.");
+        isCheckoutStarting = false;
+        setCheckoutButtonsDisabled(false);
+        updatePayButtons(currentOrders.reduce((sum, o) => sum + getOrderRemaining(o), 0));
+      }
+    }
+
+    function paySingleOrder(orderIdValue) {
+      if (!orderIdValue) {
+        alert("Invalid order ID.");
+        return;
+      }
+
+      startCheckout({
+        mode: "single",
+        orderIds: [orderIdValue]
+      });
+    }
+
+    document.getElementById("paySelectedBtn").addEventListener("click", () => {
+      const selectedOrderIds = [...document.querySelectorAll(".orderSelect:checked")]
+        .map(cb => cb.value)
+        .filter(Boolean);
+
+      if (!selectedOrderIds.length) {
+        alert("Please select at least one event to pay.");
+        return;
+      }
+
+      startCheckout({
+        mode: "selected",
+        orderIds: selectedOrderIds
+      });
+    });
+
+    document.getElementById("payAllBtn").addEventListener("click", () => {
+      const payableOrderIds = currentOrders
+        .filter(order => getOrderRemaining(order) > 0 && order.orderId)
+        .map(order => order.orderId);
+
+      if (!payableOrderIds.length) {
+        alert("There is no remaining balance to pay. ✅");
+        return;
+      }
+
+      startCheckout({
+        mode: "all",
+        orderIds: payableOrderIds
+      });
+    });
+
+    function openFeedback(orderIdValue) {
+      document.getElementById("feedbackModal").style.display = "flex";
+
+      const staff = [
+        { id: "EMP001", name: "John Doe", role: "Bartender", photo: "https://randomuser.me/api/portraits/men/32.jpg" },
+        { id: "EMP002", name: "Sarah Lee", role: "Waiter", photo: "https://randomuser.me/api/portraits/women/45.jpg" }
+      ];
+
+      const container = document.getElementById("staffList");
+      container.innerHTML = "";
+
+      staff.forEach(emp => {
+        const div = document.createElement("div");
+        div.className = "staffCard";
+        div.innerHTML = `
+          <img src="${emp.photo}" alt="">
+          <div>
+            <strong>${emp.name}</strong>
+            <span style="color:#666">(${emp.role})</span><br>
+            <label>Rating:</label>
+            <select id="rating-${emp.id}">
+              <option value="">--</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+            <textarea id="note-${emp.id}" placeholder="Leave a short note..."></textarea>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function closeFeedback() {
+      document.getElementById("feedbackModal").style.display = "none";
+    }
+
+    function submitAllFeedback() {
+      alert("Feedback submitted!");
+      closeFeedback();
+    }
+
+    function getApplicantStatusClass(status) {
+      const s = String(status || "").toLowerCase();
+      if (s === "approved" || s === "confirmed") return "status-approved";
+      if (s === "rejected") return "status-rejected";
+      return "status-pending";
+    }
+
+    function renderApplicants(applicants = []) {
+      const container = document.getElementById("applicantsList");
+
+      if (!applicants.length) {
+        container.innerHTML = `
+          <div class="empty-card">
+            No staff applications found for this event.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = applicants.map(item => {
+        const staff = item.staff || {};
+
+        const fullName =
+          [staff.firstName, staff.lastName].filter(Boolean).join(" ") ||
+          staff.name ||
+          "Unknown Staff";
+
+        const photo =
+          staff.profileImage && staff.profileImage.trim()
+            ? staff.profileImage
+            : "https://via.placeholder.com/88x88?text=Staff";
+
+        const role = staff.role || "";
+        const rating = staff.averageRating != null ? Number(staff.averageRating).toFixed(1) : "N/A";
+        const feedbackCount = staff.feedbackCount != null ? staff.feedbackCount : 0;
+        const status = item.status || "pending";
+        const appliedAt = item.appliedAt ? new Date(item.appliedAt).toLocaleDateString() : "-";
+
+        return `
+          <div class="applicantCard">
+            <img src="${photo}" alt="${fullName}" onerror="this.src='https://via.placeholder.com/88x88?text=Staff'">
+
+            <div class="applicantInfo">
+              <div class="applicantName">${fullName}</div>
+              ${role ? `<div class="applicantRole">${role}</div>` : ""}
+
+              <div class="applicantMeta">
+                <div><strong>Rating:</strong> ${rating}</div>
+                <div><strong>Feedbacks:</strong> ${feedbackCount}</div>
+                <div><strong>Applied:</strong> ${appliedAt}</div>
+              </div>
+            </div>
+
+            <div class="applicantStatusWrap">
+              <span class="status-pill ${getApplicantStatusClass(status)}">${status}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function openApplicantsModal() {
+      if (!orderId) {
+        alert("Missing order ID.");
+        return;
+      }
+
+      document.getElementById("applicantsModal").style.display = "flex";
+      document.getElementById("applicantsList").innerHTML = `
+        <div class="empty-card">Loading applicants...</div>
+      `;
+
+      try {
+        const res = await fetch(`/customer/events/${encodeURIComponent(orderId)}/applications`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.message || "Failed to load applicants");
+        }
+
+        document.getElementById("applicantsModalTitle").textContent =
+          data?.event?.title
+            ? `Applicants for ${data.event.title}`
+            : "Applicants for this Event";
+
+        const meta = [];
+        if (data?.event?.date) meta.push(`Date: ${new Date(data.event.date).toLocaleDateString()}`);
+        if (data?.event?.category) meta.push(`Category: ${data.event.category}`);
+        if (data?.event?.location) meta.push(`Location: ${data.event.location}`);
+
+        document.getElementById("applicantsModalMeta").textContent = meta.join(" • ");
+        document.getElementById("modalTotalApplicants").textContent = data.totalApplicants || 0;
+        document.getElementById("modalApprovedCount").textContent = data.approvedCount || 0;
+        document.getElementById("modalPendingCount").textContent = data.pendingCount || 0;
+
+        const currentOrder = currentOrders && currentOrders.length ? currentOrders[0] : null;
+
+        if (currentOrder) {
+          const total = Number(currentOrder.totalWithVat || currentOrder.totalAmount || 0);
+          const paid = Number(currentOrder.amountPaid || 0);
+          const remaining = Math.max(total - paid, 0);
+
+          document.getElementById("applicantsOrderSummary").innerHTML = `
+            <div class="summary-card">
+              <h4>Total</h4>
+              <p>${formatMoney(total)}</p>
+            </div>
+            <div class="summary-card">
+              <h4>Paid</h4>
+              <p>${formatMoney(paid)}</p>
+            </div>
+            <div class="summary-card">
+              <h4>Remaining</h4>
+              <p>${formatMoney(remaining)}</p>
+            </div>
+            <div class="summary-card">
+              <h4>Status</h4>
+              <p>${currentOrder.status || "Pending"}</p>
+            </div>
+          `;
+        } else {
+          document.getElementById("applicantsOrderSummary").innerHTML = "";
+        }
+
+        renderApplicants(data.applicants || []);
+      } catch (err) {
+        console.error("Error loading applicants:", err);
+        document.getElementById("applicantsOrderSummary").innerHTML = "";
+        document.getElementById("applicantsList").innerHTML = `
+          <div class="warning-card">
+            Could not load applicants.
+          </div>
+        `;
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem("appId");
+      window.location.href = "/Customer-logins/customer-login.html";
+    }
+
+    function newOrder() {
+      if (!appId) {
+        alert("Missing application ID. Please log in again.");
+        return;
+      }
+      window.location.href = `/Customer-logins/create-order.html?appId=${encodeURIComponent(appId)}`;
+    }
+
+    loadOrders();
   </script>
 </body>
 </html>

@@ -15,6 +15,9 @@ const crypto = require("crypto");
 const Order = require("./models/order");
 const Customer = require("./models/customer");
 const Staff = require("./models/staff");
+const Event = require("./models/event");
+const EventApplication = require("./models/eventApplication");
+const staffEvents = require("./routes/staffEvents");
 
 const app = express();
 
@@ -48,9 +51,6 @@ mongoose
   .catch((err) => {
     console.error("❌ MongoDB connection failed:", err);
   });
-
-// ✅ CORS
-app.use(cors());
 
 // 🔔 STRIPE WEBHOOK
 // DİKKAT: bodyParser.json() ÖNCESİNDE olmalı
@@ -138,6 +138,7 @@ app.post("/stripe-webhook", express.raw({ type: "application/json" }), async (re
           }
 
           await order.save();
+          await ensureEventForOrder(order);
           console.log(`💰 Order updated via webhook: ${order.orderId}`);
         }
       }
@@ -185,6 +186,7 @@ app.post("/stripe-webhook", express.raw({ type: "application/json" }), async (re
           }
 
           await latestOrder.save();
+          await ensureEventForOrder(latestOrder);
           console.log(`💰 Deposit updated via webhook: ${latestOrder.orderId}`);
         } else {
           console.warn(`⚠️ No order found for appId ${appId} during webhook update.`);
@@ -203,6 +205,58 @@ app.post("/stripe-webhook", express.raw({ type: "application/json" }), async (re
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 app.use(express.static(path.join(__dirname, "public")));
+app.use(cors());
+app.use("/api/staff-events", staffEvents);
+
+function normalizeRole(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function buildRoleRequirementsFromOrder(order) {
+  const staffRows = Array.isArray(order.staff) ? order.staff : [];
+  const roleMap = new Map();
+
+  for (const row of staffRows) {
+    const role = normalizeRole(row.service);
+    const qty = Number(row.quantity || 0);
+
+    if (!role || qty <= 0) continue;
+
+    roleMap.set(role, (roleMap.get(role) || 0) + qty);
+  }
+
+  return Array.from(roleMap.entries()).map(([role, quantityRequired]) => ({
+    role,
+    quantityRequired,
+  }));
+}
+
+async function ensureEventForOrder(order) {
+  if (!order || !order._id) return;
+
+  const existing = await Event.findOne({ order: order._id });
+  if (existing) return;
+
+  const firstStaff = order.staff?.[0];
+
+  if (!firstStaff?.date) return;
+
+  const roles = buildRoleRequirementsFromOrder(order);
+  if (!roles.length) return;
+
+  await Event.create({
+    order: order._id,
+    title: order.companyName || order.description || "Event",
+    location: order.location || "",
+    eventDate: new Date(firstStaff.date),
+    startTime: firstStaff.startTime || "",
+    endTime: firstStaff.endTime || "",
+    status: "open",
+    roleRequirements: roles,
+  });
+
+  console.log("✅ Event created for order:", order.orderId);
+}
 
 // 🧠 Test kullanıcıları
 const users = [
@@ -351,6 +405,10 @@ app.post("/orders", async (req, res) => {
   try {
     const newOrder = new Order(req.body);
     await newOrder.save();
+
+    // 🔥 EKLEDİĞİN SATIR
+    await ensureEventForOrder(newOrder);
+
     res.status(201).json({ success: true, orderId: newOrder.orderId });
   } catch (err) {
     console.error("❌ Error saving order:", err);
@@ -487,6 +545,116 @@ app.get("/get-order/:orderId", async (req, res) => {
   } catch (err) {
     console.error("❌ Error fetching order:", err);
     res.status(500).json({ success: false, message: "Error fetching order" });
+  }
+});
+
+// 👥 Customer event applicants - event detail popup/detail için
+app.get("/customer/events/:orderId/applications", async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "Order ID is required",
+      });
+    }
+
+    // 1) Önce order'ı bul
+    const order = await Order.findOne({ orderId });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    // 2) Bu order için oluşturulan event'i bul
+    const event = await Event.findOne({ order: order._id }).lean();
+
+    if (!event) {
+      return res.json({
+        success: true,
+        event: {
+          orderId: order.orderId,
+          title: order.eventName || order.companyName || order.description || "Untitled Event",
+          date: order.eventDate || null,
+          category: order.category || "-",
+          location: order.location || "",
+        },
+        totalApplicants: 0,
+        approvedCount: 0,
+        pendingCount: 0,
+        applicants: [],
+      });
+    }
+
+    // 3) Event'e yapılan başvuruları staff bilgileriyle çek
+    const applications = await EventApplication.find({ event: event._id })
+      .populate({
+        path: "staff",
+        select: "firstName lastName name selfieData profileImage photo image",
+      })
+      .sort({ appliedAt: -1, createdAt: -1 })
+      .lean();
+
+    const applicants = applications.map((app) => {
+      const staff = app.staff || {};
+
+      return {
+        applicationId: app._id,
+        status: app.status || "pending",
+        appliedAt: app.appliedAt || app.createdAt || null,
+        staff: {
+          _id: staff._id || null,
+          firstName: staff.firstName || "",
+          lastName: staff.lastName || "",
+          name:
+            staff.name ||
+            `${staff.firstName || ""} ${staff.lastName || ""}`.trim() ||
+            "Unknown Staff",
+          profileImage:
+            staff.selfieData ||
+            staff.profileImage ||
+            staff.photo ||
+            staff.image ||
+            "",
+          role: app.role || "",
+          averageRating: 0,
+          feedbackCount: 0,
+        },
+      };
+    });
+
+    const approvedCount = applicants.filter((item) =>
+      ["approved", "confirmed"].includes(String(item.status).toLowerCase())
+    ).length;
+
+    const pendingCount = applicants.filter(
+      (item) => String(item.status).toLowerCase() === "pending"
+    ).length;
+
+    return res.json({
+      success: true,
+      event: {
+        orderId: order.orderId,
+        title: order.eventName || order.companyName || order.description || "Untitled Event",
+        date: event.eventDate || order.eventDate || null,
+        category: order.category || "-",
+        location: event.location || order.location || "",
+      },
+      totalApplicants: applicants.length,
+      approvedCount,
+      pendingCount,
+      applicants,
+    });
+  } catch (err) {
+    console.error("❌ Error loading customer event applicants:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while loading applicants",
+    });
   }
 });
 
@@ -776,6 +944,241 @@ app.post("/api/staff/login", async (req, res) => {
   }
 });
 
+// ✅ STAFF PROFILE - get current staff by email
+app.get("/api/staff/me", async (req, res) => {
+  try {
+    const email = String(req.query.email || "").toLowerCase().trim();
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const staff = await Staff.findOne({ email }).select("-password -verifyCode -verifyCodeExpires");
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      staff: {
+        id: staff._id,
+        name: staff.name || `${staff.firstName || ""} ${staff.lastName || ""}`.trim(),
+        firstName: staff.firstName || "",
+        lastName: staff.lastName || "",
+        dob: staff.dob || null,
+        mobile: staff.mobile || "",
+        email: staff.email || "",
+        postcode: staff.postcode || "",
+        address: staff.address || "",
+        niNumber: staff.niNumber || "",
+        experience: Number(staff.experience || 0),
+        availability: staff.availability || "",
+        positions: Array.isArray(staff.positions) ? staff.positions : [],
+        emergencyContact: {
+          name: staff.emergencyContact?.name || "",
+          phone: staff.emergencyContact?.phone || "",
+        },
+        bankDetails: {
+          accountHolder: staff.bankDetails?.accountHolder || "",
+          bankName: staff.bankDetails?.bankName || "",
+          sortCode: staff.bankDetails?.sortCode || "",
+          accountNumber: staff.bankDetails?.accountNumber || "",
+          iban: staff.bankDetails?.iban || "",
+        },
+        selfieData: staff.selfieData || "",
+        role: staff.role || "staff",
+        status: staff.status || "pending",
+        isVerified: !!staff.isVerified,
+        isPasswordSet: !!staff.isPasswordSet,
+        createdAt: staff.createdAt || null,
+        updatedAt: staff.updatedAt || null,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error fetching staff profile:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching staff profile.",
+    });
+  }
+});
+
+// ✅ STAFF PROFILE - update editable personal details
+app.put("/api/staff/profile", async (req, res) => {
+  try {
+    const {
+      email,
+      firstName,
+      lastName,
+      mobile,
+      postcode,
+      address,
+      experience,
+      availability,
+      positions,
+      emergencyContact,
+    } = req.body;
+
+    const normalizedEmail = String(email || "").toLowerCase().trim();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const staff = await Staff.findOne({ email: normalizedEmail });
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found.",
+      });
+    }
+
+    if (typeof firstName === "string") {
+      staff.firstName = firstName.trim();
+    }
+
+    if (typeof lastName === "string") {
+      staff.lastName = lastName.trim();
+    }
+
+    if (typeof mobile === "string") {
+      staff.mobile = mobile.trim();
+    }
+
+    if (typeof postcode === "string") {
+      staff.postcode = postcode.trim();
+    }
+
+    if (typeof address === "string") {
+      staff.address = address.trim();
+    }
+
+    if (typeof experience !== "undefined") {
+      staff.experience = Number(experience || 0);
+    }
+
+    if (typeof availability === "string") {
+      staff.availability = availability.trim();
+    }
+
+    if (Array.isArray(positions)) {
+      staff.positions = positions.map((item) => String(item).trim()).filter(Boolean);
+    }
+
+    if (emergencyContact && typeof emergencyContact === "object") {
+      staff.emergencyContact = {
+        name: String(emergencyContact.name || "").trim(),
+        phone: String(emergencyContact.phone || "").trim(),
+      };
+    }
+
+    staff.name = `${staff.firstName || ""} ${staff.lastName || ""}`.trim();
+
+    await staff.save();
+
+    return res.json({
+      success: true,
+      message: "Staff profile updated successfully.",
+      staff: {
+        id: staff._id,
+        name: staff.name || "",
+        firstName: staff.firstName || "",
+        lastName: staff.lastName || "",
+        mobile: staff.mobile || "",
+        email: staff.email || "",
+        postcode: staff.postcode || "",
+        address: staff.address || "",
+        experience: Number(staff.experience || 0),
+        availability: staff.availability || "",
+        positions: Array.isArray(staff.positions) ? staff.positions : [],
+        emergencyContact: {
+          name: staff.emergencyContact?.name || "",
+          phone: staff.emergencyContact?.phone || "",
+        },
+        updatedAt: staff.updatedAt || null,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error updating staff profile:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating staff profile.",
+    });
+  }
+});
+
+// ✅ STAFF BANK DETAILS - update bank information
+app.put("/api/staff/bank-details", async (req, res) => {
+  try {
+    const {
+      email,
+      accountHolder,
+      bankName,
+      sortCode,
+      accountNumber,
+      iban,
+    } = req.body;
+
+    const normalizedEmail = String(email || "").toLowerCase().trim();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const staff = await Staff.findOne({ email: normalizedEmail });
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found.",
+      });
+    }
+
+    staff.bankDetails = {
+      accountHolder: String(accountHolder || "").trim(),
+      bankName: String(bankName || "").trim(),
+      sortCode: String(sortCode || "").trim(),
+      accountNumber: String(accountNumber || "").trim(),
+      iban: String(iban || "").trim(),
+    };
+
+    await staff.save();
+
+    return res.json({
+      success: true,
+      message: "Bank details updated successfully.",
+      bankDetails: {
+        accountHolder: staff.bankDetails?.accountHolder || "",
+        bankName: staff.bankDetails?.bankName || "",
+        sortCode: staff.bankDetails?.sortCode || "",
+        accountNumber: staff.bankDetails?.accountNumber || "",
+        iban: staff.bankDetails?.iban || "",
+      },
+      updatedAt: staff.updatedAt || null,
+    });
+  } catch (err) {
+    console.error("❌ Error updating staff bank details:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating bank details.",
+    });
+  }
+});
+
 // ✅ Customer Registration
 app.post("/register-customer", async (req, res) => {
   try {
@@ -1035,6 +1438,7 @@ app.post("/create-checkout-session", async (req, res) => {
         });
 
         await newOrder.save();
+        await ensureEventForOrder(newOrder);
         console.log(`✅ New order created before Stripe checkout: ${newOrder.orderId}`);
       } else {
         console.log(`ℹ️ Draft order already exists, not duplicating: ${orderId}`);
@@ -1137,7 +1541,7 @@ function renderPageWithHeader(res, pageName) {
 
 // 🌐 Default route
 app.get("/", (req, res) => {
-  renderPageWithHeader(res, path.join("Customer-logins", "customer-login.html"));
+  res.sendFile(path.join(__dirname, "public", "login.html"));
 });
 
 // 💰 Ödeme bilgisi güncelleme

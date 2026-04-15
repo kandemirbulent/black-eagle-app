@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Black Eagle Login</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    form {
+      background: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 420px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #222;
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 12px;
+      background: #333;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+      flex: 1;
+    }
+
+    button:hover {
+      background: #555;
+    }
+
+    button:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .error {
+      color: red;
+      font-size: 14px;
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    .success {
+      color: green;
+      font-size: 14px;
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    .links {
+      margin-top: 16px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .links a {
+      color: #0066cc;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .links a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <form id="loginForm">
+    <h1>Black Eagle Login</h1>
+
+    <label for="email">Email Address</label>
+    <input type="email" id="email" name="email" required />
+
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" required />
+
+    <div class="buttons">
+      <button type="submit" id="loginBtn">Login</button>
+    </div>
+
+    <div class="links">
+      <a href="/Customer-logins/customer-register.html">Create Customer Account</a>
+      <a href="/staff-logins/staff-login-create.html">Create Staff Account</a>
+    </div>
+
+    <div id="messageBox" class="error"></div>
+  </form>
+
+  <script>
+    const form = document.getElementById("loginForm");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const messageBox = document.getElementById("messageBox");
+    const loginBtn = document.getElementById("loginBtn");
+
+    function setMessage(message, type = "error") {
+      messageBox.textContent = message;
+      messageBox.className = type === "success" ? "success" : "error";
+    }
+
+    function setLoading(isLoading) {
+      loginBtn.disabled = isLoading;
+      loginBtn.textContent = isLoading ? "Logging in..." : "Login";
+    }
+
+    async function tryStaffLogin(email, password) {
+      const res = await fetch("/api/staff/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    }
+
+    async function tryCustomerLogin(email, password) {
+      const res = await fetch("/customer-login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      return { res, data };
+    }
+
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const email = emailInput.value.trim().toLowerCase();
+      const password = passwordInput.value.trim();
+
+      setMessage("");
+
+      if (!email || !password) {
+        setMessage("Please enter both email and password.");
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        // 1) Önce staff dene
+        const staffResult = await tryStaffLogin(email, password);
+
+        if (staffResult.res.ok && staffResult.data.success) {
+          localStorage.setItem("staffEmail", email);
+
+          if (staffResult.data.staff?.name) {
+            localStorage.setItem("staffName", staffResult.data.staff.name);
+          }
+
+          setMessage("Staff login successful. Redirecting...", "success");
+
+          setTimeout(() => {
+            const redirectUrl = staffResult.data.redirect || "/staff-logins/staff-dashboard.html";
+            window.location.href = redirectUrl + "?email=" + encodeURIComponent(email);
+          }, 500);
+
+          return;
+        }
+
+        // 2) Staff değilse customer dene
+        const customerResult = await tryCustomerLogin(email, password);
+
+        if (customerResult.res.ok && customerResult.data.success) {
+          localStorage.setItem("customerEmail", email);
+
+          if (customerResult.data.customer?.name) {
+            localStorage.setItem("customerName", customerResult.data.customer.name);
+          }
+
+          setMessage("Customer login successful. Redirecting...", "success");
+
+          setTimeout(() => {
+            const redirectUrl = customerResult.data.redirect || "/Customer-logins/customer-dashboard.html";
+            window.location.href = redirectUrl;
+          }, 500);
+
+          return;
+        }
+
+        // 3) İkisi de olmadıysa genel hata
+        setMessage("User not found or password is incorrect.");
+        setLoading(false);
+      } catch (error) {
+        console.error("Unified login error:", error);
+        setMessage("Server connection failed.");
+        setLoading(false);
+      }
+    });
+  </script>
+</body>
+</html>

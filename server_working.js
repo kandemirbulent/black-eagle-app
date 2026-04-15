@@ -14,7 +14,8 @@ const crypto = require("crypto");
 
 const Order = require("./models/order");
 const Customer = require("./models/customer");
-const Staff = require("./models/Staff");
+const Staff = require("./models/staff");
+const staffEvents = require("./routes/staffEvents");
 
 const app = express();
 
@@ -51,6 +52,7 @@ mongoose
 
 // ✅ CORS
 app.use(cors());
+app.use("/api/staff-events", staffEvents);
 
 // 🔔 STRIPE WEBHOOK
 // DİKKAT: bodyParser.json() ÖNCESİNDE olmalı
@@ -200,8 +202,8 @@ app.post("/stripe-webhook", express.raw({ type: "application/json" }), async (re
 });
 
 // ✅ Bunlar webhook'tan SONRA gelmeli
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 app.use(express.static(path.join(__dirname, "public")));
 
 // 🧠 Test kullanıcıları
@@ -776,6 +778,241 @@ app.post("/api/staff/login", async (req, res) => {
   }
 });
 
+// ✅ STAFF PROFILE - get current staff by email
+app.get("/api/staff/me", async (req, res) => {
+  try {
+    const email = String(req.query.email || "").toLowerCase().trim();
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const staff = await Staff.findOne({ email }).select("-password -verifyCode -verifyCodeExpires");
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      staff: {
+        id: staff._id,
+        name: staff.name || `${staff.firstName || ""} ${staff.lastName || ""}`.trim(),
+        firstName: staff.firstName || "",
+        lastName: staff.lastName || "",
+        dob: staff.dob || null,
+        mobile: staff.mobile || "",
+        email: staff.email || "",
+        postcode: staff.postcode || "",
+        address: staff.address || "",
+        niNumber: staff.niNumber || "",
+        experience: Number(staff.experience || 0),
+        availability: staff.availability || "",
+        positions: Array.isArray(staff.positions) ? staff.positions : [],
+        emergencyContact: {
+          name: staff.emergencyContact?.name || "",
+          phone: staff.emergencyContact?.phone || "",
+        },
+        bankDetails: {
+          accountHolder: staff.bankDetails?.accountHolder || "",
+          bankName: staff.bankDetails?.bankName || "",
+          sortCode: staff.bankDetails?.sortCode || "",
+          accountNumber: staff.bankDetails?.accountNumber || "",
+          iban: staff.bankDetails?.iban || "",
+        },
+        selfieData: staff.selfieData || "",
+        role: staff.role || "staff",
+        status: staff.status || "pending",
+        isVerified: !!staff.isVerified,
+        isPasswordSet: !!staff.isPasswordSet,
+        createdAt: staff.createdAt || null,
+        updatedAt: staff.updatedAt || null,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error fetching staff profile:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while fetching staff profile.",
+    });
+  }
+});
+
+// ✅ STAFF PROFILE - update editable personal details
+app.put("/api/staff/profile", async (req, res) => {
+  try {
+    const {
+      email,
+      firstName,
+      lastName,
+      mobile,
+      postcode,
+      address,
+      experience,
+      availability,
+      positions,
+      emergencyContact,
+    } = req.body;
+
+    const normalizedEmail = String(email || "").toLowerCase().trim();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const staff = await Staff.findOne({ email: normalizedEmail });
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found.",
+      });
+    }
+
+    if (typeof firstName === "string") {
+      staff.firstName = firstName.trim();
+    }
+
+    if (typeof lastName === "string") {
+      staff.lastName = lastName.trim();
+    }
+
+    if (typeof mobile === "string") {
+      staff.mobile = mobile.trim();
+    }
+
+    if (typeof postcode === "string") {
+      staff.postcode = postcode.trim();
+    }
+
+    if (typeof address === "string") {
+      staff.address = address.trim();
+    }
+
+    if (typeof experience !== "undefined") {
+      staff.experience = Number(experience || 0);
+    }
+
+    if (typeof availability === "string") {
+      staff.availability = availability.trim();
+    }
+
+    if (Array.isArray(positions)) {
+      staff.positions = positions.map((item) => String(item).trim()).filter(Boolean);
+    }
+
+    if (emergencyContact && typeof emergencyContact === "object") {
+      staff.emergencyContact = {
+        name: String(emergencyContact.name || "").trim(),
+        phone: String(emergencyContact.phone || "").trim(),
+      };
+    }
+
+    staff.name = `${staff.firstName || ""} ${staff.lastName || ""}`.trim();
+
+    await staff.save();
+
+    return res.json({
+      success: true,
+      message: "Staff profile updated successfully.",
+      staff: {
+        id: staff._id,
+        name: staff.name || "",
+        firstName: staff.firstName || "",
+        lastName: staff.lastName || "",
+        mobile: staff.mobile || "",
+        email: staff.email || "",
+        postcode: staff.postcode || "",
+        address: staff.address || "",
+        experience: Number(staff.experience || 0),
+        availability: staff.availability || "",
+        positions: Array.isArray(staff.positions) ? staff.positions : [],
+        emergencyContact: {
+          name: staff.emergencyContact?.name || "",
+          phone: staff.emergencyContact?.phone || "",
+        },
+        updatedAt: staff.updatedAt || null,
+      },
+    });
+  } catch (err) {
+    console.error("❌ Error updating staff profile:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating staff profile.",
+    });
+  }
+});
+
+// ✅ STAFF BANK DETAILS - update bank information
+app.put("/api/staff/bank-details", async (req, res) => {
+  try {
+    const {
+      email,
+      accountHolder,
+      bankName,
+      sortCode,
+      accountNumber,
+      iban,
+    } = req.body;
+
+    const normalizedEmail = String(email || "").toLowerCase().trim();
+
+    if (!normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required.",
+      });
+    }
+
+    const staff = await Staff.findOne({ email: normalizedEmail });
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found.",
+      });
+    }
+
+    staff.bankDetails = {
+      accountHolder: String(accountHolder || "").trim(),
+      bankName: String(bankName || "").trim(),
+      sortCode: String(sortCode || "").trim(),
+      accountNumber: String(accountNumber || "").trim(),
+      iban: String(iban || "").trim(),
+    };
+
+    await staff.save();
+
+    return res.json({
+      success: true,
+      message: "Bank details updated successfully.",
+      bankDetails: {
+        accountHolder: staff.bankDetails?.accountHolder || "",
+        bankName: staff.bankDetails?.bankName || "",
+        sortCode: staff.bankDetails?.sortCode || "",
+        accountNumber: staff.bankDetails?.accountNumber || "",
+        iban: staff.bankDetails?.iban || "",
+      },
+      updatedAt: staff.updatedAt || null,
+    });
+  } catch (err) {
+    console.error("❌ Error updating staff bank details:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating bank details.",
+    });
+  }
+});
+
 // ✅ Customer Registration
 app.post("/register-customer", async (req, res) => {
   try {
@@ -1137,7 +1374,7 @@ function renderPageWithHeader(res, pageName) {
 
 // 🌐 Default route
 app.get("/", (req, res) => {
-  renderPageWithHeader(res, path.join("Customer-logins", "customer-login.html"));
+  res.sendFile(path.join(__dirname, "public", "login.html"));
 });
 
 // 💰 Ödeme bilgisi güncelleme

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Black Eagle App</title>
+  <title>Black Eagle Hospitality</title>
 
   <style>
     body {
@@ -25,7 +25,6 @@
       text-align: center;
     }
 
-    /* 🔥 LOGO BÜYÜTÜLDÜ */
     img.logo {
       width: 130px;
       margin-bottom: 20px;
@@ -44,6 +43,7 @@
       border-radius: 8px;
       border: 1px solid #ccc;
       font-size: 14px;
+      box-sizing: border-box;
     }
 
     button {
@@ -69,7 +69,6 @@
       margin-top: 20px;
     }
 
-    /* 🔥 REGISTER LINKLERİ GÜÇLENDİRİLDİ */
     .links a {
       display: block;
       margin-top: 10px;
@@ -81,7 +80,6 @@
       transition: 0.3s;
     }
 
-    /* Customer kayıt */
     .customer-link {
       color: #111;
       background: #fbc531;
@@ -91,7 +89,6 @@
       background: #e0a800;
     }
 
-    /* Staff kayıt */
     .staff-link {
       color: #fff;
       background: #333;
@@ -101,13 +98,24 @@
       background: #000;
     }
 
+    .message {
+      margin-top: 14px;
+      font-size: 14px;
+      min-height: 20px;
+    }
+
+    .message.error {
+      color: #b91c1c;
+    }
+
+    .message.success {
+      color: #166534;
+    }
   </style>
 </head>
 
 <body>
   <div class="container">
-
-    <!-- 🔥 LOGO (PATH DÜZELT) -->
     <img src="/img/blackeaglelogo.png" class="logo" alt="Black Eagle Logo">
 
     <h1>Login to Black Eagle</h1>
@@ -115,50 +123,113 @@
     <input type="email" id="email" placeholder="Email" />
     <input type="password" id="password" placeholder="Password" />
 
-    <button onclick="login()">Login</button>
+    <button id="loginBtn" onclick="login()">Login</button>
 
     <div class="links">
       <a href="/Customer-logins/customer-login-create.html" class="customer-link">
         Create Customer Account
       </a>
 
-      <a href="/Staff-logins/staff-login-create.html" class="staff-link">
+      <a href="/staff-logins/staff-login-create.html" class="staff-link">
         Create Staff Account
       </a>
     </div>
 
+    <div id="messageBox" class="message"></div>
   </div>
 
   <script>
+    const messageBox = document.getElementById("messageBox");
+    const loginBtn = document.getElementById("loginBtn");
+
+    function setMessage(message, type = "error") {
+      messageBox.textContent = message;
+      messageBox.className = "message " + type;
+    }
+
+    function setLoading(isLoading) {
+      loginBtn.disabled = isLoading;
+      loginBtn.textContent = isLoading ? "Logging in..." : "Login";
+    }
+
     async function login() {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
+      const email = document.getElementById("email").value.trim().toLowerCase();
+      const password = document.getElementById("password").value.trim();
 
       if (!email || !password) {
-        alert("Enter email and password");
+        setMessage("Enter email and password", "error");
         return;
       }
 
       try {
-        const res = await fetch("/customer-login", {
+        setLoading(true);
+        setMessage("");
+
+        // 1) ÖNCE CUSTOMER DENE
+        const customerRes = await fetch("/customer-login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
 
-        const data = await res.json();
+        const customerData = await customerRes.json().catch(() => ({}));
 
-        if (!data.success) {
-          alert(data.message || "Login failed");
+        if (customerRes.ok && customerData.success) {
+          localStorage.setItem("customerEmail", email);
+
+          if (customerData.customer?.name) {
+            localStorage.setItem("customerName", customerData.customer.name);
+          }
+
+          setMessage("Customer login successful. Redirecting...", "success");
+
+          setTimeout(() => {
+            window.location.href =
+              `/Customer-logins/customer-dashboard.html?appId=${customerData.customer.applicationId}`;
+          }, 500);
+
           return;
         }
 
-        window.location.href =
-          `/Customer-logins/customer-dashboard.html?appId=${data.customer.applicationId}`;
+        // 2) CUSTOMER DEĞİLSE STAFF DENE
+        const staffRes = await fetch("/api/staff/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const staffData = await staffRes.json().catch(() => ({}));
+
+        if (staffRes.ok && staffData.success) {
+          localStorage.setItem("staffEmail", email);
+
+          if (staffData.staff?.name) {
+            localStorage.setItem("staffName", staffData.staff.name);
+          }
+
+          setMessage("Staff login successful. Redirecting...", "success");
+
+          setTimeout(() => {
+            const redirectUrl = staffData.redirect || "/staff-logins/staff-dashboard.html";
+            window.location.href = redirectUrl + "?email=" + encodeURIComponent(email);
+          }, 500);
+
+          return;
+        }
+
+        // 3) HİÇBİRİ DEĞİLSE
+        const finalMessage =
+          customerData.message ||
+          staffData.message ||
+          "User not found or password incorrect.";
+
+        setMessage(finalMessage, "error");
+        setLoading(false);
 
       } catch (err) {
         console.error(err);
-        alert("Server error");
+        setMessage("Server error", "error");
+        setLoading(false);
       }
     }
   </script>

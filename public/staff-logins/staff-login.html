@@ -87,18 +87,18 @@
 <body>
   <form id="staffLoginForm">
     <h1>Staff Login</h1>
-    
+
     <label for="email">Email Address</label>
     <input type="email" id="email" name="email" required>
-    
+
     <label for="password">Password</label>
     <input type="password" id="password" name="password" required>
-    
+
     <div class="buttons">
       <button type="submit" id="loginBtn">Login</button>
       <button type="button" onclick="window.history.back()">Back</button>
     </div>
-    
+
     <a class="forgot" href="../forgot/forgot.html">Forgot password?</a>
     <div id="errorMessage" class="error"></div>
   </form>
@@ -152,10 +152,19 @@
           return;
         }
 
+        // ✅ Staff email bilgisini sakla
+        localStorage.setItem("staffEmail", email);
+
+        // ✅ İstersen staff adı da saklanır
+        if (data.staff && data.staff.name) {
+          localStorage.setItem("staffName", data.staff.name);
+        }
+
         setMessage("Login successful. Redirecting...", "success");
 
         setTimeout(() => {
-          window.location.href = data.redirect || "/staff-logins/staff-dashboard.html";
+          const redirectUrl = data.redirect || "/staff-logins/staff-dashboard.html";
+          window.location.href = redirectUrl + "?email=" + encodeURIComponent(email);
         }, 800);
 
       } catch (error) {
