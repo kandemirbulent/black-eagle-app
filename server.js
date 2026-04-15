@@ -318,7 +318,7 @@ app.post("/approve-customer/:id", async (req, res) => {
         ? "https://blackeagleapp.com"
         : "http://localhost:3000";
 
-    const setupLink = `${baseUrl}/Customer-logins/set-password.html?token=${token}`;
+    const setupLink = `${baseUrl}/customer-logins/set-password.html?token=${token}`;
 
     const mailOptions = {
       from: `"Black Eagle Services" <${process.env.EMAIL_USER}>`,
@@ -1283,7 +1283,7 @@ app.post("/set-password", async (req, res) => {
       return res.json({
         success: false,
         message: "❌ Invalid or expired link.",
-        redirect: "/Customer-logins/customer-login.html",
+        redirect: "/customer-logins/customer-login.html",
       });
     }
 
@@ -1300,7 +1300,7 @@ app.post("/set-password", async (req, res) => {
     res.json({
       success: true,
       message: "✅ Password set successfully! Redirecting to login...",
-      redirect: "/Customer-logins/customer-login.html",
+      redirect: "/customer-logins/customer-login.html",
     });
   } catch (err) {
     console.error("❌ Error setting password:", err);
@@ -1349,7 +1349,7 @@ app.post("/customer-login", async (req, res) => {
     return res.json({
       success: true,
       message: "Login successful",
-      redirect: "/Customer-logins/customer-dashboard.html",
+      redirect: "/customer-logins/customer-dashboard.html",
       customer: {
         id: customer._id,
         name: `${customer.firstName} ${customer.lastName}`,
