@@ -922,7 +922,7 @@ app.post("/api/staff/login", async (req, res) => {
     return res.json({
       success: true,
       message: "Login successful",
-      redirect: "/Staff-logins/staff-dashboard.html",
+      redirect: "/staff-logins/staff-dashboard.html",
       staff: {
         id: staff._id,
         name: staff.name,
