@@ -1065,7 +1065,7 @@ await loadMyApplications();
 
         if (!staffEmail) {
           alert("Staff email not found. Please log in again.");
-          window.location.href = "/Staff-logins/staff-login.html";
+          window.location.href = "/staff-logins/staff-login.html";
           return;
         }
 
@@ -1179,7 +1179,7 @@ await loadMyApplications();
 
     function logout() {
       localStorage.removeItem("staffEmail");
-      window.location.href = "/Staff-logins/staff-login.html";
+      window.location.href = "/staff-logins/staff-login.html";
     }
 
     loadStaffProfile();

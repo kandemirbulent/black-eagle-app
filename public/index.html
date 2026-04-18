@@ -3,235 +3,272 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Black Eagle Hospitality</title>
-
-  <style>
-    body {
-      font-family: "Poppins", Arial, sans-serif;
-      background: linear-gradient(145deg, #1a1a1a, #2c2c2c);
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .container {
-      background: #fff;
-      width: 380px;
-      padding: 50px 40px;
-      border-radius: 18px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-      text-align: center;
-    }
-
-    img.logo {
-      width: 130px;
-      margin-bottom: 20px;
-    }
-
-    h1 {
-      font-size: 22px;
-      margin-bottom: 25px;
-      color: #111;
-    }
-
-    input {
-      width: 100%;
-      padding: 13px;
-      margin: 10px 0;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      font-size: 14px;
-      box-sizing: border-box;
-    }
-
-    button {
-      width: 100%;
-      padding: 13px;
-      background: #000;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      margin-top: 12px;
-      cursor: pointer;
-      font-weight: bold;
-      font-size: 15px;
-      transition: 0.3s;
-    }
-
-    button:hover {
-      background: #d4af37;
-      color: #000;
-    }
-
-    .links {
-      margin-top: 20px;
-    }
-
-    .links a {
-      display: block;
-      margin-top: 10px;
-      font-size: 15px;
-      font-weight: 600;
-      text-decoration: none;
-      padding: 10px;
-      border-radius: 8px;
-      transition: 0.3s;
-    }
-
-    .customer-link {
-      color: #111;
-      background: #fbc531;
-    }
-
-    .customer-link:hover {
-      background: #e0a800;
-    }
-
-    .staff-link {
-      color: #fff;
-      background: #333;
-    }
-
-    .staff-link:hover {
-      background: #000;
-    }
-
-    .message {
-      margin-top: 14px;
-      font-size: 14px;
-      min-height: 20px;
-    }
-
-    .message.error {
-      color: #b91c1c;
-    }
-
-    .message.success {
-      color: #166534;
-    }
-  </style>
+  <title>Black Eagle Agency | Event Staffing Across London & the UK</title>
+  <meta
+    name="description"
+    content="Black Eagle Agency connects event clients with vetted hospitality staff for weddings, private events, and corporate service across London and the UK."
+  />
+  <meta name="theme-color" content="#0a0d12" />
+  <link rel="stylesheet" href="/css/brand.css" />
 </head>
-
 <body>
-  <div class="container">
-    <img src="/img/blackeaglelogo.png" class="logo" alt="Black Eagle Logo">
+  <div class="page-shell">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="/">
+          <img class="brand-logo" src="/img/blackeaglelogo.png" alt="Black Eagle Agency logo" />
+          <span>
+            <span class="brand-title">Black Eagle</span>
+            <span class="brand-subtitle">Hospitality Staffing Agency</span>
+          </span>
+        </a>
 
-    <h1>Login to Black Eagle</h1>
+        <nav class="nav-links">
+          <a href="#services">Services</a>
+          <a href="#how-it-works">How It Works</a>
+          <a href="#platform">Platform</a>
+          <a href="#standards">Standards</a>
+        </nav>
 
-    <input type="email" id="email" placeholder="Email" />
-    <input type="password" id="password" placeholder="Password" />
+        <div class="nav-actions">
+          <a class="button button-ghost" href="/terms.html">Terms</a>
+          <a class="button button-primary" href="/login.html">Client & Staff Login</a>
+        </div>
+      </div>
+    </header>
 
-    <button id="loginBtn" onclick="login()">Login</button>
+    <main>
+      <section class="hero">
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <span class="eyebrow">Verified staffing for live events</span>
+            <h1>
+              Hospitality teams that feel
+              <span>ready before guests arrive.</span>
+            </h1>
+            <p>
+              Black Eagle Agency helps clients secure trained bar, floor, kitchen, and support staff
+              for weddings, private events, and commercial service. Clients stay in control of deposits,
+              final rosters, and post-event feedback. Staff see relevant opportunities, apply to the
+              right roles, and manage work through one professional platform.
+            </p>
 
-    <div class="links">
-      <a href="/Customer-logins/customer-login-create.html" class="customer-link">
-        Create Customer Account
-      </a>
+            <div class="hero-actions">
+              <a class="button button-primary" href="/Customer-logins/customer-login-create.html">Hire Staff</a>
+              <a class="button button-secondary" href="/staff-logins/staff-login-create.html">Join Our Team</a>
+            </div>
 
-      <a href="/staff-logins/staff-login-create.html" class="staff-link">
-        Create Staff Account
-      </a>
-    </div>
+            <div class="badge-row">
+              <span class="badge">Weddings & private parties</span>
+              <span class="badge">Corporate hospitality</span>
+              <span class="badge">Verified onboarding flow</span>
+              <span class="badge">Deposit + balance payment structure</span>
+            </div>
+          </div>
 
-    <div id="messageBox" class="message"></div>
+          <aside class="panel hero-panel">
+            <span class="panel-kicker">Operational clarity</span>
+            <h2 class="panel-title">Built for clients, staff, and internal control.</h2>
+            <p class="panel-copy">
+              Instead of chasing staffing updates in messages, Black Eagle keeps approvals, event access,
+              staffing decisions, and feedback in one place.
+            </p>
+
+            <div class="mini-list">
+              <div class="mini-item">
+                <div class="mini-icon">01</div>
+                <div>
+                  <strong>Client requests stay structured</strong>
+                  <span>Create events, pay deposits, review confirmed teams, and see who is attending before the day begins.</span>
+                </div>
+              </div>
+
+              <div class="mini-item">
+                <div class="mini-icon">02</div>
+                <div>
+                  <strong>Staff only see relevant opportunities</strong>
+                  <span>Role matching, availability, and location rules reduce bad applications and last-minute dropouts.</span>
+                </div>
+              </div>
+
+              <div class="mini-item">
+                <div class="mini-icon">03</div>
+                <div>
+                  <strong>Admin decisions stay accountable</strong>
+                  <span>Approvals, roster visibility, staff selection, and payments can all be managed from the desktop dashboard.</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="section" id="services">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Services</span>
+            <h2 class="section-title">Hospitality support for <span>high-pressure event days</span></h2>
+            <p class="section-copy">
+              The platform is designed around real staffing operations, not a generic booking form. That matters
+              when timing, presentation, and accountability all affect the event.
+            </p>
+          </div>
+
+          <div class="card-grid">
+            <article class="card">
+              <div class="card-icon">A</div>
+              <h3>Client booking experience</h3>
+              <p>Clients create event requests, pay deposits, review assigned staff, and confirm service with confidence.</p>
+            </article>
+
+            <article class="card">
+              <div class="card-icon">B</div>
+              <h3>Role-based staff access</h3>
+              <p>Applicants do not see every job. They see the right roles for their profile, location, and working fit.</p>
+            </article>
+
+            <article class="card">
+              <div class="card-icon">C</div>
+              <h3>Admin-controlled approvals</h3>
+              <p>Real people review applications, approve valid users, reject risky ones, and maintain quality across the roster.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="how-it-works">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">How It Works</span>
+            <h2 class="section-title">A cleaner path from <span>event request to confirmed team</span></h2>
+          </div>
+
+          <div class="steps">
+            <article class="step">
+              <div class="step-number">1</div>
+              <h3>Apply and verify</h3>
+              <p>Clients and staff submit registration details. Admin review keeps the system credible before access is granted.</p>
+            </article>
+
+            <article class="step">
+              <div class="step-number">2</div>
+              <h3>Create the event</h3>
+              <p>Clients submit staffing needs and complete the deposit so the request becomes a real live booking.</p>
+            </article>
+
+            <article class="step">
+              <div class="step-number">3</div>
+              <h3>Collect the right applications</h3>
+              <p>Suitable staff apply, the application window closes, and the strongest available team can be selected.</p>
+            </article>
+
+            <article class="step">
+              <div class="step-number">4</div>
+              <h3>Confirm, deliver, and review</h3>
+              <p>Clients see confirmed staff on the event, service is delivered, and feedback closes the quality loop.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="platform">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Platform Access</span>
+            <h2 class="section-title">One brand, two user journeys, <span>one controlled operation</span></h2>
+          </div>
+
+          <div class="split-grid">
+            <article class="audience-card">
+              <h3>For clients</h3>
+              <p>
+                Create events, track payments, review confirmed staff, and leave feedback after the work is complete.
+                The client experience is designed to reduce uncertainty before the event day.
+              </p>
+              <div class="check-list">
+                <div class="check-item"><span>+</span><span>Approved-only access after review</span></div>
+                <div class="check-item"><span>+</span><span>Deposit and final payment visibility</span></div>
+                <div class="check-item"><span>+</span><span>Confirmed staff shown inside the event record</span></div>
+              </div>
+            </article>
+
+            <article class="audience-card">
+              <h3>For staff</h3>
+              <p>
+                Staff build verified accounts, complete payment details, apply to suitable jobs, and track assignments
+                without being flooded by irrelevant listings.
+              </p>
+              <div class="check-list">
+                <div class="check-item"><span>+</span><span>Email verification and admin approval workflow</span></div>
+                <div class="check-item"><span>+</span><span>Role and location-aware event visibility</span></div>
+                <div class="check-item"><span>+</span><span>Assignment and earnings visibility after selection</span></div>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="standards">
+        <div class="container">
+          <div class="section-header">
+            <span class="section-tag">Standards</span>
+            <h2 class="section-title">Built to feel <span>reassuring, not chaotic</span></h2>
+            <p class="section-copy">
+              The public site should communicate the same thing the service delivers: control, credibility,
+              and a premium operational standard from first enquiry to final payment.
+            </p>
+          </div>
+
+          <div class="card-grid">
+            <article class="card">
+              <div class="card-icon">Q</div>
+              <h3>Verified access</h3>
+              <p>Pending approvals and manual review help protect clients, staff, and the business from low-quality signups.</p>
+            </article>
+
+            <article class="card">
+              <div class="card-icon">R</div>
+              <h3>Roster visibility</h3>
+              <p>Clients can match the confirmed staff list to the event itself, reducing uncertainty on the day of service.</p>
+            </article>
+
+            <article class="card">
+              <div class="card-icon">S</div>
+              <h3>Operational follow-through</h3>
+              <p>Feedback, payment stages, and role tracking turn one-off bookings into a manageable operating system.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <div class="container">
+        <section class="cta-strip">
+          <div>
+            <h3>Ready to book staff or join the roster?</h3>
+            <p>Use the live platform to create an account, submit your application, or continue into your dashboard.</p>
+          </div>
+
+          <div class="nav-actions">
+            <a class="button button-secondary" href="/Customer-logins/customer-login-create.html">Create Client Account</a>
+            <a class="button button-secondary" href="/staff-logins/staff-login-create.html">Create Staff Account</a>
+            <a class="button button-primary" href="/login.html">Login</a>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <span>Black Eagle Agency. Hospitality staffing for events across London and the UK.</span>
+        <div class="footer-links">
+          <a href="/about.html">About</a>
+          <a href="/contact.html">Contact</a>
+          <a href="/privacy.html">Privacy</a>
+          <a href="/terms.html">Terms</a>
+          <a href="/login.html">Login</a>
+        </div>
+      </div>
+    </footer>
   </div>
-
-  <script>
-    const messageBox = document.getElementById("messageBox");
-    const loginBtn = document.getElementById("loginBtn");
-
-    function setMessage(message, type = "error") {
-      messageBox.textContent = message;
-      messageBox.className = "message " + type;
-    }
-
-    function setLoading(isLoading) {
-      loginBtn.disabled = isLoading;
-      loginBtn.textContent = isLoading ? "Logging in..." : "Login";
-    }
-
-    async function login() {
-      const email = document.getElementById("email").value.trim().toLowerCase();
-      const password = document.getElementById("password").value.trim();
-
-      if (!email || !password) {
-        setMessage("Enter email and password", "error");
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setMessage("");
-
-        // 1) ÖNCE CUSTOMER DENE
-        const customerRes = await fetch("/customer-login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-
-        const customerData = await customerRes.json().catch(() => ({}));
-
-        if (customerRes.ok && customerData.success) {
-          localStorage.setItem("customerEmail", email);
-
-          if (customerData.customer?.name) {
-            localStorage.setItem("customerName", customerData.customer.name);
-          }
-
-          setMessage("Customer login successful. Redirecting...", "success");
-
-          setTimeout(() => {
-            window.location.href =
-              `/Customer-logins/customer-dashboard.html?appId=${customerData.customer.applicationId}`;
-          }, 500);
-
-          return;
-        }
-
-        // 2) CUSTOMER DEĞİLSE STAFF DENE
-        const staffRes = await fetch("/api/staff/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
-        });
-
-        const staffData = await staffRes.json().catch(() => ({}));
-
-        if (staffRes.ok && staffData.success) {
-          localStorage.setItem("staffEmail", email);
-
-          if (staffData.staff?.name) {
-            localStorage.setItem("staffName", staffData.staff.name);
-          }
-
-          setMessage("Staff login successful. Redirecting...", "success");
-
-          setTimeout(() => {
-            const redirectUrl = staffData.redirect || "/staff-logins/staff-dashboard.html";
-            window.location.href = redirectUrl + "?email=" + encodeURIComponent(email);
-          }, 500);
-
-          return;
-        }
-
-        // 3) HİÇBİRİ DEĞİLSE
-        const finalMessage =
-          customerData.message ||
-          staffData.message ||
-          "User not found or password incorrect.";
-
-        setMessage(finalMessage, "error");
-        setLoading(false);
-
-      } catch (err) {
-        console.error(err);
-        setMessage("Server error", "error");
-        setLoading(false);
-      }
-    }
-  </script>
 </body>
 </html>

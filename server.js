@@ -18,6 +18,26 @@ const Staff = require("./models/staff");
 const Event = require("./models/event");
 const EventApplication = require("./models/eventApplication");
 const staffEvents = require("./routes/staffEvents");
+const {
+  normalizeEmail,
+  getBaseUrl,
+  serializeCustomer,
+} = require("./utils/customer-utils");
+const {
+  normalizeRole,
+  buildRoleRequirementsFromOrder,
+  getRequiredQuantityForRole,
+  canAutoApprovalStart,
+} = require("./utils/event-utils");
+const {
+  approveCustomer,
+  rejectCustomer,
+  requestCustomerPasswordReset,
+  resetCustomerPassword,
+  registerCustomer,
+  loginCustomer,
+} = require("./services/customer-service");
+const { resendStaffVerificationCode } = require("./services/staff-service");
 
 const app = express();
 
@@ -36,12 +56,14 @@ const mailer = nodemailer.createTransport({
   },
 });
 
-// 🔐 MongoDB
-console.log("🔍 MONGO_URI_USED =", process.env.MONGO_URI);
-console.log("✅ STRIPE_SECRET_KEY exists:", !!process.env.STRIPE_SECRET_KEY);
-console.log("✅ STRIPE_WEBHOOK_SECRET exists:", !!process.env.STRIPE_WEBHOOK_SECRET);
-console.log("✅ STRIPE_SUCCESS_URL:", process.env.STRIPE_SUCCESS_URL);
-console.log("✅ STRIPE_CANCEL_URL:", process.env.STRIPE_CANCEL_URL);
+// Environment sanity check without exposing secret values in logs
+console.log("Environment ready:", {
+  mongo: !!process.env.MONGO_URI,
+  stripeSecret: !!process.env.STRIPE_SECRET_KEY,
+  stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET,
+  emailUser: !!process.env.EMAIL_USER,
+  emailPass: !!process.env.EMAIL_PASS,
+});
 
 mongoose
   .connect(process.env.MONGO_URI)
@@ -208,27 +230,50 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(cors());
 app.use("/api/staff-events", staffEvents);
 
-function normalizeRole(value) {
-  return String(value || "").trim().toLowerCase();
-}
+async function sendCustomerPasswordLink(customer, token, options = {}) {
+  const mode = options.mode === "reset" ? "reset" : "setup";
+  const baseUrl = getBaseUrl();
+  const pagePath =
+    mode === "reset"
+      ? "/Customer-logins/reset.html"
+      : "/Customer-logins/set-password.html";
 
-function buildRoleRequirementsFromOrder(order) {
-  const staffRows = Array.isArray(order.staff) ? order.staff : [];
-  const roleMap = new Map();
+  const query =
+    mode === "reset"
+      ? `?token=${encodeURIComponent(token)}&email=${encodeURIComponent(
+          customer.email || ""
+        )}`
+      : `?token=${encodeURIComponent(token)}`;
 
-  for (const row of staffRows) {
-    const role = normalizeRole(row.service);
-    const qty = Number(row.quantity || 0);
+  const actionLink = `${baseUrl}${pagePath}${query}`;
+  const title =
+    mode === "reset"
+      ? "Reset your Black Eagle password"
+      : "Your Black Eagle Account Has Been Approved";
+  const intro =
+    mode === "reset"
+      ? "We received a request to reset your password. Use the link below to set a new password."
+      : "Your application has been approved. Please create your password to access your customer dashboard.";
+  const actionText =
+    mode === "reset" ? "Reset Your Password" : "Create Your Password";
 
-    if (!role || qty <= 0) continue;
-
-    roleMap.set(role, (roleMap.get(role) || 0) + qty);
-  }
-
-  return Array.from(roleMap.entries()).map(([role, quantityRequired]) => ({
-    role,
-    quantityRequired,
-  }));
+  await mailer.sendMail({
+    from: `"Black Eagle Services" <${process.env.EMAIL_USER}>`,
+    to: customer.email,
+    subject: title,
+    html: `
+      <div style="font-family:Arial,sans-serif;padding:20px;">
+        <h2>Hello ${customer.firstName || "there"}!</h2>
+        <p>${intro}</p>
+        <p>
+          <a href="${actionLink}" style="background:#000;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">
+            ${actionText}
+          </a>
+        </p>
+        <p>This link will expire in 24 hours.</p>
+      </div>
+    `,
+  });
 }
 
 async function ensureEventForOrder(order) {
@@ -237,25 +282,168 @@ async function ensureEventForOrder(order) {
   const existing = await Event.findOne({ order: order._id });
   if (existing) return;
 
-  const firstStaff = order.staff?.[0];
-
+  const firstStaff = Array.isArray(order.staff) ? order.staff[0] : null;
   if (!firstStaff?.date) return;
 
   const roles = buildRoleRequirementsFromOrder(order);
   if (!roles.length) return;
 
+  const primaryRole = normalizeRole(firstStaff.service || roles[0]?.role || "");
+  const readableRole = primaryRole
+    ? primaryRole.charAt(0).toUpperCase() + primaryRole.slice(1)
+    : "Staff";
+
+  const eventTitle =
+    String(order.eventName || "").trim() ||
+    String(order.companyName || "").trim() ||
+    `${readableRole} Event`;
+
+  const eventDate = new Date(firstStaff.date);
+
   await Event.create({
     order: order._id,
-    title: order.companyName || order.description || "Event",
+    title: eventTitle,
+    description: order.description || "",
     location: order.location || "",
-    eventDate: new Date(firstStaff.date),
+    eventDate,
+    applicationDeadline: order.applicationDeadline
+      ? new Date(order.applicationDeadline)
+      : eventDate,
     startTime: firstStaff.startTime || "",
     endTime: firstStaff.endTime || "",
     status: "open",
     roleRequirements: roles,
+    autoApprovalProcessed: false,
+    autoApprovalProcessedAt: null,
+    notes: order.notes || "",
   });
 
   console.log("✅ Event created for order:", order.orderId);
+}
+
+async function autoApproveApplicationsForEvent(eventId) {
+  if (!eventId) return;
+
+  const event = await Event.findById(eventId).lean();
+  if (!event) return;
+
+  if (normalizeRole(event.status) !== "open") {
+    console.log("ℹ️ Event is not open, skipping auto-approval:", event._id);
+    return;
+  }
+
+  const now = new Date();
+
+  if (event.applicationDeadline && new Date(event.applicationDeadline) < now) {
+    console.log("ℹ️ Application deadline passed, skipping auto-approval:", event._id);
+    return;
+  }
+
+  if (event.eventDate && new Date(event.eventDate) < now) {
+    console.log("ℹ️ Event date passed, skipping auto-approval:", event._id);
+    return;
+  }
+
+  if (!canAutoApprovalStart(event)) {
+    console.log("⏳ Auto-approval waiting period not finished yet for event:", event._id);
+    return;
+  }
+
+  const roleRequirements = Array.isArray(event.roleRequirements) ? event.roleRequirements : [];
+  if (!roleRequirements.length) {
+    console.log("ℹ️ No role requirements found for event:", event._id);
+    return;
+  }
+
+  for (const requirement of roleRequirements) {
+    const role = normalizeRole(requirement.role);
+    const quantityRequired = Number(requirement.quantityRequired || 0);
+
+    if (!role || quantityRequired <= 0) continue;
+
+    const approvedCount = await EventApplication.countDocuments({
+      event: event._id,
+      role,
+      status: "approved",
+    });
+
+    const remainingSlots = Math.max(quantityRequired - approvedCount, 0);
+
+    if (remainingSlots <= 0) {
+      console.log(`✅ Role already full for ${role} on event ${event._id}`);
+      continue;
+    }
+
+    const pendingApplications = await EventApplication.find({
+      event: event._id,
+      role,
+      status: "pending",
+    })
+      .populate({
+        path: "staff",
+        select: "averageRating feedbackCount status positions firstName lastName name",
+      })
+      .sort({ appliedAt: 1, createdAt: 1 });
+
+    if (!pendingApplications.length) {
+      console.log(`ℹ️ No pending applications for role ${role} on event ${event._id}`);
+      continue;
+    }
+
+    const eligibleApplications = pendingApplications
+      .filter((app) => {
+        const staff = app.staff;
+        if (!staff) return false;
+        if (normalizeRole(staff.status) !== "active") return false;
+
+        const positions = Array.isArray(staff.positions)
+          ? staff.positions.map((item) => normalizeRole(item))
+          : [];
+
+        return positions.includes(role);
+      })
+      .sort((a, b) => {
+        const ratingA = Number(a.staff?.averageRating || 0);
+        const ratingB = Number(b.staff?.averageRating || 0);
+
+        if (ratingB !== ratingA) return ratingB - ratingA;
+
+        const feedbackA = Number(a.staff?.feedbackCount || 0);
+        const feedbackB = Number(b.staff?.feedbackCount || 0);
+
+        if (feedbackB !== feedbackA) return feedbackB - feedbackA;
+
+        const appliedA = new Date(a.appliedAt || a.createdAt || 0).getTime();
+        const appliedB = new Date(b.appliedAt || b.createdAt || 0).getTime();
+
+        return appliedA - appliedB;
+      });
+
+    const toApprove = eligibleApplications.slice(0, remainingSlots);
+
+    if (!toApprove.length) {
+      console.log(`ℹ️ No eligible applications to approve for role ${role} on event ${event._id}`);
+      continue;
+    }
+
+    const idsToApprove = toApprove.map((item) => item._id);
+
+    await EventApplication.updateMany(
+      { _id: { $in: idsToApprove } },
+      { $set: { status: "approved" } }
+    );
+
+    console.log(
+      `✅ Auto-approved ${idsToApprove.length} application(s) for role ${role} on event ${event._id}`
+    );
+  }
+
+  await Event.findByIdAndUpdate(event._id, {
+    $set: {
+      autoApprovalProcessed: true,
+      autoApprovalProcessedAt: new Date(),
+    },
+  });
 }
 
 // 🧠 Test kullanıcıları
@@ -275,7 +463,7 @@ app.get("/get-user-role", (req, res) => {
 app.get("/get-pending-customers", async (req, res) => {
   try {
     const pendingCustomers = await Customer.find({ status: "pending" }).sort({ createdAt: -1 });
-    res.json(pendingCustomers);
+    res.json(pendingCustomers.map(serializeCustomer));
   } catch (err) {
     console.error("❌ Error fetching pending customers:", err);
     res.status(500).json({ message: "Server error" });
@@ -300,68 +488,46 @@ app.get("/test-email", async (req, res) => {
 // ✅ Approve customer and send email with password setup link
 app.post("/approve-customer/:id", async (req, res) => {
   try {
-    const customer = await Customer.findById(req.params.id);
-    if (!customer) {
-      return res.status(404).json({ success: false, message: "Customer not found" });
-    }
-
-    const token = crypto.randomBytes(24).toString("hex");
-
-    customer.status = "approved";
-    customer.resetToken = token;
-    customer.tokenExpires = Date.now() + 1000 * 60 * 60 * 24;
-    customer.approvedAt = new Date();
-    await customer.save();
-
-    const baseUrl =
-      process.env.NODE_ENV === "production"
-        ? "https://blackeagleapp.com"
-        : "http://localhost:3000";
-
-    const setupLink = `${baseUrl}/customer-logins/set-password.html?token=${token}`;
-
-    const mailOptions = {
-      from: `"Black Eagle Services" <${process.env.EMAIL_USER}>`,
-      to: customer.email,
-      subject: "Your Black Eagle Account Has Been Approved",
-      html: `
-        <div style="font-family:Arial,sans-serif;padding:20px;">
-          <h2>Welcome to Black Eagle Services, ${customer.firstName}!</h2>
-          <p>Your application has been approved. Please create your password to access your customer dashboard.</p>
-          <p>
-            <a href="${setupLink}" 
-               style="background:#000;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">
-               Create Your Password
-            </a>
-          </p>
-          <p>This link will expire in 24 hours.</p>
-        </div>
-      `,
-    };
-
-    await mailer.sendMail(mailOptions);
-
-    console.log(`✅ Approval email sent to ${customer.email}`);
-    res.json({
-      success: true,
-      message: "Customer approved and email sent with setup link.",
-      updatedStatus: "approved",
-      customerId: customer._id,
+    const result = await approveCustomer({
+      Customer,
+      customerId: req.params.id,
+      createToken: () => crypto.randomBytes(24).toString("hex"),
+      sendCustomerPasswordLink,
     });
+
+    res.status(result.statusCode).json(result.body);
   } catch (err) {
     console.error("❌ Error approving customer:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
+app.post("/reject-customer/:id", async (req, res) => {
+  try {
+    const result = await rejectCustomer({
+      Customer,
+      customerId: req.params.id,
+    });
+
+    return res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error("❌ Error rejecting customer:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while rejecting customer.",
+    });
+  }
+});
+
 // 📩 Get customer info by email
 app.get("/get-customer-by-email/:email", async (req, res) => {
   try {
-    const customer = await Customer.findOne({ email: req.params.email });
+    const normalizedEmail = normalizeEmail(req.params.email);
+    const customer = await Customer.findOne({ email: normalizedEmail });
     if (!customer) {
       return res.status(404).json({ success: false, message: "Customer not found" });
     }
-    res.json({ success: true, customer });
+    res.json({ success: true, customer: serializeCustomer(customer) });
   } catch (err) {
     if (err && err.code === 11000) {
       const dupField =
@@ -393,12 +559,29 @@ app.post("/login", (req, res) => {
   res.json({ success: true, user });
 });
 
-// 🔐 Forgot password
-app.post("/customer-forgot-password", (req, res) => {
-  const { email } = req.body;
-  console.log(`🔐 Password reset requested for: ${email}`);
-  res.json({ message: "If this email exists, a reset link has been sent." });
-});
+async function handleCustomerForgotPassword(req, res) {
+  try {
+    const result = await requestCustomerPasswordReset({
+      Customer,
+      email: req.body?.email,
+      createToken: () => crypto.randomBytes(24).toString("hex"),
+      sendCustomerPasswordLink,
+    });
+
+    console.log(`🔐 Password reset requested for: ${normalizeEmail(req.body?.email)}`);
+
+    return res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error("❌ Customer forgot password error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while sending reset link.",
+    });
+  }
+}
+
+app.post("/customer-forgot-password", handleCustomerForgotPassword);
+app.post("/customer-forgot", handleCustomerForgotPassword);
 
 // 🧾 Yeni sipariş
 app.post("/orders", async (req, res) => {
@@ -471,7 +654,7 @@ app.get("/get-customer-orders/:applicationId", async (req, res) => {
 app.get("/getApprovedCustomers", async (req, res) => {
   try {
     const customers = await Customer.find({ status: "approved" }).sort({ createdAt: -1 });
-    res.json(customers);
+    res.json(customers.map(serializeCustomer));
   } catch (err) {
     console.error("❌ Error fetching approved customers:", err);
     res.status(500).json({ error: "Failed to load approved customers" });
@@ -486,7 +669,7 @@ app.get("/get-customer-details/:appId", async (req, res) => {
     if (!customer) {
       return res.status(404).json({ success: false, message: "Customer not found" });
     }
-    res.json(customer);
+    res.json(serializeCustomer(customer));
   } catch (err) {
     console.error("❌ Error fetching customer details:", err);
     res.status(500).json({ success: false, message: "Server error" });
@@ -500,7 +683,7 @@ app.get("/get-customer-details-by-id/:id", async (req, res) => {
     if (!customer) {
       return res.status(404).json({ success: false, message: "Customer not found" });
     }
-    res.json(customer);
+    res.json(serializeCustomer(customer));
   } catch (err) {
     console.error("❌ Error fetching customer details by id:", err);
     res.status(500).json({ success: false, message: "Server error" });
@@ -594,7 +777,7 @@ app.get("/customer/events/:orderId/applications", async (req, res) => {
     const applications = await EventApplication.find({ event: event._id })
       .populate({
         path: "staff",
-        select: "firstName lastName name selfieData profileImage photo image",
+        select: "firstName lastName name selfieData profileImage photo image averageRating feedbackCount",
       })
       .sort({ appliedAt: -1, createdAt: -1 })
       .lean();
@@ -621,8 +804,8 @@ app.get("/customer/events/:orderId/applications", async (req, res) => {
             staff.image ||
             "",
           role: app.role || "",
-          averageRating: 0,
-          feedbackCount: 0,
+          averageRating: Number(staff.averageRating || 0),
+          feedbackCount: Number(staff.feedbackCount || 0),
         },
       };
     });
@@ -654,6 +837,138 @@ app.get("/customer/events/:orderId/applications", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error while loading applicants",
+    });
+  }
+});
+
+// ✅ Staff apply to event
+app.post("/api/events/apply", async (req, res) => {
+  try {
+    const { eventId, staffId, role } = req.body;
+
+    if (!eventId || !staffId || !role) {
+      return res.status(400).json({
+        success: false,
+        message: "eventId, staffId and role are required.",
+      });
+    }
+
+    const normalizedRole = normalizeRole(role);
+
+    const event = await Event.findById(eventId);
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found.",
+      });
+    }
+
+    if (normalizeRole(event.status) !== "open") {
+      return res.status(400).json({
+        success: false,
+        message: "This event is not open for applications.",
+      });
+    }
+
+    const now = new Date();
+
+    if (event.applicationDeadline && new Date(event.applicationDeadline) < now) {
+      return res.status(400).json({
+        success: false,
+        message: "Application deadline has passed.",
+      });
+    }
+
+    if (event.eventDate && new Date(event.eventDate) < now) {
+      return res.status(400).json({
+        success: false,
+        message: "This event has already passed.",
+      });
+    }
+
+    const requiredQuantity = getRequiredQuantityForRole(event, normalizedRole);
+
+    if (requiredQuantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "This role is not required for the event.",
+      });
+    }
+
+    const staff = await Staff.findById(staffId);
+
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found.",
+      });
+    }
+
+    if (normalizeRole(staff.status) !== "active") {
+      return res.status(400).json({
+        success: false,
+        message: "Only active staff can apply.",
+      });
+    }
+
+    const staffPositions = Array.isArray(staff.positions)
+      ? staff.positions.map((item) => normalizeRole(item))
+      : [];
+
+    if (!staffPositions.includes(normalizedRole)) {
+      return res.status(400).json({
+        success: false,
+        message: "Staff is not registered for this role.",
+      });
+    }
+
+    const existingApplication = await EventApplication.findOne({
+      event: event._id,
+      staff: staff._id,
+    });
+
+    if (existingApplication) {
+      return res.status(409).json({
+        success: false,
+        message: "You have already applied to this event.",
+      });
+    }
+
+    const newApplication = new EventApplication({
+      event: event._id,
+      staff: staff._id,
+      role: normalizedRole,
+      status: "pending",
+      appliedAt: new Date(),
+    });
+
+    await newApplication.save();
+
+    await autoApproveApplicationsForEvent(event._id);
+
+    const refreshedApplication = await EventApplication.findById(newApplication._id).lean();
+
+    return res.status(201).json({
+      success: true,
+      message:
+        refreshedApplication?.status === "approved"
+          ? "Application submitted and approved."
+          : "Application submitted successfully and is pending review.",
+      application: refreshedApplication,
+    });
+  } catch (err) {
+    if (err && err.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "You have already applied to this event.",
+      });
+    }
+
+    console.error("❌ Error applying to event:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while applying to event.",
     });
   }
 });
@@ -831,6 +1146,26 @@ app.post("/api/staff/verify-email", async (req, res) => {
   }
 });
 
+app.post("/api/staff/resend-code", async (req, res) => {
+  try {
+    const result = await resendStaffVerificationCode({
+      Staff,
+      mailer,
+      email: req.body?.email,
+      generateCode: () =>
+        Math.floor(100000 + Math.random() * 900000).toString(),
+    });
+
+    return res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error("❌ Error resending staff verification code:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while resending verification code.",
+    });
+  }
+});
+
 // ✅ STAFF Set Password
 app.post("/api/staff/set-password", async (req, res) => {
   try {
@@ -997,6 +1332,8 @@ app.get("/api/staff/me", async (req, res) => {
         status: staff.status || "pending",
         isVerified: !!staff.isVerified,
         isPasswordSet: !!staff.isPasswordSet,
+        averageRating: Number(staff.averageRating || 0),
+        feedbackCount: Number(staff.feedbackCount || 0),
         createdAt: staff.createdAt || null,
         updatedAt: staff.updatedAt || null,
       },
@@ -1106,6 +1443,8 @@ app.put("/api/staff/profile", async (req, res) => {
           name: staff.emergencyContact?.name || "",
           phone: staff.emergencyContact?.phone || "",
         },
+        averageRating: Number(staff.averageRating || 0),
+        feedbackCount: Number(staff.feedbackCount || 0),
         updatedAt: staff.updatedAt || null,
       },
     });
@@ -1182,80 +1521,42 @@ app.put("/api/staff/bank-details", async (req, res) => {
 // ✅ Customer Registration
 app.post("/register-customer", async (req, res) => {
   try {
-    const blocked = await Customer.findOne({
-      $or: [{ email: req.body.email }, { companyName: req.body.companyName }],
-      status: { $in: ["rejected", "banned"] },
+    const result = await registerCustomer({
+      Customer,
+      input: req.body,
+      generateApplicationId: () =>
+        `BE-CUST-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      generateCustomerCode: () =>
+        "BE-" + Math.floor(100000 + Math.random() * 900000),
+      now: () => new Date(),
     });
 
-    if (blocked) {
-      return res.json({
-        success: false,
-        message: "🚫 This customer is blocked from registering again. Contact support.",
-      });
+    if (result.customer) {
+      try {
+        await mailer.sendMail({
+          from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+          to: result.customer.email,
+          subject: "✅ Black Eagle: Application Received (Pending Approval)",
+          html: `
+            <div style="font-family:Arial,sans-serif;padding:20px;">
+              <h2>Thanks, ${result.customer.firstName}!</h2>
+              <p>We received your customer application and it is now <b>pending approval</b>.</p>
+              <p><b>Application ID:</b> ${result.body.applicationId}</p>
+              <p>We will email you again once your account is approved.</p>
+            </div>
+          `,
+        });
+        console.log(`✅ Pending email sent to ${result.customer.email}`);
+      } catch (mailErr) {
+        console.error("❌ Pending email send failed:", mailErr);
+      }
+
+      console.log(
+        `🕓 New customer registration pending: ${result.customer.companyName} (${result.body.applicationId}, ${result.body.customerCode})`
+      );
     }
 
-    const existing = await Customer.findOne({
-      $or: [{ companyName: req.body.companyName }, { email: req.body.email }],
-    });
-
-    if (existing) {
-      return res.json({
-        success: false,
-        message: "⚠️ This company or email is already registered or awaiting approval.",
-      });
-    }
-
-    const applicationId = `BE-CUST-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    const customerCode = "BE-" + Math.floor(100000 + Math.random() * 900000);
-
-    const newCustomer = new Customer({
-      applicationId,
-      customerCode,
-      companyName: req.body.companyName,
-      companyAddress: req.body.companyAddress,
-      postcode: req.body.postcode,
-      firstName: req.body.firstName,
-      lastName: req.body.lastName,
-      mobilePhone: req.body.mobilePhone,
-      email: req.body.email,
-      website: req.body.website || "",
-      vatNumber: req.body.vatNumber || "",
-      companyNumber: req.body.companyNumber,
-      status: "pending",
-      createdAt: new Date(),
-    });
-
-    await newCustomer.save();
-
-    try {
-      await mailer.sendMail({
-        from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-        to: newCustomer.email,
-        subject: "✅ Black Eagle: Application Received (Pending Approval)",
-        html: `
-          <div style="font-family:Arial,sans-serif;padding:20px;">
-            <h2>Thanks, ${newCustomer.firstName}!</h2>
-            <p>We received your customer application and it is now <b>pending approval</b>.</p>
-            <p><b>Application ID:</b> ${applicationId}</p>
-            <p>We will email you again once your account is approved.</p>
-          </div>
-        `,
-      });
-      console.log(`✅ Pending email sent to ${newCustomer.email}`);
-    } catch (mailErr) {
-      console.error("❌ Pending email send failed:", mailErr);
-    }
-
-    console.log(
-      `🕓 New customer registration pending: ${newCustomer.companyName} (${applicationId}, ${customerCode})`
-    );
-
-    res.json({
-      success: true,
-      message: "✅ Registration received and pending approval.",
-      applicationId,
-      customerCode,
-    });
+    res.status(result.statusCode).json(result.body);
   } catch (err) {
     console.error("❌ Error saving customer:", err.message);
     res.status(500).json({ success: false, message: err.message });
@@ -1283,7 +1584,7 @@ app.post("/set-password", async (req, res) => {
       return res.json({
         success: false,
         message: "❌ Invalid or expired link.",
-        redirect: "/customer-logins/customer-login.html",
+        redirect: "/Customer-logins/customer-login.html",
       });
     }
 
@@ -1300,7 +1601,7 @@ app.post("/set-password", async (req, res) => {
     res.json({
       success: true,
       message: "✅ Password set successfully! Redirecting to login...",
-      redirect: "/customer-logins/customer-login.html",
+      redirect: "/Customer-logins/customer-login.html",
     });
   } catch (err) {
     console.error("❌ Error setting password:", err);
@@ -1311,53 +1612,39 @@ app.post("/set-password", async (req, res) => {
   }
 });
 
+async function handleCustomerResetPassword(req, res) {
+  try {
+    const result = await resetCustomerPassword({
+      Customer,
+      bcrypt,
+      token: req.body?.token,
+      email: req.body?.email,
+      password: req.body?.newPassword || req.body?.password,
+    });
+
+    return res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error("❌ Error resetting customer password:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while resetting password.",
+    });
+  }
+}
+
+app.post("/customer-reset-password", handleCustomerResetPassword);
+
 // 🔑 CUSTOMER LOGIN (real one)
 app.post("/customer-login", async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    const customer = await Customer.findOne({ email });
-    if (!customer) {
-      return res.json({
-        success: false,
-        message: "Customer not found.",
-      });
-    }
-
-    if (customer.status !== "approved") {
-      return res.json({
-        success: false,
-        message: "Your account is not approved yet.",
-      });
-    }
-
-    if (!customer.password) {
-      return res.json({
-        success: false,
-        message: "No password set. Please use the link in your email.",
-      });
-    }
-
-    const isMatch = await bcrypt.compare(password, customer.password);
-    if (!isMatch) {
-      return res.json({
-        success: false,
-        message: "Login failed. Please check your credentials.",
-      });
-    }
-
-    return res.json({
-      success: true,
-      message: "Login successful",
-      redirect: "/customer-logins/customer-dashboard.html",
-      customer: {
-        id: customer._id,
-        name: `${customer.firstName} ${customer.lastName}`,
-        email: customer.email,
-        applicationId: customer.applicationId,
-        customerCode: customer.customerCode,
-      },
+    const result = await loginCustomer({
+      Customer,
+      bcrypt,
+      email: req.body?.email,
+      password: req.body?.password,
     });
+
+    return res.status(result.statusCode).json(result.body);
   } catch (err) {
     console.error("❌ Login error:", err);
     return res.status(500).json({
@@ -1434,6 +1721,11 @@ app.post("/create-checkout-session", async (req, res) => {
           paymentStatus: orderDraft.paymentStatus || "Awaiting Deposit",
           orderStatus: orderDraft.orderStatus || "Draft - Awaiting Payment",
           isVisibleToCustomer: false,
+          applicationDeadline: orderDraft.applicationDeadline
+            ? new Date(orderDraft.applicationDeadline)
+            : firstStaffItem?.date
+              ? new Date(firstStaffItem.date)
+              : null,
           createdAt: orderDraft.createdAt ? new Date(orderDraft.createdAt) : new Date(),
         });
 
@@ -1541,7 +1833,7 @@ function renderPageWithHeader(res, pageName) {
 
 // 🌐 Default route
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "login.html"));
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // 💰 Ödeme bilgisi güncelleme
@@ -1594,6 +1886,24 @@ app.post("/update-payment-status", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+// 🔁 Safety net: open event'leri periyodik olarak tekrar değerlendir
+setInterval(async () => {
+  try {
+    const now = new Date();
+
+    const events = await Event.find({
+      status: "open",
+      eventDate: { $gte: now },
+    }).select("_id");
+
+    for (const event of events) {
+      await autoApproveApplicationsForEvent(event._id);
+    }
+  } catch (err) {
+    console.error("❌ Auto-approval interval error:", err);
+  }
+}, 10 * 60 * 1000);
 
 // 🚀 Server start
 const PORT = process.env.PORT || 3000;

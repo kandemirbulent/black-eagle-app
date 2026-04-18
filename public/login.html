@@ -3,237 +3,114 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Black Eagle Login</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      margin: 0;
-      padding: 20px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-    }
-
-    form {
-      background: #fff;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      width: 100%;
-      max-width: 420px;
-    }
-
-    h1 {
-      text-align: center;
-      color: #222;
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      margin: 10px 0 5px;
-      font-weight: bold;
-    }
-
-    input {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      margin-bottom: 15px;
-      box-sizing: border-box;
-    }
-
-    .buttons {
-      display: flex;
-      gap: 10px;
-    }
-
-    button {
-      padding: 12px;
-      background: #333;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
-      flex: 1;
-    }
-
-    button:hover {
-      background: #555;
-    }
-
-    button:disabled {
-      opacity: 0.7;
-      cursor: not-allowed;
-    }
-
-    .error {
-      color: red;
-      font-size: 14px;
-      margin-top: 12px;
-      text-align: center;
-    }
-
-    .success {
-      color: green;
-      font-size: 14px;
-      margin-top: 12px;
-      text-align: center;
-    }
-
-    .links {
-      margin-top: 16px;
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .links a {
-      color: #0066cc;
-      text-decoration: none;
-      font-size: 14px;
-    }
-
-    .links a:hover {
-      text-decoration: underline;
-    }
-  </style>
+  <title>Black Eagle Login | Client & Staff Access</title>
+  <meta
+    name="description"
+    content="Secure customer and staff login for the Black Eagle Agency operations platform."
+  />
+  <meta name="theme-color" content="#0a0d12" />
+  <link rel="stylesheet" href="/css/brand.css" />
 </head>
-<body>
-  <form id="loginForm">
-    <h1>Black Eagle Login</h1>
+<body class="auth-page">
+  <div class="page-shell">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="/">
+          <img class="brand-logo" src="/img/blackeaglelogo.png" alt="Black Eagle Agency logo" />
+          <span>
+            <span class="brand-title">Black Eagle</span>
+            <span class="brand-subtitle">Client & Staff Access</span>
+          </span>
+        </a>
 
-    <label for="email">Email Address</label>
-    <input type="email" id="email" name="email" required />
+        <div class="nav-actions">
+          <a class="button button-ghost" href="/">Back to Site</a>
+          <a class="button button-secondary" href="/privacy.html">Privacy</a>
+          <a class="button button-secondary" href="/terms.html">Terms</a>
+        </div>
+      </div>
+    </header>
 
-    <label for="password">Password</label>
-    <input type="password" id="password" name="password" required />
+    <main class="auth-shell">
+      <section class="auth-panel">
+        <span class="eyebrow">Platform access</span>
+        <h1>Continue into the <span>Black Eagle</span> workspace.</h1>
+        <p>
+          Customers can manage live events, payments, and confirmed staff. Team members can track approvals,
+          suitable opportunities, assignments, and profile completion in one place.
+        </p>
 
-    <div class="buttons">
-      <button type="submit" id="loginBtn">Login</button>
-    </div>
+        <div class="pill-row">
+          <span class="pill">Verified sign-up flow</span>
+          <span class="pill">Client dashboard</span>
+          <span class="pill">Staff event access</span>
+          <span class="pill">Desktop admin control</span>
+        </div>
 
-    <div class="links">
-      <a href="/Customer-logins/customer-register.html">Create Customer Account</a>
-      <a href="/staff-logins/staff-login-create.html">Create Staff Account</a>
-    </div>
+        <div class="support-grid">
+          <div class="support-card">
+            <strong>Client access</strong>
+            <span>Create staffing requests, track payments, and review the assigned team before the event.</span>
+          </div>
+          <div class="support-card">
+            <strong>Staff access</strong>
+            <span>See relevant roles, apply to live work, and track assignments after approval.</span>
+          </div>
+          <div class="support-card">
+            <strong>Approval process</strong>
+            <span>Every account still goes through review so the platform remains credible and controlled.</span>
+          </div>
+          <div class="support-card">
+            <strong>Need a new account?</strong>
+            <span>Choose the correct registration route below and return here once your access is approved.</span>
+          </div>
+        </div>
+      </section>
 
-    <div id="messageBox" class="error"></div>
-  </form>
+      <section class="auth-card">
+        <h2>Login</h2>
+        <p>Use the email and password attached to your approved Black Eagle account.</p>
 
-  <script>
-    const form = document.getElementById("loginForm");
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
-    const messageBox = document.getElementById("messageBox");
-    const loginBtn = document.getElementById("loginBtn");
+        <form id="unifiedLoginForm" class="auth-form">
+          <div class="form-row">
+            <label for="email">Email address</label>
+            <input type="email" id="email" name="email" autocomplete="email" required />
+          </div>
 
-    function setMessage(message, type = "error") {
-      messageBox.textContent = message;
-      messageBox.className = type === "success" ? "success" : "error";
-    }
+          <div class="form-row">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" autocomplete="current-password" required />
+          </div>
 
-    function setLoading(isLoading) {
-      loginBtn.disabled = isLoading;
-      loginBtn.textContent = isLoading ? "Logging in..." : "Login";
-    }
+          <button class="button button-primary button-block" id="loginBtn" type="submit">Login</button>
+          <div id="messageBox" class="message" aria-live="polite"></div>
+        </form>
 
-    async function tryStaffLogin(email, password) {
-      const res = await fetch("/api/staff/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ email, password })
-      });
+        <div class="auth-links">
+          <a class="button button-secondary button-block" href="/Customer-logins/customer-login-create.html">Create Customer Account</a>
+          <a class="button button-secondary button-block" href="/staff-logins/staff-login-create.html">Create Staff Account</a>
+          <a class="button button-ghost button-block" href="/forgot/forgot.html">Forgot password</a>
+        </div>
 
-      const data = await res.json().catch(() => ({}));
-      return { res, data };
-    }
+        <p class="muted-note">
+          Admin operations remain on desktop. This login page is intended for customer and staff access only.
+        </p>
+      </section>
+    </main>
 
-    async function tryCustomerLogin(email, password) {
-      const res = await fetch("/customer-login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ email, password })
-      });
+    <footer class="footer">
+      <div class="footer-inner">
+        <span>Black Eagle Agency. Client and staff platform access.</span>
+        <div class="footer-links">
+          <a href="/about.html">About</a>
+          <a href="/contact.html">Contact</a>
+          <a href="/privacy.html">Privacy</a>
+          <a href="/terms.html">Terms</a>
+        </div>
+      </div>
+    </footer>
+  </div>
 
-      const data = await res.json().catch(() => ({}));
-      return { res, data };
-    }
-
-    form.addEventListener("submit", async function (e) {
-      e.preventDefault();
-
-      const email = emailInput.value.trim().toLowerCase();
-      const password = passwordInput.value.trim();
-
-      setMessage("");
-
-      if (!email || !password) {
-        setMessage("Please enter both email and password.");
-        return;
-      }
-
-      try {
-        setLoading(true);
-
-        // 1) Önce staff dene
-        const staffResult = await tryStaffLogin(email, password);
-
-        if (staffResult.res.ok && staffResult.data.success) {
-          localStorage.setItem("staffEmail", email);
-
-          if (staffResult.data.staff?.name) {
-            localStorage.setItem("staffName", staffResult.data.staff.name);
-          }
-
-          setMessage("Staff login successful. Redirecting...", "success");
-
-          setTimeout(() => {
-            const redirectUrl = staffResult.data.redirect || "/staff-logins/staff-dashboard.html";
-            window.location.href = redirectUrl + "?email=" + encodeURIComponent(email);
-          }, 500);
-
-          return;
-        }
-
-        // 2) Staff değilse customer dene
-        const customerResult = await tryCustomerLogin(email, password);
-
-        if (customerResult.res.ok && customerResult.data.success) {
-          localStorage.setItem("customerEmail", email);
-
-          if (customerResult.data.customer?.name) {
-            localStorage.setItem("customerName", customerResult.data.customer.name);
-          }
-
-          setMessage("Customer login successful. Redirecting...", "success");
-
-          setTimeout(() => {
-            const redirectUrl = customerResult.data.redirect || "/Customer-logins/customer-dashboard.html";
-            window.location.href = redirectUrl;
-          }, 500);
-
-          return;
-        }
-
-        // 3) İkisi de olmadıysa genel hata
-        setMessage("User not found or password is incorrect.");
-        setLoading(false);
-      } catch (error) {
-        console.error("Unified login error:", error);
-        setMessage("Server connection failed.");
-        setLoading(false);
-      }
-    });
-  </script>
+  <script src="/js/unified-login.js"></script>
 </body>
 </html>
