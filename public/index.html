@@ -685,36 +685,55 @@
       if (!carousel) return;
 
       const track = carousel.querySelector(".role-pill-track");
+      const viewport = carousel.querySelector(".role-carousel-viewport");
       const prevButton = carousel.querySelector("[data-role-prev]");
       const nextButton = carousel.querySelector("[data-role-next]");
-      const firstCard = track?.querySelector(".role-pill");
+      const cards = Array.from(track?.querySelectorAll(".role-pill") || []);
       const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       let autoplayId = null;
+      let currentIndex = 0;
 
-      if (!track || !firstCard) return;
+      if (!track || !viewport || !cards.length) return;
 
-      const getStep = () => {
+      const getMetrics = () => {
+        const firstCard = cards[0];
         const styles = window.getComputedStyle(track);
         const gap = Number.parseFloat(styles.columnGap || styles.gap || "14") || 14;
-        return firstCard.getBoundingClientRect().width + gap;
+        const step = firstCard.getBoundingClientRect().width + gap;
+        const visibleCount = Math.max(1, Math.floor((viewport.clientWidth + gap) / step));
+        const maxIndex = Math.max(0, cards.length - visibleCount);
+        return { step, maxIndex };
       };
 
-      const scrollRoles = (direction) => {
-        const step = getStep();
-        const maxScroll = track.scrollWidth - track.clientWidth;
-        const nextLeft = direction > 0 ? track.scrollLeft + step : track.scrollLeft - step;
+      const updateControls = () => {
+        const { maxIndex } = getMetrics();
+        const disabled = maxIndex === 0;
+        prevButton.disabled = disabled;
+        nextButton.disabled = disabled;
+      };
 
-        if (direction > 0 && track.scrollLeft >= maxScroll - step * 0.35) {
-          track.scrollTo({ left: 0, behavior: "smooth" });
+      const renderCarousel = () => {
+        const { step, maxIndex } = getMetrics();
+        currentIndex = Math.min(currentIndex, maxIndex);
+        track.style.transform = `translate3d(${-currentIndex * step}px, 0, 0)`;
+        updateControls();
+      };
+
+      const moveCarousel = (direction) => {
+        const { maxIndex } = getMetrics();
+        if (maxIndex === 0) {
+          currentIndex = 0;
+          renderCarousel();
           return;
         }
 
-        if (direction < 0 && track.scrollLeft <= step * 0.35) {
-          track.scrollTo({ left: maxScroll, behavior: "smooth" });
-          return;
+        if (direction > 0) {
+          currentIndex = currentIndex >= maxIndex ? 0 : currentIndex + 1;
+        } else {
+          currentIndex = currentIndex <= 0 ? maxIndex : currentIndex - 1;
         }
 
-        track.scrollTo({ left: nextLeft, behavior: "smooth" });
+        renderCarousel();
       };
 
       const stopAutoplay = () => {
@@ -726,20 +745,23 @@
 
       const startAutoplay = () => {
         if (prefersReducedMotion) return;
+        const { maxIndex } = getMetrics();
+        if (maxIndex === 0) return;
         stopAutoplay();
-        autoplayId = window.setInterval(() => scrollRoles(1), 3200);
+        autoplayId = window.setInterval(() => moveCarousel(1), 3200);
       };
 
       prevButton?.addEventListener("click", () => {
-        scrollRoles(-1);
+        moveCarousel(-1);
         startAutoplay();
       });
 
       nextButton?.addEventListener("click", () => {
-        scrollRoles(1);
+        moveCarousel(1);
         startAutoplay();
       });
 
+      window.addEventListener("resize", renderCarousel);
       carousel.addEventListener("mouseenter", stopAutoplay);
       carousel.addEventListener("mouseleave", startAutoplay);
       carousel.addEventListener("focusin", stopAutoplay);
@@ -749,6 +771,7 @@
         }
       });
 
+      renderCarousel();
       startAutoplay();
     })();
   </script>
