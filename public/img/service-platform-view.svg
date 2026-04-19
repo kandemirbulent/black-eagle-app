@@ -1,0 +1,41 @@
+<svg width="960" height="720" viewBox="0 0 960 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="960" height="720" rx="40" fill="#0A0D12"/>
+  <rect x="36" y="36" width="888" height="648" rx="30" fill="url(#bg)"/>
+  <circle cx="786" cy="118" r="72" fill="#D3AE56" fill-opacity="0.16"/>
+  <circle cx="170" cy="590" r="90" fill="#486E97" fill-opacity="0.12"/>
+  <rect x="96" y="104" width="206" height="40" rx="20" fill="#D3AE56" fill-opacity="0.12" stroke="#D3AE56" stroke-opacity="0.35"/>
+  <text x="128" y="131" fill="#F0C96A" font-family="Arial, sans-serif" font-size="22" font-weight="700">Live Platform Control</text>
+  <text x="96" y="188" fill="#F5F0E5" font-family="Arial, sans-serif" font-size="54" font-weight="700">The work stays visible</text>
+  <text x="96" y="236" fill="#B8C0CE" font-family="Arial, sans-serif" font-size="28">Events, staffing decisions, approvals, and roster status</text>
+  <text x="96" y="272" fill="#B8C0CE" font-family="Arial, sans-serif" font-size="28">are kept in one controlled system instead of message threads.</text>
+
+  <rect x="96" y="336" width="768" height="284" rx="28" fill="#131A25" stroke="#FFFFFF" stroke-opacity="0.08"/>
+  <rect x="126" y="366" width="174" height="224" rx="20" fill="#0E141D"/>
+  <rect x="154" y="398" width="116" height="18" rx="9" fill="#D3AE56" fill-opacity="0.3"/>
+  <rect x="154" y="434" width="100" height="14" rx="7" fill="#B8C0CE" fill-opacity="0.5"/>
+  <rect x="154" y="466" width="112" height="14" rx="7" fill="#B8C0CE" fill-opacity="0.35"/>
+  <rect x="154" y="520" width="118" height="42" rx="14" fill="#D3AE56"/>
+
+  <rect x="324" y="366" width="508" height="224" rx="20" fill="#0E141D"/>
+  <rect x="354" y="394" width="448" height="24" rx="12" fill="#D8E0E8"/>
+  <rect x="354" y="438" width="224" height="126" rx="18" fill="#151F2D"/>
+  <rect x="378" y="464" width="72" height="72" rx="16" fill="#D3AE56" fill-opacity="0.24"/>
+  <rect x="470" y="474" width="88" height="14" rx="7" fill="#F5F0E5"/>
+  <rect x="470" y="502" width="68" height="14" rx="7" fill="#B8C0CE" fill-opacity="0.55"/>
+  <rect x="470" y="530" width="82" height="14" rx="7" fill="#B8C0CE" fill-opacity="0.4"/>
+
+  <rect x="594" y="438" width="208" height="54" rx="18" fill="#151F2D"/>
+  <rect x="618" y="458" width="88" height="14" rx="7" fill="#F5F0E5"/>
+  <rect x="726" y="454" width="46" height="22" rx="11" fill="#D3AE56"/>
+
+  <rect x="594" y="510" width="208" height="54" rx="18" fill="#151F2D"/>
+  <rect x="618" y="530" width="76" height="14" rx="7" fill="#F5F0E5"/>
+  <rect x="726" y="526" width="46" height="22" rx="11" fill="#86D6A8"/>
+
+  <defs>
+    <linearGradient id="bg" x1="118" y1="80" x2="854" y2="650" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111722"/>
+      <stop offset="1" stop-color="#0D131B"/>
+    </linearGradient>
+  </defs>
+</svg>
