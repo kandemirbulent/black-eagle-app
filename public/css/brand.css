@@ -392,6 +392,66 @@ img {
   gap: 24px;
 }
 
+.work-banner {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(0, 1.05fr);
+  gap: 22px;
+  padding: 24px;
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(circle at top left, rgba(211, 174, 86, 0.16), transparent 30%),
+    linear-gradient(180deg, rgba(18, 24, 35, 0.98), rgba(10, 13, 18, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.work-banner-copy {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+}
+
+.work-banner-copy h3 {
+  margin: 0;
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(2.2rem, 4vw, 3.5rem);
+  line-height: 0.98;
+}
+
+.work-banner-copy p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.work-banner-collage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  min-height: 340px;
+}
+
+.work-banner-tile {
+  margin: 0;
+  min-height: 0;
+  border-radius: 22px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+.work-banner-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.work-banner-tile-main {
+  grid-row: 1 / span 2;
+}
+
 .work-card-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -516,6 +576,136 @@ img {
 }
 
 .work-detail-body p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.role-strip {
+  display: grid;
+  gap: 16px;
+  padding: 20px 0 4px;
+}
+
+.role-strip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 18px;
+}
+
+.role-strip-header h3 {
+  margin: 8px 0 0;
+  font-size: 1.45rem;
+  line-height: 1.2;
+}
+
+.role-strip-header p {
+  margin: 0;
+  max-width: 58ch;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.role-pill-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(190px, 1fr);
+  gap: 14px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(211, 174, 86, 0.4) transparent;
+}
+
+.role-pill-track::-webkit-scrollbar {
+  height: 8px;
+}
+
+.role-pill-track::-webkit-scrollbar-thumb {
+  background: rgba(211, 174, 86, 0.38);
+  border-radius: 999px;
+}
+
+.role-pill {
+  min-height: 114px;
+  padding: 18px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.role-pill strong {
+  font-size: 1.08rem;
+  line-height: 1.25;
+}
+
+.role-pill-group {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.role-pill-featured {
+  background:
+    linear-gradient(135deg, rgba(211, 174, 86, 0.12), transparent 56%),
+    rgba(255, 255, 255, 0.05);
+  border-color: rgba(240, 201, 106, 0.22);
+}
+
+.featured-stack {
+  display: grid;
+  gap: 16px;
+  padding-top: 6px;
+}
+
+.featured-role-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1.06fr) minmax(300px, 0.94fr);
+  gap: 24px;
+  padding: 18px;
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(140deg, rgba(211, 174, 86, 0.1), transparent 36%),
+    linear-gradient(180deg, rgba(18, 24, 35, 0.98), rgba(10, 13, 18, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow);
+}
+
+.featured-role-media {
+  border-radius: 22px;
+  overflow: hidden;
+  min-height: 320px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.featured-role-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.featured-role-body {
+  display: grid;
+  align-content: center;
+  gap: 16px;
+}
+
+.featured-role-body h3 {
+  margin: 0;
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(2rem, 3vw, 2.9rem);
+  line-height: 1.02;
+}
+
+.featured-role-body p {
   margin: 0;
   color: var(--muted);
   line-height: 1.8;
@@ -1136,8 +1326,19 @@ img {
     margin-left: auto;
   }
 
+  .work-banner,
+  .role-strip-header {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .work-card-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .work-banner-collage {
+    min-height: 300px;
   }
 
   .work-card-media {
@@ -1145,6 +1346,10 @@ img {
   }
 
   .work-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .featured-role-card {
     grid-template-columns: 1fr;
   }
 
@@ -1186,12 +1391,30 @@ img {
     grid-template-columns: 1fr;
   }
 
+  .work-banner {
+    padding: 18px;
+  }
+
+  .work-banner-collage {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(3, 180px);
+    min-height: auto;
+  }
+
+  .work-banner-tile-main {
+    grid-row: auto;
+  }
+
   .work-card-media {
     height: 240px;
   }
 
   .work-card-body {
     padding: 16px 18px 20px;
+  }
+
+  .role-pill-track {
+    grid-auto-columns: minmax(170px, 76vw);
   }
 
   .work-detail-shell {
