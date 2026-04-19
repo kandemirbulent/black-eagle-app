@@ -140,90 +140,149 @@
       <section class="section" id="showcase">
         <div class="container">
           <div class="section-header">
-            <span class="section-tag">Visual Showcase</span>
-            <h2 class="section-title">What the work looks like <span>when the day has to run properly</span></h2>
+            <span class="section-tag">Our Work</span>
+            <h2 class="section-title">See the kind of teams <span>we place on live event days</span></h2>
             <p class="section-copy">
-              Black Eagle is not only a booking form. It supports the real work behind event delivery: guest-facing
-              service, back-of-house support, bar flow, and the platform visibility needed to keep teams organised.
+              This area is built for real photos. Click any card to open the larger preview and the related service
+              notes. We can now swap these images one by one whenever you send the next visual.
             </p>
           </div>
 
-          <div class="story-grid">
-            <article class="story-card">
-              <div class="story-media">
-                <img src="/img/service-wedding-floor.svg" alt="Illustration of front-of-house event staff preparing a wedding reception floor for guests." />
-              </div>
-              <div class="story-body">
-                <span class="story-tag">Front-of-house</span>
-                <h3>Reception teams prepared before guests arrive</h3>
-                <p>
-                  For weddings and private functions, presentation matters as much as speed. This part of the service
-                  focuses on floor staff who can help the room feel calm, ready, and professionally managed from the start.
-                </p>
-                <div class="story-notes">
-                  <span>Guest welcome and arrival flow</span>
-                  <span>Floor presence during live service</span>
-                  <span>Clear support around tables and timing</span>
-                </div>
-              </div>
-            </article>
+          <div class="work-gallery" data-work-gallery>
+            <div class="work-card-grid" role="tablist" aria-label="Black Eagle service gallery">
+              <button
+                class="work-card is-active"
+                type="button"
+                id="work-tab-bartenders"
+                role="tab"
+                data-work-target="bartenders"
+                aria-controls="work-panel-bartenders"
+                aria-selected="true"
+              >
+                <span class="work-card-media">
+                  <img src="/img/service-bartenders-photo.png" alt="Bartenders preparing drinks behind the bar during live event service." />
+                </span>
+                <span class="work-card-body">
+                  <span class="work-card-label">Bar Service</span>
+                  <span class="work-card-title">Bartenders</span>
+                </span>
+              </button>
 
-            <article class="story-card">
-              <div class="story-media">
-                <img src="/img/service-bar-team.svg" alt="Illustration of bar staff serving drinks and managing guest-facing service at an event." />
-              </div>
-              <div class="story-body">
-                <span class="story-tag">Bar service</span>
-                <h3>Fast service without losing the polished feel</h3>
-                <p>
-                  Drinks service can shape the guest experience very quickly. The website now shows that Black Eagle
-                  supports high-tempo bar environments while still keeping the standard expected at premium events.
-                </p>
-                <div class="story-notes">
-                  <span>Welcome drinks and bar coverage</span>
-                  <span>Consistent guest-facing communication</span>
-                  <span>Support for busy hospitality moments</span>
-                </div>
-              </div>
-            </article>
+              <button
+                class="work-card"
+                type="button"
+                id="work-tab-waiters"
+                role="tab"
+                data-work-target="waiters"
+                aria-controls="work-panel-waiters"
+                aria-selected="false"
+              >
+                <span class="work-card-media">
+                  <img src="/img/service-waiters-photo.png" alt="Waiting staff serving guests and supporting front-of-house event delivery." />
+                </span>
+                <span class="work-card-body">
+                  <span class="work-card-label">Front of House</span>
+                  <span class="work-card-title">Waiters</span>
+                </span>
+              </button>
 
-            <article class="story-card">
-              <div class="story-media">
-                <img src="/img/service-kitchen-support.svg" alt="Illustration of kitchen and support staff working behind the scenes during event service." />
-              </div>
-              <div class="story-body">
-                <span class="story-tag">Back-of-house</span>
-                <h3>Kitchen and support roles that keep service moving</h3>
-                <p>
-                  A strong event depends on more than the visible team. Behind the scenes, support staff help prep,
-                  clear, reset, and maintain the pace that the front-of-house team relies on.
-                </p>
-                <div class="story-notes">
-                  <span>Preparation and service support</span>
-                  <span>Clear-down and operational assistance</span>
-                  <span>Better coordination during pressure points</span>
-                </div>
-              </div>
-            </article>
+              <button
+                class="work-card"
+                type="button"
+                id="work-tab-chefs"
+                role="tab"
+                data-work-target="chefs"
+                aria-controls="work-panel-chefs"
+                aria-selected="false"
+              >
+                <span class="work-card-media">
+                  <img src="/img/service-chefs-photo.png" alt="Chef-led kitchen service supporting event delivery behind the scenes." />
+                </span>
+                <span class="work-card-body">
+                  <span class="work-card-label">Kitchen Team</span>
+                  <span class="work-card-title">Chefs</span>
+                </span>
+              </button>
+            </div>
 
-            <article class="story-card">
-              <div class="story-media">
-                <img src="/img/service-platform-view.svg" alt="Illustration of the Black Eagle platform showing event status, approvals, and staffing visibility." />
-              </div>
-              <div class="story-body">
-                <span class="story-tag">Platform visibility</span>
-                <h3>The digital side keeps bookings and staffing under control</h3>
-                <p>
-                  The public site also needs to show that the agency works through a real system. Clients and staff are
-                  not managed through scattered messages alone; the platform keeps approvals, bookings, and staffing steps visible.
-                </p>
-                <div class="story-notes">
-                  <span>Application and approval stages</span>
-                  <span>Confirmed staffing visibility</span>
-                  <span>One place for operational follow-through</span>
+            <div class="work-detail-shell">
+              <article
+                class="work-detail is-active"
+                id="work-panel-bartenders"
+                role="tabpanel"
+                aria-labelledby="work-tab-bartenders"
+                data-work-panel="bartenders"
+              >
+                <div class="work-detail-media">
+                  <img src="/img/service-bartenders-photo.png" alt="Bartenders preparing drinks behind the bar during live event service." />
                 </div>
-              </div>
-            </article>
+                <div class="work-detail-body">
+                  <span class="story-tag">Bartender Service</span>
+                  <h3>Fast drinks service with a polished guest-facing feel</h3>
+                  <p>
+                    This gallery item shows the type of bar team Black Eagle can place for weddings, private functions,
+                    and premium hospitality moments where both speed and presentation matter.
+                  </p>
+                  <div class="story-notes">
+                    <span>Welcome drinks and cocktail support</span>
+                    <span>Busy bar coverage during peak service</span>
+                    <span>Professional presentation behind the counter</span>
+                  </div>
+                </div>
+              </article>
+
+              <article
+                class="work-detail"
+                id="work-panel-waiters"
+                role="tabpanel"
+                aria-labelledby="work-tab-waiters"
+                data-work-panel="waiters"
+                hidden
+              >
+                <div class="work-detail-media">
+                  <img src="/img/service-waiters-photo.png" alt="Waiting staff serving guests and supporting front-of-house event delivery." />
+                </div>
+                <div class="work-detail-body">
+                  <span class="story-tag">Waiting Staff</span>
+                  <h3>Floor teams that help the room feel calm, ready, and organised</h3>
+                  <p>
+                    This card is for front-of-house service work. It is the right place to show images of event staff
+                    serving guests, handling tables, and maintaining a polished standard across the floor.
+                  </p>
+                  <div class="story-notes">
+                    <span>Guest welcome and table support</span>
+                    <span>Reliable pacing throughout live service</span>
+                    <span>Professional presence at private events</span>
+                  </div>
+                </div>
+              </article>
+
+              <article
+                class="work-detail"
+                id="work-panel-chefs"
+                role="tabpanel"
+                aria-labelledby="work-tab-chefs"
+                data-work-panel="chefs"
+                hidden
+              >
+                <div class="work-detail-media">
+                  <img src="/img/service-chefs-photo.png" alt="Chef-led kitchen service supporting event delivery behind the scenes." />
+                </div>
+                <div class="work-detail-body">
+                  <span class="story-tag">Chef Support</span>
+                  <h3>Kitchen specialists who keep back-of-house delivery moving</h3>
+                  <p>
+                    This space highlights chef and kitchen roles that support the event from behind the scenes. It works
+                    well for showing food preparation, service coordination, and the pressure-handling side of operations.
+                  </p>
+                  <div class="story-notes">
+                    <span>Prep and pass support during service</span>
+                    <span>Stronger back-of-house coordination</span>
+                    <span>Experienced kitchen coverage for event days</span>
+                  </div>
+                </div>
+              </article>
+            </div>
           </div>
         </div>
       </section>
@@ -362,5 +421,37 @@
       </div>
     </footer>
   </div>
+
+  <script>
+    (() => {
+      const gallery = document.querySelector("[data-work-gallery]");
+      if (!gallery) return;
+
+      const cards = Array.from(gallery.querySelectorAll("[data-work-target]"));
+      const panels = Array.from(gallery.querySelectorAll("[data-work-panel]"));
+
+      const activatePanel = (targetId) => {
+        cards.forEach((card) => {
+          const isActive = card.dataset.workTarget === targetId;
+          card.classList.toggle("is-active", isActive);
+          card.setAttribute("aria-selected", String(isActive));
+        });
+
+        panels.forEach((panel) => {
+          const isActive = panel.dataset.workPanel === targetId;
+          panel.classList.toggle("is-active", isActive);
+          panel.hidden = !isActive;
+        });
+      };
+
+      cards.forEach((card) => {
+        card.addEventListener("click", () => activatePanel(card.dataset.workTarget));
+      });
+
+      if (cards.length) {
+        activatePanel(cards[0].dataset.workTarget);
+      }
+    })();
+  </script>
 </body>
 </html>
