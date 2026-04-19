@@ -33,6 +33,7 @@ body {
     linear-gradient(180deg, #0a0d12 0%, #0d1219 45%, #101620 100%);
   color: var(--text);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 body::before {
@@ -61,6 +62,7 @@ img {
 .page-shell {
   position: relative;
   z-index: 1;
+  overflow-x: clip;
 }
 
 .container {
@@ -531,6 +533,7 @@ img {
 .work-gallery {
   display: grid;
   gap: 24px;
+  min-width: 0;
 }
 
 .work-banner {
@@ -726,6 +729,7 @@ img {
   display: grid;
   gap: 16px;
   padding: 20px 0 4px;
+  min-width: 0;
 }
 
 .role-strip-header {
@@ -760,10 +764,16 @@ img {
 
 .role-carousel-shell {
   position: relative;
+  width: 100%;
+  max-width: 100%;
   padding: 0 68px;
+  overflow: hidden;
 }
 
 .role-carousel-viewport {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -807,6 +817,7 @@ img {
 
 .role-pill {
   flex: 0 0 clamp(220px, 16vw, 252px);
+  max-width: 252px;
   min-height: 114px;
   padding: 18px;
   display: grid;
@@ -842,6 +853,7 @@ img {
   display: grid;
   gap: 16px;
   padding-top: 6px;
+  min-width: 0;
 }
 
 .featured-role-card {
@@ -849,6 +861,7 @@ img {
   grid-template-columns: minmax(0, 1.06fr) minmax(300px, 0.94fr);
   gap: 24px;
   padding: 18px;
+  min-width: 0;
   border-radius: var(--radius-xl);
   background:
     linear-gradient(140deg, rgba(211, 174, 86, 0.1), transparent 36%),
@@ -858,6 +871,7 @@ img {
 }
 
 .featured-role-media {
+  min-width: 0;
   border-radius: 22px;
   overflow: hidden;
   min-height: 320px;
@@ -868,6 +882,7 @@ img {
 .featured-role-media img {
   width: 100%;
   height: 100%;
+  display: block;
   object-fit: cover;
 }
 
@@ -875,6 +890,7 @@ img {
   display: grid;
   align-content: center;
   gap: 16px;
+  min-width: 0;
 }
 
 .featured-role-body h3 {
