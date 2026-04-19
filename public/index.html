@@ -40,67 +40,74 @@
 
     <main>
       <section class="hero">
-        <div class="container hero-grid">
-          <div class="hero-copy">
-            <span class="eyebrow">Verified staffing for live events</span>
-            <h1>
-              Hospitality teams that feel
-              <span>ready before guests arrive.</span>
-            </h1>
-            <p>
-              Black Eagle Agency helps clients secure trained bar, floor, kitchen, and support staff
-              for weddings, private events, and commercial service. Clients stay in control of deposits,
-              final rosters, and post-event feedback. Staff see relevant opportunities, apply to the
-              right roles, and manage work through one professional platform.
-            </p>
+        <div class="container">
+          <div class="hero-slider-shell" data-hero-slider>
+            <figure class="hero-slide is-active" data-hero-slide aria-hidden="false">
+              <img class="hero-slide-image" src="/img/service-bartenders-photo.png" alt="Bartenders preparing drinks behind the bar during live event service." />
+            </figure>
+            <figure class="hero-slide" data-hero-slide aria-hidden="true">
+              <img class="hero-slide-image" src="/img/service-waiters-photo.png" alt="Waiting staff serving guests and supporting front-of-house event delivery." />
+            </figure>
+            <figure class="hero-slide" data-hero-slide aria-hidden="true">
+              <img class="hero-slide-image" src="/img/service-chefs-photo.png" alt="Chef-led kitchen service supporting event delivery behind the scenes." />
+            </figure>
+            <figure class="hero-slide" data-hero-slide aria-hidden="true">
+              <img class="hero-slide-image" src="/img/service-security-photo.png" alt="Security staff checking guest identification at an event entrance." />
+            </figure>
 
-            <div class="hero-actions">
-              <a class="button button-primary" href="/Customer-logins/customer-login-create.html">Hire Staff</a>
-              <a class="button button-secondary" href="/staff-logins/staff-login-create.html">Join Our Team</a>
+            <div class="hero-slide-wash"></div>
+
+            <div class="hero-slider-overlay">
+              <div class="hero-copy hero-copy-card">
+                <span class="eyebrow">Homepage Slider</span>
+                <h1>
+                  Event teams shown in a
+                  <span>clean rotating banner.</span>
+                </h1>
+                <p>
+                  The top of the homepage now uses the uploaded visuals as a slimmer slider. It stays more rectangular,
+                  less overwhelming, and still gives the page a stronger first impression.
+                </p>
+
+                <div class="hero-actions">
+                  <a class="button button-primary" href="/Customer-logins/customer-login-create.html">Hire Staff</a>
+                  <a class="button button-secondary" href="/staff-logins/staff-login-create.html">Join Our Team</a>
+                </div>
+
+                <div class="badge-row">
+                  <span class="badge">Bartenders</span>
+                  <span class="badge">Waiters</span>
+                  <span class="badge">Chefs</span>
+                  <span class="badge">Security</span>
+                </div>
+              </div>
+
+              <aside class="panel hero-panel hero-panel-floating">
+                <span class="panel-kicker">Visual Slider</span>
+                <h2 class="panel-title">Slim rectangle, not full-width.</h2>
+                <p class="panel-copy">
+                  This slider now sits inside the page container so it feels cleaner and more controlled instead of stretching
+                  edge to edge across the full screen.
+                </p>
+              </aside>
             </div>
 
-            <div class="badge-row">
-              <span class="badge">Weddings & private parties</span>
-              <span class="badge">Corporate hospitality</span>
-              <span class="badge">Verified onboarding flow</span>
-              <span class="badge">Deposit + balance payment structure</span>
+            <div class="hero-slider-controls">
+              <div class="hero-slider-controls-inner">
+                <div class="hero-slider-arrows">
+                  <button class="hero-slider-arrow" type="button" data-hero-prev aria-label="Previous header slide">&#8249;</button>
+                  <button class="hero-slider-arrow" type="button" data-hero-next aria-label="Next header slide">&#8250;</button>
+                </div>
+
+                <div class="hero-slider-dots" role="tablist" aria-label="Homepage header slides">
+                  <button class="hero-slider-dot is-active" type="button" role="tab" data-hero-dot="0" aria-selected="true">Bartenders</button>
+                  <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="1" aria-selected="false">Waiters</button>
+                  <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="2" aria-selected="false">Chefs</button>
+                  <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="3" aria-selected="false">Security</button>
+                </div>
+              </div>
             </div>
           </div>
-
-          <aside class="panel hero-panel">
-            <span class="panel-kicker">Operational clarity</span>
-            <h2 class="panel-title">Built for clients, staff, and internal control.</h2>
-            <p class="panel-copy">
-              Instead of chasing staffing updates in messages, Black Eagle keeps approvals, event access,
-              staffing decisions, and feedback in one place.
-            </p>
-
-            <div class="mini-list">
-              <div class="mini-item">
-                <div class="mini-icon">01</div>
-                <div>
-                  <strong>Client requests stay structured</strong>
-                  <span>Create events, pay deposits, review confirmed teams, and see who is attending before the day begins.</span>
-                </div>
-              </div>
-
-              <div class="mini-item">
-                <div class="mini-icon">02</div>
-                <div>
-                  <strong>Staff only see relevant opportunities</strong>
-                  <span>Role matching, availability, and location rules reduce bad applications and last-minute dropouts.</span>
-                </div>
-              </div>
-
-              <div class="mini-item">
-                <div class="mini-icon">03</div>
-                <div>
-                  <strong>Admin decisions stay accountable</strong>
-                  <span>Approvals, roster visibility, staff selection, and payments can all be managed from the desktop dashboard.</span>
-                </div>
-              </div>
-            </div>
-          </aside>
         </div>
       </section>
 
@@ -565,6 +572,77 @@
 
   <script>
     (() => {
+      const slider = document.querySelector("[data-hero-slider]");
+      if (slider) {
+        const slides = Array.from(slider.querySelectorAll("[data-hero-slide]"));
+        const dots = Array.from(slider.querySelectorAll("[data-hero-dot]"));
+        const prevButton = slider.querySelector("[data-hero-prev]");
+        const nextButton = slider.querySelector("[data-hero-next]");
+        const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        let currentIndex = slides.findIndex((slide) => slide.classList.contains("is-active"));
+        let autoplayId = null;
+
+        if (currentIndex < 0) currentIndex = 0;
+
+        const activateSlide = (nextIndex) => {
+          currentIndex = (nextIndex + slides.length) % slides.length;
+
+          slides.forEach((slide, index) => {
+            const isActive = index === currentIndex;
+            slide.classList.toggle("is-active", isActive);
+            slide.setAttribute("aria-hidden", String(!isActive));
+          });
+
+          dots.forEach((dot, index) => {
+            const isActive = index === currentIndex;
+            dot.classList.toggle("is-active", isActive);
+            dot.setAttribute("aria-selected", String(isActive));
+          });
+        };
+
+        const stopAutoplay = () => {
+          if (autoplayId !== null) {
+            window.clearInterval(autoplayId);
+            autoplayId = null;
+          }
+        };
+
+        const startAutoplay = () => {
+          if (prefersReducedMotion || slides.length < 2) return;
+          stopAutoplay();
+          autoplayId = window.setInterval(() => activateSlide(currentIndex + 1), 5200);
+        };
+
+        prevButton?.addEventListener("click", () => {
+          activateSlide(currentIndex - 1);
+          startAutoplay();
+        });
+
+        nextButton?.addEventListener("click", () => {
+          activateSlide(currentIndex + 1);
+          startAutoplay();
+        });
+
+        dots.forEach((dot, index) => {
+          dot.addEventListener("click", () => {
+            activateSlide(index);
+            startAutoplay();
+          });
+        });
+
+        slider.addEventListener("mouseenter", stopAutoplay);
+        slider.addEventListener("mouseleave", startAutoplay);
+        slider.addEventListener("focusin", stopAutoplay);
+        slider.addEventListener("focusout", (event) => {
+          if (!slider.contains(event.relatedTarget)) {
+            startAutoplay();
+          }
+        });
+
+        activateSlide(currentIndex);
+        startAutoplay();
+      }
+
       const gallery = document.querySelector("[data-work-gallery]");
       if (!gallery) return;
 
