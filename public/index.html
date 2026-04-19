@@ -332,71 +332,79 @@
                 </p>
               </div>
 
-              <div class="role-pill-track" aria-label="Additional Black Eagle roles">
-                <article class="role-pill">
-                  <span class="role-pill-group">Hospitality</span>
-                  <strong>Kitchen Porter</strong>
-                </article>
-                <article class="role-pill role-pill-featured">
-                  <span class="role-pill-group">Featured Next</span>
-                  <strong>Security</strong>
-                </article>
-                <article class="role-pill role-pill-featured">
-                  <span class="role-pill-group">Featured Next</span>
-                  <strong>Barback</strong>
-                </article>
-                <article class="role-pill">
-                  <span class="role-pill-group">Event Crew</span>
-                  <strong>Event Staff</strong>
-                </article>
-                <article class="role-pill role-pill-featured">
-                  <span class="role-pill-group">Cleaning</span>
-                  <strong>House Cleaning</strong>
-                </article>
-                <article class="role-pill role-pill-featured">
-                  <span class="role-pill-group">Cleaning</span>
-                  <strong>Office Cleaning</strong>
-                </article>
-                <article class="role-pill role-pill-featured">
-                  <span class="role-pill-group">Cleaning</span>
-                  <strong>Deep Cleaning</strong>
-                </article>
-                <article class="role-pill role-pill-featured">
-                  <span class="role-pill-group">Cleaning</span>
-                  <strong>Window Cleaner</strong>
-                </article>
-                <article class="role-pill">
-                  <span class="role-pill-group">Trade</span>
-                  <strong>Construction Worker</strong>
-                </article>
-                <article class="role-pill">
-                  <span class="role-pill-group">Trade</span>
-                  <strong>Electrician</strong>
-                </article>
-                <article class="role-pill">
-                  <span class="role-pill-group">Trade</span>
-                  <strong>Plumber</strong>
-                </article>
-                <article class="role-pill">
-                  <span class="role-pill-group">Trade</span>
-                  <strong>Painter</strong>
-                </article>
-                <article class="role-pill">
-                  <span class="role-pill-group">Trade</span>
-                  <strong>Handyman</strong>
-                </article>
-                <article class="role-pill">
-                  <span class="role-pill-group">Security</span>
-                  <strong>Door Supervisor</strong>
-                </article>
-                <article class="role-pill">
-                  <span class="role-pill-group">Support</span>
-                  <strong>Delivery Driver</strong>
-                </article>
-                <article class="role-pill">
-                  <span class="role-pill-group">Support</span>
-                  <strong>Warehouse Staff</strong>
-                </article>
+              <div class="role-carousel-shell" data-role-carousel>
+                <button class="role-carousel-arrow role-carousel-arrow-prev" type="button" data-role-prev aria-label="Previous roles">&#8249;</button>
+
+                <div class="role-carousel-viewport">
+                  <div class="role-pill-track" aria-label="Additional Black Eagle roles">
+                    <article class="role-pill">
+                      <span class="role-pill-group">Hospitality</span>
+                      <strong>Kitchen Porter</strong>
+                    </article>
+                    <article class="role-pill role-pill-featured">
+                      <span class="role-pill-group">Featured Next</span>
+                      <strong>Security</strong>
+                    </article>
+                    <article class="role-pill role-pill-featured">
+                      <span class="role-pill-group">Featured Next</span>
+                      <strong>Barback</strong>
+                    </article>
+                    <article class="role-pill">
+                      <span class="role-pill-group">Event Crew</span>
+                      <strong>Event Staff</strong>
+                    </article>
+                    <article class="role-pill role-pill-featured">
+                      <span class="role-pill-group">Cleaning</span>
+                      <strong>House Cleaning</strong>
+                    </article>
+                    <article class="role-pill role-pill-featured">
+                      <span class="role-pill-group">Cleaning</span>
+                      <strong>Office Cleaning</strong>
+                    </article>
+                    <article class="role-pill role-pill-featured">
+                      <span class="role-pill-group">Cleaning</span>
+                      <strong>Deep Cleaning</strong>
+                    </article>
+                    <article class="role-pill role-pill-featured">
+                      <span class="role-pill-group">Cleaning</span>
+                      <strong>Window Cleaner</strong>
+                    </article>
+                    <article class="role-pill">
+                      <span class="role-pill-group">Trade</span>
+                      <strong>Construction Worker</strong>
+                    </article>
+                    <article class="role-pill">
+                      <span class="role-pill-group">Trade</span>
+                      <strong>Electrician</strong>
+                    </article>
+                    <article class="role-pill">
+                      <span class="role-pill-group">Trade</span>
+                      <strong>Plumber</strong>
+                    </article>
+                    <article class="role-pill">
+                      <span class="role-pill-group">Trade</span>
+                      <strong>Painter</strong>
+                    </article>
+                    <article class="role-pill">
+                      <span class="role-pill-group">Trade</span>
+                      <strong>Handyman</strong>
+                    </article>
+                    <article class="role-pill">
+                      <span class="role-pill-group">Security</span>
+                      <strong>Door Supervisor</strong>
+                    </article>
+                    <article class="role-pill">
+                      <span class="role-pill-group">Support</span>
+                      <strong>Delivery Driver</strong>
+                    </article>
+                    <article class="role-pill">
+                      <span class="role-pill-group">Support</span>
+                      <strong>Warehouse Staff</strong>
+                    </article>
+                  </div>
+                </div>
+
+                <button class="role-carousel-arrow role-carousel-arrow-next" type="button" data-role-next aria-label="Next roles">&#8250;</button>
               </div>
             </section>
 
@@ -670,6 +678,78 @@
       if (cards.length) {
         activatePanel(cards[0].dataset.workTarget);
       }
+    })();
+
+    (() => {
+      const carousel = document.querySelector("[data-role-carousel]");
+      if (!carousel) return;
+
+      const track = carousel.querySelector(".role-pill-track");
+      const prevButton = carousel.querySelector("[data-role-prev]");
+      const nextButton = carousel.querySelector("[data-role-next]");
+      const firstCard = track?.querySelector(".role-pill");
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      let autoplayId = null;
+
+      if (!track || !firstCard) return;
+
+      const getStep = () => {
+        const styles = window.getComputedStyle(track);
+        const gap = Number.parseFloat(styles.columnGap || styles.gap || "14") || 14;
+        return firstCard.getBoundingClientRect().width + gap;
+      };
+
+      const scrollRoles = (direction) => {
+        const step = getStep();
+        const maxScroll = track.scrollWidth - track.clientWidth;
+        const nextLeft = direction > 0 ? track.scrollLeft + step : track.scrollLeft - step;
+
+        if (direction > 0 && track.scrollLeft >= maxScroll - step * 0.35) {
+          track.scrollTo({ left: 0, behavior: "smooth" });
+          return;
+        }
+
+        if (direction < 0 && track.scrollLeft <= step * 0.35) {
+          track.scrollTo({ left: maxScroll, behavior: "smooth" });
+          return;
+        }
+
+        track.scrollTo({ left: nextLeft, behavior: "smooth" });
+      };
+
+      const stopAutoplay = () => {
+        if (autoplayId !== null) {
+          window.clearInterval(autoplayId);
+          autoplayId = null;
+        }
+      };
+
+      const startAutoplay = () => {
+        if (prefersReducedMotion) return;
+        stopAutoplay();
+        autoplayId = window.setInterval(() => scrollRoles(1), 3200);
+      };
+
+      prevButton?.addEventListener("click", () => {
+        scrollRoles(-1);
+        startAutoplay();
+      });
+
+      nextButton?.addEventListener("click", () => {
+        scrollRoles(1);
+        startAutoplay();
+      });
+
+      carousel.addEventListener("mouseenter", stopAutoplay);
+      carousel.addEventListener("mouseleave", startAutoplay);
+      carousel.addEventListener("focusin", stopAutoplay);
+      carousel.addEventListener("focusout", (event) => {
+        if (!carousel.contains(event.relatedTarget)) {
+          startAutoplay();
+        }
+      });
+
+      startAutoplay();
     })();
   </script>
 </body>
