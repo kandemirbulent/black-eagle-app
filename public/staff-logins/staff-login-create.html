@@ -6,38 +6,59 @@
   <title>Create Staff Account</title>
 
   <style>
+    :root {
+      --bg: #0a0d12;
+      --bg-soft: #101723;
+      --panel: rgba(12, 17, 24, 0.92);
+      --panel-soft: rgba(19, 27, 39, 0.96);
+      --text: #f5f0e5;
+      --muted: #b8c0ce;
+      --gold: #d3ae56;
+      --gold-strong: #f0c96a;
+      --border: rgba(255, 255, 255, 0.08);
+      --danger: #ff9f9f;
+      --success: #9ae8b2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: Arial, sans-serif;
-      background: #f3f4f6;
+      background:
+        radial-gradient(circle at top left, rgba(211, 174, 86, 0.18), transparent 28%),
+        linear-gradient(160deg, var(--bg) 0%, #101823 52%, #090c11 100%);
       margin: 0;
-      padding: 0;
+      padding: 24px;
       display: flex;
       justify-content: center;
       align-items: flex-start;
       min-height: 100vh;
+      color: var(--text);
     }
 
     form {
-      background: #ffffff;
+      background: linear-gradient(180deg, var(--panel-soft), var(--panel));
       padding: 28px;
-      border-radius: 14px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      border-radius: 18px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
       width: 100%;
       max-width: 760px;
       margin: 30px 0;
-      border: 1px solid #e5e7eb;
+      border: 1px solid rgba(211, 174, 86, 0.18);
     }
 
     h1 {
       font-size: 24px;
-      color: #1f2937;
+      color: var(--text);
       margin-bottom: 8px;
       font-weight: 600;
     }
 
     .step-indicator {
       font-size: 14px;
-      color: #6b7280;
+      color: var(--muted);
       margin-bottom: 20px;
     }
 
@@ -62,7 +83,7 @@
     label {
       font-size: 13px;
       font-weight: 600;
-      color: #374151;
+      color: var(--muted);
       margin-top: 8px;
       display: block;
     }
@@ -72,28 +93,28 @@
       width: 100%;
       padding: 10px;
       margin-top: 5px;
-      border-radius: 8px;
-      border: 1px solid #d1d5db;
-      background: #f9fafb;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
       font-size: 14px;
-      transition: 0.2s;
-      box-sizing: border-box;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
     }
 
     input:focus,
     select:focus {
       outline: none;
-      border-color: #f4c430;
-      box-shadow: 0 0 0 2px rgba(244,196,48,0.25);
-      background: #fff;
+      border-color: rgba(240, 201, 106, 0.75);
+      box-shadow: 0 0 0 3px rgba(211, 174, 86, 0.18);
+      background: rgba(255, 255, 255, 0.06);
     }
 
     .positions {
       margin-top: 6px;
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
       padding: 12px;
-      background: #f9fafb;
+      background: rgba(255, 255, 255, 0.03);
     }
 
     .positions-grid {
@@ -107,35 +128,35 @@
       align-items: center;
       gap: 8px;
       font-size: 14px;
-      color: #1f2937;
+      color: var(--text);
       cursor: pointer;
-      padding: 6px 4px;
-      border-radius: 8px;
-      transition: 0.2s;
+      padding: 6px 8px;
+      border-radius: 10px;
+      transition: background 0.2s ease;
     }
 
     .pos-item:hover {
-      background: rgba(244,196,48,0.10);
+      background: rgba(211, 174, 86, 0.12);
     }
 
     .pos-item input {
       width: auto;
       margin: 0;
-      accent-color: #f4c430;
+      accent-color: var(--gold);
     }
 
     .camera-box {
       margin-top: 6px;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
       padding: 14px;
-      background: #f9fafb;
+      background: rgba(255, 255, 255, 0.03);
     }
 
     .camera-note {
       margin-top: 0;
       margin-bottom: 12px;
-      color: #6b7280;
+      color: var(--muted);
       font-size: 13px;
       line-height: 1.5;
     }
@@ -160,7 +181,7 @@
       max-width: 100%;
       aspect-ratio: 4 / 3;
       border-radius: 12px;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--border);
       background: #111;
       object-fit: cover;
     }
@@ -171,7 +192,7 @@
 
     .selfie-preview {
       display: none;
-      background: #e5e7eb;
+      background: rgba(255, 255, 255, 0.06);
     }
 
     .camera-buttons {
@@ -183,31 +204,34 @@
 
     button {
       padding: 11px 14px;
-      border-radius: 8px;
-      border: none;
+      border-radius: 10px;
+      border: 1px solid transparent;
       font-weight: 600;
       cursor: pointer;
       font-size: 14px;
-      transition: 0.2s;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     }
 
     .camera-btn {
-      background: #111;
-      color: #fff;
+      background: linear-gradient(135deg, var(--gold), var(--gold-strong));
+      color: #15110a;
     }
 
     .camera-btn:hover {
-      background: #f4c430;
-      color: #000;
+      background: linear-gradient(135deg, var(--gold-strong), #ffd77d);
+      transform: translateY(-1px);
     }
 
-    .secondary-btn {
-      background: #6b7280;
-      color: #fff;
+    .secondary-btn,
+    .back-btn {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border-color: var(--border);
     }
 
-    .secondary-btn:hover {
-      background: #4b5563;
+    .secondary-btn:hover,
+    .back-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
     }
 
     .submit-row {
@@ -219,14 +243,14 @@
     .next-btn,
     .submit-btn {
       flex: 1;
-      background: #111;
-      color: #fff;
+      background: linear-gradient(135deg, var(--gold), var(--gold-strong));
+      color: #15110a;
     }
 
     .next-btn:hover,
     .submit-btn:hover {
-      background: #f4c430;
-      color: #000;
+      background: linear-gradient(135deg, var(--gold-strong), #ffd77d);
+      transform: translateY(-1px);
     }
 
     .submit-btn:disabled {
@@ -236,26 +260,20 @@
 
     .back-btn {
       flex: 1;
-      background: #6b7280;
-      color: #fff;
-    }
-
-    .back-btn:hover {
-      background: #4b5563;
     }
 
     .status {
       margin-top: 10px;
       font-size: 13px;
-      color: #6b7280;
+      color: var(--muted);
     }
 
     .status.error {
-      color: #b91c1c;
+      color: var(--danger);
     }
 
     .status.ok {
-      color: #166534;
+      color: var(--success);
     }
 
     @media (max-width: 700px) {

@@ -5,71 +5,132 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Customer Login</title>
   <style>
+    :root {
+      --bg: #0a0d12;
+      --bg-soft: #101723;
+      --panel: rgba(12, 17, 24, 0.92);
+      --panel-soft: rgba(19, 27, 39, 0.96);
+      --text: #f5f0e5;
+      --muted: #b8c0ce;
+      --gold: #d3ae56;
+      --gold-strong: #f0c96a;
+      --border: rgba(255, 255, 255, 0.08);
+      --danger: #ff9f9f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       font-family: Arial, sans-serif;
-      background: #f4f4f4;
+      background:
+        radial-gradient(circle at top left, rgba(211, 174, 86, 0.18), transparent 30%),
+        linear-gradient(160deg, var(--bg) 0%, #101823 52%, #090c11 100%);
       margin: 0;
       padding: 20px;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
+      color: var(--text);
     }
+
     form {
-      background: #fff;
+      background: linear-gradient(180deg, var(--panel-soft), var(--panel));
       padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      border-radius: 18px;
+      border: 1px solid rgba(211, 174, 86, 0.18);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
       width: 100%;
       max-width: 400px;
     }
+
     h1 {
       text-align: center;
-      color: #222;
+      color: var(--text);
       margin-bottom: 20px;
     }
+
     label {
       display: block;
       margin: 10px 0 5px;
       font-weight: bold;
+      color: var(--muted);
     }
+
     input {
       width: 100%;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
+      padding: 11px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
       margin-bottom: 15px;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
     }
+
+    input:focus {
+      outline: none;
+      border-color: rgba(240, 201, 106, 0.75);
+      box-shadow: 0 0 0 3px rgba(211, 174, 86, 0.18);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
     .buttons {
       display: flex;
       justify-content: space-between;
+      gap: 10px;
     }
+
     button {
       padding: 12px;
-      background: #333;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
+      border: 1px solid transparent;
+      border-radius: 10px;
       cursor: pointer;
       font-size: 16px;
+      font-weight: 600;
       flex: 1;
-      margin: 0 5px;
+      transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
     }
-    button:hover {
-      background: #555;
+
+    .buttons button:first-child {
+      background: linear-gradient(135deg, var(--gold), var(--gold-strong));
+      color: #15110a;
     }
+
+    .buttons button:first-child:hover {
+      background: linear-gradient(135deg, var(--gold-strong), #ffd77d);
+      transform: translateY(-1px);
+    }
+
+    .buttons button:last-child {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      border-color: var(--border);
+    }
+
+    .buttons button:last-child:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(211, 174, 86, 0.25);
+    }
+
     .error {
-      color: red;
+      color: var(--danger);
       font-size: 14px;
       margin-top: 10px;
       text-align: center;
     }
+
     a.forgot {
       display: block;
       margin-top: 10px;
       text-align: right;
-      color: #0066cc;
+      color: var(--gold-strong);
       text-decoration: none;
+    }
+
+    a.forgot:hover {
+      color: #ffe3a6;
     }
   </style>
 </head>
