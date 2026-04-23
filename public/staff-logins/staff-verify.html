@@ -160,10 +160,16 @@
         return;
       }
 
+      if (!data.setupToken) {
+        setStatus("Verification succeeded but activation could not be prepared. Please try again.", "error");
+        setLoading(verifyBtn, false, "", "Verify");
+        return;
+      }
+
       setStatus("Verified successfully!", "ok");
 
       setTimeout(() => {
-        window.location.href = `/staff-logins/staff-set-password.html?email=${encodeURIComponent(email)}`;
+        window.location.href = `/staff-logins/staff-set-password.html?email=${encodeURIComponent(email)}&token=${encodeURIComponent(data.setupToken)}`;
       }, 1000);
 
     } catch (err) {

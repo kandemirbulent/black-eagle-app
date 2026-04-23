@@ -37,7 +37,13 @@ const {
   registerCustomer,
   loginCustomer,
 } = require("./services/customer-service");
-const { resendStaffVerificationCode } = require("./services/staff-service");
+const {
+  createStaffSetupToken,
+  requestStaffPasswordReset,
+  resetStaffPassword,
+  resendStaffVerificationCode,
+  validateStaffPasswordSetup,
+} = require("./services/staff-service");
 
 const app = express();
 
@@ -270,6 +276,35 @@ async function sendCustomerPasswordLink(customer, token, options = {}) {
             ${actionText}
           </a>
         </p>
+        <p>This link will expire in 24 hours.</p>
+      </div>
+    `,
+  });
+}
+
+async function sendStaffPasswordLink(staff, token) {
+  const baseUrl = getBaseUrl();
+  const actionLink =
+    `${baseUrl}/staff-logins/staff-reset-password.html?token=${encodeURIComponent(
+      token
+    )}&email=${encodeURIComponent(staff.email || "")}`;
+
+  await mailer.sendMail({
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    to: staff.email,
+    subject: "Reset your Black Eagle staff password",
+    html: `
+      <div style="font-family:Arial,sans-serif;padding:20px;">
+        <h2>Hello ${staff.firstName || "there"},</h2>
+        <p>We received a request to reset your Black Eagle staff password.</p>
+        <p>Use the secure link below to set a new password:</p>
+        <p style="margin:24px 0;">
+          <a href="${actionLink}" style="background:#111827;color:#ffffff;padding:12px 18px;border-radius:8px;text-decoration:none;display:inline-block;">
+            Reset Staff Password
+          </a>
+        </p>
+        <p>If the button does not work, copy and paste this link into your browser:</p>
+        <p style="word-break:break-all;">${actionLink}</p>
         <p>This link will expire in 24 hours.</p>
       </div>
     `,
@@ -582,6 +617,49 @@ async function handleCustomerForgotPassword(req, res) {
 
 app.post("/customer-forgot-password", handleCustomerForgotPassword);
 app.post("/customer-forgot", handleCustomerForgotPassword);
+
+async function handleStaffForgotPassword(req, res) {
+  try {
+    const result = await requestStaffPasswordReset({
+      Staff,
+      email: req.body?.email,
+      createToken: () => crypto.randomBytes(24).toString("hex"),
+      sendStaffPasswordLink,
+    });
+
+    console.log(`🔐 Staff password reset requested for: ${normalizeEmail(req.body?.email)}`);
+
+    return res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error("❌ Staff forgot password error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while sending reset link.",
+    });
+  }
+}
+
+app.post("/api/staff/forgot-password", handleStaffForgotPassword);
+app.post("/staff-forgot-password", handleStaffForgotPassword);
+
+app.post("/api/staff/reset-password", async (req, res) => {
+  try {
+    const result = await resetStaffPassword({
+      Staff,
+      email: req.body?.email,
+      token: req.body?.token,
+      password: req.body?.password ?? req.body?.newPassword,
+    });
+
+    return res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error("❌ Staff reset password error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while resetting password.",
+    });
+  }
+});
 
 // 🧾 Yeni sipariş
 app.post("/orders", async (req, res) => {
@@ -1127,15 +1205,21 @@ app.post("/api/staff/verify-email", async (req, res) => {
       });
     }
 
+    const { token: setupToken, expiresAt: setupTokenExpires } =
+      createStaffSetupToken({ crypto });
+
     staff.isVerified = true;
     staff.verifyCode = "";
     staff.verifyCodeExpires = null;
+    staff.setupToken = setupToken;
+    staff.setupTokenExpires = setupTokenExpires;
 
     await staff.save();
 
     return res.json({
       success: true,
       message: "Email verified successfully.",
+      setupToken,
     });
   } catch (err) {
     console.error("❌ Error verifying staff email:", err);
@@ -1169,36 +1253,36 @@ app.post("/api/staff/resend-code", async (req, res) => {
 // ✅ STAFF Set Password
 app.post("/api/staff/set-password", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, token } = req.body;
 
-    if (!email || !password) {
+    const normalizedEmail = String(email || "").toLowerCase().trim();
+
+    if (!normalizedEmail) {
       return res.status(400).json({
         success: false,
-        message: "Email and password are required.",
+        message: "Email is required.",
       });
     }
-
-    const normalizedEmail = String(email).toLowerCase().trim();
 
     const staff = await Staff.findOne({ email: normalizedEmail });
 
-    if (!staff) {
-      return res.status(404).json({
-        success: false,
-        message: "Staff account not found.",
-      });
+    const validation = validateStaffPasswordSetup({
+      staff,
+      token,
+      password,
+    });
+
+    if (!validation.ok) {
+      return res.status(validation.statusCode).json(validation.body);
     }
 
-    if (!staff.isVerified) {
-      return res.status(403).json({
-        success: false,
-        message: "Please verify your email first.",
-      });
-    }
-
-    staff.password = password;
+    staff.password = validation.normalizedPassword;
     staff.isPasswordSet = true;
     staff.status = "active";
+    staff.setupToken = "";
+    staff.setupTokenExpires = null;
+    staff.resetToken = "";
+    staff.resetTokenExpires = null;
 
     await staff.save();
 

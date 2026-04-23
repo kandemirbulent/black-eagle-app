@@ -136,6 +136,26 @@ const staffSchema = new mongoose.Schema(
       default: null,
     },
 
+    setupToken: {
+      type: String,
+      default: "",
+    },
+
+    setupTokenExpires: {
+      type: Date,
+      default: null,
+    },
+
+    resetToken: {
+      type: String,
+      default: "",
+    },
+
+    resetTokenExpires: {
+      type: Date,
+      default: null,
+    },
+
     isVerified: {
       type: Boolean,
       default: false,
@@ -155,6 +175,18 @@ const staffSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "active", "inactive", "rejected"],
       default: "pending",
+    },
+
+    averageRating: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+
+    feedbackCount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
   },
   {
