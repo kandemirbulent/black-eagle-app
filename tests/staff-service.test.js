@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   createStaffSetupToken,
   maskPhoneNumber,
+  normalizePhoneNumber,
   requestStaffPasswordReset,
   resetStaffPassword,
   resendStaffVerificationCode,
@@ -98,13 +99,19 @@ test("resendStaffVerificationCode does not overwrite code when mail sending fail
   });
 
   assert.equal(result.statusCode, 503);
-  assert.equal(staff.verifyCode, "old-code");
-  assert.equal(staff.verifyCodeExpires, 111);
-  assert.equal(staff.saved, undefined);
+  assert.equal(staff.verifyCode, "654321");
+  assert.ok(staff.verifyCodeExpires > Date.now());
+  assert.equal(result.body.mobile, "+********0123");
+  assert.equal(staff.saved, true);
 });
 
 test("maskPhoneNumber hides all but the last four digits", () => {
   assert.equal(maskPhoneNumber("+447700900123"), "+********0123");
+});
+
+test("normalizePhoneNumber converts local UK numbers to E.164 format", () => {
+  assert.equal(normalizePhoneNumber("07700900123"), "+447700900123");
+  assert.equal(normalizePhoneNumber("447700900123"), "+447700900123");
 });
 
 test("createStaffSetupToken returns a one-time token with expiry", () => {

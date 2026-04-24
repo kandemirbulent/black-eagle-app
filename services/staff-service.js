@@ -100,14 +100,31 @@ function normalizePhoneNumber(phone) {
     return "";
   }
 
-  const hasPlusPrefix = rawValue.startsWith("+");
+  if (rawValue.startsWith("00")) {
+    return normalizePhoneNumber(`+${rawValue.slice(2)}`);
+  }
+
   const digits = rawValue.replace(/\D/g, "");
 
   if (!digits) {
     return "";
   }
 
-  return hasPlusPrefix ? `+${digits}` : digits;
+  if (rawValue.startsWith("+")) {
+    return `+${digits}`;
+  }
+
+  // Default local UK mobile numbers like 07... to E.164 for Twilio delivery.
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return `+44${digits.slice(1)}`;
+  }
+
+  // Accept already international-looking numbers without the plus sign.
+  if (digits.length >= 10 && digits.length <= 15) {
+    return `+${digits}`;
+  }
+
+  return digits;
 }
 
 function maskPhoneNumber(phone) {
@@ -342,6 +359,9 @@ async function resendStaffVerificationCode({
   }
 
   const verifyCode = generateCode();
+  staff.verifyCode = verifyCode;
+  staff.verifyCodeExpires = Date.now() + 1000 * 60 * 15;
+  await staff.save();
 
   const smsResult = await sendStaffPhoneVerificationCode({
     sendSms,
@@ -353,13 +373,12 @@ async function resendStaffVerificationCode({
   if (!smsResult.ok) {
     return {
       statusCode: smsResult.statusCode,
-      body: smsResult.body,
+      body: {
+        ...smsResult.body,
+        mobile: maskPhoneNumber(staff.mobile),
+      },
     };
   }
-
-  staff.verifyCode = verifyCode;
-  staff.verifyCodeExpires = Date.now() + 1000 * 60 * 15;
-  await staff.save();
 
   return {
     statusCode: 200,

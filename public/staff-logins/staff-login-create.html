@@ -682,6 +682,18 @@
       if (!res.ok) {
         cameraStatus.textContent = data.message || "Failed to create staff account.";
         cameraStatus.className = "status error";
+
+        if (data.email) {
+          stopCamera();
+          setTimeout(() => {
+            const nextUrl = new URL("/staff-logins/staff-verify.html", window.location.origin);
+            nextUrl.searchParams.set("email", data.email || payload.email);
+            nextUrl.searchParams.set("mobile", data.mobile || payload.mobile);
+            window.location.href = nextUrl.toString();
+          }, 1200);
+          return;
+        }
+
         setSubmitState(false, "Submit");
         return;
       }

@@ -1184,6 +1184,8 @@ app.post("/api/staff/create", async (req, res) => {
 
     await newStaff.save();
 
+    const maskedMobile = maskPhoneNumber(newStaff.mobile);
+
     const smsResult = await sendStaffPhoneVerificationCode({
       sendSms: sendStaffPhoneOtpSms,
       mobile: newStaff.mobile,
@@ -1193,19 +1195,18 @@ app.post("/api/staff/create", async (req, res) => {
 
     if (!smsResult.ok) {
       console.error("❌ Staff phone verification SMS send failed:", smsResult.error);
-
-      await Staff.deleteOne({ _id: newStaff._id }).catch((cleanupErr) => {
-        console.error("❌ Failed to roll back staff after SMS send failure:", cleanupErr);
+      return res.status(smsResult.statusCode).json({
+        ...smsResult.body,
+        email: newStaff.email,
+        mobile: maskedMobile,
       });
-
-      return res.status(smsResult.statusCode).json(smsResult.body);
     }
 
     return res.status(201).json({
       success: true,
       message: "Do\u011frulama kodu telefonunuza g\u00f6nderildi.",
       email: newStaff.email,
-      mobile: maskPhoneNumber(newStaff.mobile),
+      mobile: maskedMobile,
     });
   } catch (err) {
     if (err && err.code === 11000) {
@@ -1268,87 +1269,6 @@ async function handleStaffPhoneOtpResend(req, res) {
 
 app.post("/api/staff/resend-phone-otp", handleStaffPhoneOtpResend);
 app.post("/api/staff/resend-code", handleStaffPhoneOtpResend);
-
-app.post("/api/staff/verify-email", async (req, res) => {
-  try {
-    const { email, code } = req.body;
-
-    if (!email || !code) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and verification code are required.",
-      });
-    }
-
-    const normalizedEmail = String(email).toLowerCase().trim();
-
-    const staff = await Staff.findOne({ email: normalizedEmail });
-
-    if (!staff) {
-      return res.status(404).json({
-        success: false,
-        message: "Staff account not found.",
-      });
-    }
-
-    if (!staff.verifyCode || staff.verifyCode !== String(code).trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid verification code.",
-      });
-    }
-
-    if (!staff.verifyCodeExpires || staff.verifyCodeExpires < Date.now()) {
-      return res.status(400).json({
-        success: false,
-        message: "Verification code has expired.",
-      });
-    }
-
-    const { token: setupToken, expiresAt: setupTokenExpires } =
-      createStaffSetupToken({ crypto });
-
-    staff.isVerified = true;
-    staff.verifyCode = "";
-    staff.verifyCodeExpires = null;
-    staff.setupToken = setupToken;
-    staff.setupTokenExpires = setupTokenExpires;
-
-    await staff.save();
-
-    return res.json({
-      success: true,
-      message: "Email verified successfully.",
-      setupToken,
-    });
-  } catch (err) {
-    console.error("❌ Error verifying staff email:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Server error while verifying email.",
-    });
-  }
-});
-
-app.post("/api/staff/resend-code", async (req, res) => {
-  try {
-    const result = await resendStaffVerificationCode({
-      Staff,
-      mailer,
-      email: req.body?.email,
-      generateCode: () =>
-        Math.floor(100000 + Math.random() * 900000).toString(),
-    });
-
-    return res.status(result.statusCode).json(result.body);
-  } catch (err) {
-    console.error("❌ Error resending staff verification code:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Server error while resending verification code.",
-    });
-  }
-});
 
 // ✅ STAFF Set Password
 app.post("/api/staff/set-password", async (req, res) => {
