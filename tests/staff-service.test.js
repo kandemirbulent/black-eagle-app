@@ -6,6 +6,7 @@ const {
   requestStaffPasswordReset,
   resetStaffPassword,
   resendStaffVerificationCode,
+  sendStaffVerificationEmail,
   validateStaffPasswordSetup,
 } = require("../services/staff-service");
 
@@ -55,6 +56,52 @@ test("resendStaffVerificationCode updates staff and sends email", async () => {
   assert.ok(staff.verifyCodeExpires > Date.now());
   assert.equal(mailPayload.to, "staff@example.com");
   assert.match(mailPayload.html, /654321/);
+});
+
+test("sendStaffVerificationEmail returns service error when mailer fails", async () => {
+  const result = await sendStaffVerificationEmail({
+    mailer: {
+      sendMail: async () => {
+        throw new Error("smtp unavailable");
+      },
+    },
+    email: "staff@example.com",
+    firstName: "Alex",
+    verifyCode: "654321",
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.statusCode, 503);
+  assert.match(result.body.message, /could not be sent/i);
+});
+
+test("resendStaffVerificationCode does not overwrite code when mail sending fails", async () => {
+  const staff = {
+    email: "staff@example.com",
+    firstName: "Alex",
+    isVerified: false,
+    verifyCode: "old-code",
+    verifyCodeExpires: 111,
+    save: async function () {
+      this.saved = true;
+    },
+  };
+
+  const result = await resendStaffVerificationCode({
+    Staff: createStaffModel(async () => staff),
+    mailer: {
+      sendMail: async () => {
+        throw new Error("smtp unavailable");
+      },
+    },
+    email: "staff@example.com",
+    generateCode: () => "654321",
+  });
+
+  assert.equal(result.statusCode, 503);
+  assert.equal(staff.verifyCode, "old-code");
+  assert.equal(staff.verifyCodeExpires, 111);
+  assert.equal(staff.saved, undefined);
 });
 
 test("createStaffSetupToken returns a one-time token with expiry", () => {

@@ -42,6 +42,7 @@ const {
   requestStaffPasswordReset,
   resetStaffPassword,
   resendStaffVerificationCode,
+  sendStaffVerificationEmail,
   validateStaffPasswordSetup,
 } = require("./services/staff-service");
 
@@ -1127,25 +1128,21 @@ app.post("/api/staff/create", async (req, res) => {
 
     await newStaff.save();
 
-    try {
-      await mailer.sendMail({
-        from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-        to: newStaff.email,
-        subject: "Verify your staff account",
-        html: `
-          <div style="font-family:Arial,sans-serif;padding:20px;">
-            <h2>Hello ${newStaff.firstName},</h2>
-            <p>Your staff account request has been received.</p>
-            <p>Please use the verification code below to verify your email:</p>
-            <div style="font-size:28px;font-weight:bold;letter-spacing:4px;margin:20px 0;">
-              ${verifyCode}
-            </div>
-            <p>This code will expire in 15 minutes.</p>
-          </div>
-        `,
+    const mailResult = await sendStaffVerificationEmail({
+      mailer,
+      email: newStaff.email,
+      firstName: newStaff.firstName,
+      verifyCode,
+    });
+
+    if (!mailResult.ok) {
+      console.error("❌ Staff verification email send failed:", mailResult.error);
+
+      await Staff.deleteOne({ _id: newStaff._id }).catch((cleanupErr) => {
+        console.error("❌ Failed to roll back staff after email send failure:", cleanupErr);
       });
-    } catch (mailErr) {
-      console.error("❌ Staff verification email send failed:", mailErr);
+
+      return res.status(mailResult.statusCode).json(mailResult.body);
     }
 
     return res.status(201).json({

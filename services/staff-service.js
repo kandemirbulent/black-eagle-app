@@ -93,6 +93,41 @@ function validateStaffPasswordSetup({ staff, token, password, now = Date.now() }
   };
 }
 
+async function sendStaffVerificationEmail({ mailer, email, firstName, verifyCode }) {
+  try {
+    await mailer.sendMail({
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to: email,
+      subject: "Verify your staff account",
+      html: `
+        <div style="font-family:Arial,sans-serif;padding:20px;">
+          <h2>Hello ${firstName || "there"},</h2>
+          <p>Please use the verification code below to verify your email:</p>
+          <div style="font-size:28px;font-weight:bold;letter-spacing:4px;margin:20px 0;">
+            ${verifyCode}
+          </div>
+          <p>This code will expire in 15 minutes.</p>
+        </div>
+      `,
+    });
+
+    return {
+      ok: true,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: 503,
+      body: {
+        success: false,
+        message:
+          "Verification email could not be sent right now. Please try again shortly.",
+      },
+      error,
+    };
+  }
+}
+
 async function requestStaffPasswordReset({
   Staff,
   email,
@@ -237,25 +272,23 @@ async function resendStaffVerificationCode({
 
   const verifyCode = generateCode();
 
+  const mailResult = await sendStaffVerificationEmail({
+    mailer,
+    email: staff.email,
+    firstName: staff.firstName,
+    verifyCode,
+  });
+
+  if (!mailResult.ok) {
+    return {
+      statusCode: mailResult.statusCode,
+      body: mailResult.body,
+    };
+  }
+
   staff.verifyCode = verifyCode;
   staff.verifyCodeExpires = Date.now() + 1000 * 60 * 15;
   await staff.save();
-
-  await mailer.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-    to: staff.email,
-    subject: "Verify your staff account",
-    html: `
-      <div style="font-family:Arial,sans-serif;padding:20px;">
-        <h2>Hello ${staff.firstName || "there"},</h2>
-        <p>Please use the verification code below to verify your email:</p>
-        <div style="font-size:28px;font-weight:bold;letter-spacing:4px;margin:20px 0;">
-          ${verifyCode}
-        </div>
-        <p>This code will expire in 15 minutes.</p>
-      </div>
-    `,
-  });
 
   return {
     statusCode: 200,
@@ -268,5 +301,6 @@ module.exports = {
   requestStaffPasswordReset,
   resetStaffPassword,
   resendStaffVerificationCode,
+  sendStaffVerificationEmail,
   validateStaffPasswordSetup,
 };
