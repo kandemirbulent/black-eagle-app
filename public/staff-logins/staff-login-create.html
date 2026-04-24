@@ -344,7 +344,7 @@
 
       <div>
         <label for="mobile">Mobile Phone</label>
-        <input id="mobile" type="tel">
+        <input id="mobile" type="tel" required>
       </div>
 
       <div class="full">
@@ -686,13 +686,16 @@
         return;
       }
 
-      cameraStatus.textContent = data.message || "Staff account created successfully. Redirecting to verification page...";
+      cameraStatus.textContent = data.message || "Do\u011frulama kodu telefonunuza g\u00f6nderildi.";
       cameraStatus.className = "status ok";
 
       stopCamera();
 
       setTimeout(() => {
-        window.location.href ="/staff-logins/staff-verify.html?email="+encodeURIComponent(payload.email); 
+        const nextUrl = new URL("/staff-logins/staff-verify.html", window.location.origin);
+        nextUrl.searchParams.set("email", data.email || payload.email);
+        nextUrl.searchParams.set("mobile", data.mobile || payload.mobile);
+        window.location.href = nextUrl.toString();
       }, 800);
 
     } catch (error) {

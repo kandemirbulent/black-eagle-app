@@ -50,8 +50,8 @@ function validateStaffPasswordSetup({ staff, token, password, now = Date.now() }
     return {
       ok: false,
       statusCode: 403,
-      body: { success: false, message: "Please verify your email first." },
-    };
+      body: { success: false, message: "Please verify your phone number first." },
+      };
   }
 
   if (staff.isPasswordSet || staff.password) {
@@ -71,7 +71,7 @@ function validateStaffPasswordSetup({ staff, token, password, now = Date.now() }
       statusCode: 403,
       body: {
         success: false,
-        message: "Invalid activation link. Please verify your email again.",
+        message: "Invalid activation link. Please complete phone verification again.",
       },
     };
   }
@@ -82,7 +82,7 @@ function validateStaffPasswordSetup({ staff, token, password, now = Date.now() }
       statusCode: 403,
       body: {
         success: false,
-        message: "Activation link has expired. Please verify your email again.",
+        message: "Activation link has expired. Please complete phone verification again.",
       },
     };
   }
@@ -91,6 +91,67 @@ function validateStaffPasswordSetup({ staff, token, password, now = Date.now() }
     ok: true,
     normalizedPassword,
   };
+}
+
+function normalizePhoneNumber(phone) {
+  const rawValue = String(phone || "").trim();
+
+  if (!rawValue) {
+    return "";
+  }
+
+  const hasPlusPrefix = rawValue.startsWith("+");
+  const digits = rawValue.replace(/\D/g, "");
+
+  if (!digits) {
+    return "";
+  }
+
+  return hasPlusPrefix ? `+${digits}` : digits;
+}
+
+function maskPhoneNumber(phone) {
+  const normalizedPhone = normalizePhoneNumber(phone);
+
+  if (!normalizedPhone) {
+    return "";
+  }
+
+  const prefix = normalizedPhone.startsWith("+") ? "+" : "";
+  const digits = normalizedPhone.replace(/\D/g, "");
+
+  if (digits.length <= 4) {
+    return `${prefix}${digits}`;
+  }
+
+  return `${prefix}${"*".repeat(digits.length - 4)}${digits.slice(-4)}`;
+}
+
+async function sendStaffPhoneVerificationCode({
+  sendSms,
+  mobile,
+  firstName,
+  verifyCode,
+}) {
+  try {
+    await sendSms({
+      to: mobile,
+      body: `Black Eagle verification code for ${firstName || "your account"}: ${verifyCode}. This code expires in 15 minutes.`,
+    });
+
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: 503,
+      body: {
+        success: false,
+        message:
+          "Phone verification code could not be sent right now. Please try again shortly.",
+      },
+      error,
+    };
+  }
 }
 
 async function sendStaffVerificationEmail({ mailer, email, firstName, verifyCode }) {
@@ -238,7 +299,7 @@ async function resetStaffPassword({
 
 async function resendStaffVerificationCode({
   Staff,
-  mailer,
+  sendSms,
   email,
   generateCode,
 }) {
@@ -265,24 +326,34 @@ async function resendStaffVerificationCode({
       statusCode: 400,
       body: {
         success: false,
-        message: "This email is already verified.",
+        message: "This phone number is already verified.",
+      },
+    };
+  }
+
+  if (!normalizePhoneNumber(staff.mobile)) {
+    return {
+      statusCode: 400,
+      body: {
+        success: false,
+        message: "A mobile number is required for phone verification.",
       },
     };
   }
 
   const verifyCode = generateCode();
 
-  const mailResult = await sendStaffVerificationEmail({
-    mailer,
-    email: staff.email,
+  const smsResult = await sendStaffPhoneVerificationCode({
+    sendSms,
+    mobile: staff.mobile,
     firstName: staff.firstName,
     verifyCode,
   });
 
-  if (!mailResult.ok) {
+  if (!smsResult.ok) {
     return {
-      statusCode: mailResult.statusCode,
-      body: mailResult.body,
+      statusCode: smsResult.statusCode,
+      body: smsResult.body,
     };
   }
 
@@ -292,15 +363,89 @@ async function resendStaffVerificationCode({
 
   return {
     statusCode: 200,
-    body: { success: true, message: "New verification code sent." },
+    body: {
+      success: true,
+      message: "New verification code sent to your phone.",
+      mobile: maskPhoneNumber(staff.mobile),
+    },
+  };
+}
+
+async function verifyStaffPhoneOtp({
+  Staff,
+  email,
+  code,
+  createSetupToken,
+  now = Date.now(),
+}) {
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedCode = String(code || "").trim();
+
+  if (!normalizedEmail || !normalizedCode) {
+    return {
+      statusCode: 400,
+      body: {
+        success: false,
+        message: "Email and phone verification code are required.",
+      },
+    };
+  }
+
+  const staff = await Staff.findOne({ email: normalizedEmail });
+
+  if (!staff) {
+    return {
+      statusCode: 404,
+      body: { success: false, message: "Staff account not found." },
+    };
+  }
+
+  if (!staff.verifyCode || staff.verifyCode !== normalizedCode) {
+    return {
+      statusCode: 400,
+      body: { success: false, message: "Invalid phone verification code." },
+    };
+  }
+
+  if (!staff.verifyCodeExpires || staff.verifyCodeExpires < now) {
+    return {
+      statusCode: 400,
+      body: {
+        success: false,
+        message: "Phone verification code has expired.",
+      },
+    };
+  }
+
+  const { token: setupToken, expiresAt: setupTokenExpires } = createSetupToken();
+
+  staff.isVerified = true;
+  staff.verifyCode = "";
+  staff.verifyCodeExpires = null;
+  staff.setupToken = setupToken;
+  staff.setupTokenExpires = setupTokenExpires;
+
+  await staff.save();
+
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      message: "Phone number verified successfully.",
+      setupToken,
+    },
   };
 }
 
 module.exports = {
   createStaffSetupToken,
+  maskPhoneNumber,
+  normalizePhoneNumber,
   requestStaffPasswordReset,
   resetStaffPassword,
   resendStaffVerificationCode,
+  sendStaffPhoneVerificationCode,
   sendStaffVerificationEmail,
   validateStaffPasswordSetup,
+  verifyStaffPhoneOtp,
 };

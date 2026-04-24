@@ -3,11 +3,13 @@ const assert = require("node:assert/strict");
 
 const {
   createStaffSetupToken,
+  maskPhoneNumber,
   requestStaffPasswordReset,
   resetStaffPassword,
   resendStaffVerificationCode,
-  sendStaffVerificationEmail,
+  sendStaffPhoneVerificationCode,
   validateStaffPasswordSetup,
+  verifyStaffPhoneOtp,
 } = require("../services/staff-service");
 
 function createStaffModel(findOneImpl) {
@@ -19,7 +21,7 @@ function createStaffModel(findOneImpl) {
 test("resendStaffVerificationCode rejects missing email", async () => {
   const result = await resendStaffVerificationCode({
     Staff: createStaffModel(),
-    mailer: { sendMail: async () => {} },
+    sendSms: async () => {},
     email: "",
     generateCode: () => "123456",
   });
@@ -28,8 +30,9 @@ test("resendStaffVerificationCode rejects missing email", async () => {
   assert.equal(result.body.success, false);
 });
 
-test("resendStaffVerificationCode updates staff and sends email", async () => {
+test("resendStaffVerificationCode updates staff and sends phone OTP", async () => {
   const staff = {
+    mobile: "+447700900123",
     email: "staff@example.com",
     firstName: "Alex",
     isVerified: false,
@@ -38,14 +41,12 @@ test("resendStaffVerificationCode updates staff and sends email", async () => {
     },
   };
 
-  let mailPayload = null;
+  let smsPayload = null;
 
   const result = await resendStaffVerificationCode({
     Staff: createStaffModel(async () => staff),
-    mailer: {
-      sendMail: async (payload) => {
-        mailPayload = payload;
-      },
+    sendSms: async (payload) => {
+      smsPayload = payload;
     },
     email: " STAFF@example.com ",
     generateCode: () => "654321",
@@ -54,18 +55,17 @@ test("resendStaffVerificationCode updates staff and sends email", async () => {
   assert.equal(result.statusCode, 200);
   assert.equal(staff.verifyCode, "654321");
   assert.ok(staff.verifyCodeExpires > Date.now());
-  assert.equal(mailPayload.to, "staff@example.com");
-  assert.match(mailPayload.html, /654321/);
+  assert.equal(result.body.mobile, "+********0123");
+  assert.equal(smsPayload.to, "+447700900123");
+  assert.match(smsPayload.body, /654321/);
 });
 
-test("sendStaffVerificationEmail returns service error when mailer fails", async () => {
-  const result = await sendStaffVerificationEmail({
-    mailer: {
-      sendMail: async () => {
-        throw new Error("smtp unavailable");
-      },
+test("sendStaffPhoneVerificationCode returns service error when SMS sender fails", async () => {
+  const result = await sendStaffPhoneVerificationCode({
+    sendSms: async () => {
+      throw new Error("sms unavailable");
     },
-    email: "staff@example.com",
+    mobile: "+447700900123",
     firstName: "Alex",
     verifyCode: "654321",
   });
@@ -77,6 +77,7 @@ test("sendStaffVerificationEmail returns service error when mailer fails", async
 
 test("resendStaffVerificationCode does not overwrite code when mail sending fails", async () => {
   const staff = {
+    mobile: "+447700900123",
     email: "staff@example.com",
     firstName: "Alex",
     isVerified: false,
@@ -89,10 +90,8 @@ test("resendStaffVerificationCode does not overwrite code when mail sending fail
 
   const result = await resendStaffVerificationCode({
     Staff: createStaffModel(async () => staff),
-    mailer: {
-      sendMail: async () => {
-        throw new Error("smtp unavailable");
-      },
+    sendSms: async () => {
+      throw new Error("sms unavailable");
     },
     email: "staff@example.com",
     generateCode: () => "654321",
@@ -102,6 +101,10 @@ test("resendStaffVerificationCode does not overwrite code when mail sending fail
   assert.equal(staff.verifyCode, "old-code");
   assert.equal(staff.verifyCodeExpires, 111);
   assert.equal(staff.saved, undefined);
+});
+
+test("maskPhoneNumber hides all but the last four digits", () => {
+  assert.equal(maskPhoneNumber("+447700900123"), "+********0123");
 });
 
 test("createStaffSetupToken returns a one-time token with expiry", () => {
@@ -152,6 +155,34 @@ test("validateStaffPasswordSetup accepts a valid activation token", () => {
 
   assert.equal(result.ok, true);
   assert.equal(result.normalizedPassword, "secret12");
+});
+
+test("verifyStaffPhoneOtp marks staff verified and returns setup token", async () => {
+  const staff = {
+    email: "staff@example.com",
+    verifyCode: "654321",
+    verifyCodeExpires: Date.now() + 60 * 1000,
+    isVerified: false,
+    save: async function () {
+      this.saved = true;
+    },
+  };
+
+  const result = await verifyStaffPhoneOtp({
+    Staff: createStaffModel(async () => staff),
+    email: "staff@example.com",
+    code: "654321",
+    createSetupToken: () => ({
+      token: "setup-token-123",
+      expiresAt: Date.now() + 60 * 1000,
+    }),
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.setupToken, "setup-token-123");
+  assert.equal(staff.isVerified, true);
+  assert.equal(staff.verifyCode, "");
+  assert.equal(staff.saved, true);
 });
 
 test("requestStaffPasswordReset sends link only for active verified staff", async () => {

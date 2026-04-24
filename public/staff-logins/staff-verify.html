@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Verify Staff Email</title>
+  <title>Verify Phone Number</title>
 
   <style>
     body {
@@ -95,14 +95,14 @@
 <body>
 
 <div class="card">
-  <h1>Email Verification</h1>
-  <p>Enter the code sent to your email.</p>
+  <h1>Phone Verification</h1>
+  <p id="introText">Enter the code sent to your phone.</p>
 
   <form id="verifyForm">
     <label>Email</label>
-    <input id="email" type="email" required>
+    <input id="email" type="email" required readonly>
 
-    <label>Verification Code</label>
+    <label>Phone Verification Code</label>
     <input id="code" type="text" maxlength="6" required>
 
     <div class="btn-row">
@@ -121,10 +121,16 @@
   const verifyBtn = document.getElementById("verifyBtn");
   const resendBtn = document.getElementById("resendBtn");
 
-  // URL'den email al
+  const introText = document.getElementById("introText");
+
+  // URL'den email ve mobile al
   const params = new URLSearchParams(window.location.search);
   const emailParam = params.get("email");
+  const mobileParam = params.get("mobile");
   if (emailParam) emailInput.value = emailParam;
+  if (mobileParam) {
+    introText.textContent = `Do\u011frulama kodu telefonunuza g\u00f6nderildi. ${mobileParam}`;
+  }
 
   function setStatus(msg, type="") {
     statusBox.textContent = msg;
@@ -146,7 +152,7 @@
     try {
       setLoading(verifyBtn, true, "Verifying...", "Verify");
 
-      const res = await fetch("/api/staff/verify-email", {
+        const res = await fetch("/api/staff/verify-phone-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code })
@@ -166,7 +172,7 @@
         return;
       }
 
-      setStatus("Verified successfully!", "ok");
+      setStatus("Phone verified successfully!", "ok");
 
       setTimeout(() => {
         window.location.href = `/staff-logins/staff-set-password.html?email=${encodeURIComponent(email)}&token=${encodeURIComponent(data.setupToken)}`;
@@ -191,7 +197,7 @@
     try {
       setLoading(resendBtn, true, "Sending...", "Resend Code");
 
-      const res = await fetch("/api/staff/resend-code", {
+        const res = await fetch("/api/staff/resend-phone-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
@@ -205,7 +211,7 @@
         return;
       }
 
-      setStatus("New code sent to your email", "ok");
+      setStatus(data.message || "Do\u011frulama kodu telefonunuza g\u00f6nderildi.", "ok");
       setLoading(resendBtn, false, "", "Resend Code");
 
     } catch (err) {

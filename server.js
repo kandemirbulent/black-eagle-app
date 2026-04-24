@@ -39,11 +39,15 @@ const {
 } = require("./services/customer-service");
 const {
   createStaffSetupToken,
+  maskPhoneNumber,
+  normalizePhoneNumber,
   requestStaffPasswordReset,
   resetStaffPassword,
   resendStaffVerificationCode,
+  sendStaffPhoneVerificationCode,
   sendStaffVerificationEmail,
   validateStaffPasswordSetup,
+  verifyStaffPhoneOtp,
 } = require("./services/staff-service");
 
 const app = express();
@@ -76,7 +80,44 @@ console.log("Environment ready:", {
   emailPort: smtpPort,
   emailUser: !!process.env.EMAIL_USER,
   emailPass: !!process.env.EMAIL_PASS,
+  smsAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
+  smsFromNumber: !!process.env.TWILIO_FROM_NUMBER,
 });
+
+async function sendStaffPhoneOtpSms({ to, body }) {
+  const accountSid = String(process.env.TWILIO_ACCOUNT_SID || "").trim();
+  const authToken = String(process.env.TWILIO_AUTH_TOKEN || "").trim();
+  const fromNumber = String(process.env.TWILIO_FROM_NUMBER || "").trim();
+
+  if (!accountSid || !authToken || !fromNumber) {
+    throw new Error("SMS provider is not configured.");
+  }
+
+  if (typeof fetch !== "function") {
+    throw new Error("Fetch API is not available in this runtime.");
+  }
+
+  const response = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Messages.json`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body: new URLSearchParams({
+        To: to,
+        From: fromNumber,
+        Body: body,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Twilio send failed: ${response.status} ${errorText}`);
+  }
+}
 
 mongoose
   .connect(process.env.MONGO_URI)
@@ -1081,6 +1122,7 @@ app.post("/api/staff/create", async (req, res) => {
       !firstName ||
       !lastName ||
       !dob ||
+      !mobile ||
       !email ||
       !postcode ||
       !address ||
@@ -1095,6 +1137,14 @@ app.post("/api/staff/create", async (req, res) => {
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
+    const normalizedMobile = normalizePhoneNumber(mobile);
+
+    if (!normalizedMobile || normalizedMobile.replace(/\D/g, "").length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid mobile number for phone verification.",
+      });
+    }
 
     const existingStaff = await Staff.findOne({ email: normalizedEmail });
 
@@ -1111,7 +1161,7 @@ app.post("/api/staff/create", async (req, res) => {
       firstName,
       lastName,
       dob,
-      mobile: mobile || "",
+      mobile: normalizedMobile,
       email: normalizedEmail,
       postcode,
       address,
@@ -1134,26 +1184,28 @@ app.post("/api/staff/create", async (req, res) => {
 
     await newStaff.save();
 
-    const mailResult = await sendStaffVerificationEmail({
-      mailer,
-      email: newStaff.email,
+    const smsResult = await sendStaffPhoneVerificationCode({
+      sendSms: sendStaffPhoneOtpSms,
+      mobile: newStaff.mobile,
       firstName: newStaff.firstName,
       verifyCode,
     });
 
-    if (!mailResult.ok) {
-      console.error("❌ Staff verification email send failed:", mailResult.error);
+    if (!smsResult.ok) {
+      console.error("❌ Staff phone verification SMS send failed:", smsResult.error);
 
       await Staff.deleteOne({ _id: newStaff._id }).catch((cleanupErr) => {
-        console.error("❌ Failed to roll back staff after email send failure:", cleanupErr);
+        console.error("❌ Failed to roll back staff after SMS send failure:", cleanupErr);
       });
 
-      return res.status(mailResult.statusCode).json(mailResult.body);
+      return res.status(smsResult.statusCode).json(smsResult.body);
     }
 
     return res.status(201).json({
       success: true,
-      message: "Staff registered successfully. Please verify your email.",
+      message: "Do\u011frulama kodu telefonunuza g\u00f6nderildi.",
+      email: newStaff.email,
+      mobile: maskPhoneNumber(newStaff.mobile),
     });
   } catch (err) {
     if (err && err.code === 11000) {
@@ -1172,6 +1224,51 @@ app.post("/api/staff/create", async (req, res) => {
 });
 
 // ✅ STAFF Email Verification
+async function handleStaffPhoneVerification(req, res) {
+  try {
+    const result = await verifyStaffPhoneOtp({
+      Staff,
+      email: req.body?.email,
+      code: req.body?.code,
+      createSetupToken: () => createStaffSetupToken({ crypto }),
+    });
+
+    return res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error("❌ Error verifying staff phone OTP:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while verifying phone code.",
+    });
+  }
+}
+
+app.post("/api/staff/verify-phone-otp", handleStaffPhoneVerification);
+app.post("/api/staff/verify-email", handleStaffPhoneVerification);
+
+async function handleStaffPhoneOtpResend(req, res) {
+  try {
+    const result = await resendStaffVerificationCode({
+      Staff,
+      sendSms: sendStaffPhoneOtpSms,
+      email: req.body?.email,
+      generateCode: () =>
+        Math.floor(100000 + Math.random() * 900000).toString(),
+    });
+
+    return res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    console.error("❌ Error resending staff phone verification code:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while resending phone verification code.",
+    });
+  }
+}
+
+app.post("/api/staff/resend-phone-otp", handleStaffPhoneOtpResend);
+app.post("/api/staff/resend-code", handleStaffPhoneOtpResend);
+
 app.post("/api/staff/verify-email", async (req, res) => {
   try {
     const { email, code } = req.body;
@@ -1321,7 +1418,7 @@ app.post("/api/staff/login", async (req, res) => {
     if (!staff.isVerified) {
       return res.status(403).json({
         success: false,
-        message: "Please verify your email first.",
+        message: "Please verify your phone number first.",
       });
     }
 
