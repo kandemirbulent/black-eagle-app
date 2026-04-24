@@ -49,11 +49,15 @@ const {
 const app = express();
 
 // 📨 Nodemailer
+const emailPort = Number.parseInt(process.env.EMAIL_PORT || "587", 10);
+const smtpPort = Number.isNaN(emailPort) ? 587 : emailPort;
+const useSecureEmail = smtpPort === 465;
+
 const mailer = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
-  port: 587,
-  secure: false,
-  requireTLS: true,
+  port: smtpPort,
+  secure: useSecureEmail,
+  requireTLS: !useSecureEmail,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -68,6 +72,8 @@ console.log("Environment ready:", {
   mongo: !!process.env.MONGO_URI,
   stripeSecret: !!process.env.STRIPE_SECRET_KEY,
   stripeWebhook: !!process.env.STRIPE_WEBHOOK_SECRET,
+  emailHost: !!process.env.EMAIL_HOST,
+  emailPort: smtpPort,
   emailUser: !!process.env.EMAIL_USER,
   emailPass: !!process.env.EMAIL_PASS,
 });
