@@ -81,15 +81,18 @@ console.log("Environment ready:", {
   emailUser: !!process.env.EMAIL_USER,
   emailPass: !!process.env.EMAIL_PASS,
   smsAccountSid: !!process.env.TWILIO_ACCOUNT_SID,
+  smsAuthToken: !!process.env.TWILIO_AUTH_TOKEN,
+  smsVerifyServiceSid: !!process.env.TWILIO_VERIFY_SERVICE_SID,
   smsFromNumber: !!process.env.TWILIO_FROM_NUMBER,
 });
 
 async function sendStaffPhoneOtpSms({ to, body }) {
   const accountSid = String(process.env.TWILIO_ACCOUNT_SID || "").trim();
   const authToken = String(process.env.TWILIO_AUTH_TOKEN || "").trim();
+  const verifyServiceSid = String(process.env.TWILIO_VERIFY_SERVICE_SID || "").trim();
   const fromNumber = String(process.env.TWILIO_FROM_NUMBER || "").trim();
 
-  if (!accountSid || !authToken || !fromNumber) {
+  if (!accountSid || !authToken || (!verifyServiceSid && !fromNumber)) {
     throw new Error("SMS provider is not configured.");
   }
 
@@ -97,8 +100,63 @@ async function sendStaffPhoneOtpSms({ to, body }) {
     throw new Error("Fetch API is not available in this runtime.");
   }
 
+  const authHeader = `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`;
+  let response;
+
+  if (verifyServiceSid) {
+    response = await fetch(
+      `https://verify.twilio.com/v2/Services/${encodeURIComponent(verifyServiceSid)}/Verifications`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: authHeader,
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        body: new URLSearchParams({
+          To: to,
+          Channel: "sms",
+        }),
+      }
+    );
+  } else {
+    response = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Messages.json`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: authHeader,
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        },
+        body: new URLSearchParams({
+          To: to,
+          From: fromNumber,
+          Body: body,
+        }),
+      }
+    );
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Twilio send failed: ${response.status} ${errorText}`);
+  }
+}
+
+async function verifyStaffPhoneOtpCode({ to, code }) {
+  const accountSid = String(process.env.TWILIO_ACCOUNT_SID || "").trim();
+  const authToken = String(process.env.TWILIO_AUTH_TOKEN || "").trim();
+  const verifyServiceSid = String(process.env.TWILIO_VERIFY_SERVICE_SID || "").trim();
+
+  if (!verifyServiceSid) {
+    return null;
+  }
+
+  if (!accountSid || !authToken) {
+    throw new Error("Twilio Verify is not configured.");
+  }
+
   const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(accountSid)}/Messages.json`,
+    `https://verify.twilio.com/v2/Services/${encodeURIComponent(verifyServiceSid)}/VerificationCheck`,
     {
       method: "POST",
       headers: {
@@ -107,16 +165,20 @@ async function sendStaffPhoneOtpSms({ to, body }) {
       },
       body: new URLSearchParams({
         To: to,
-        From: fromNumber,
-        Body: body,
+        Code: code,
       }),
     }
   );
 
+  const payload = await response.json().catch(() => null);
+
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Twilio send failed: ${response.status} ${errorText}`);
+    throw new Error(
+      `Twilio verify failed: ${response.status} ${JSON.stringify(payload || {})}`
+    );
   }
+
+  return payload?.status === "approved";
 }
 
 mongoose
@@ -1227,6 +1289,50 @@ app.post("/api/staff/create", async (req, res) => {
 // ✅ STAFF Email Verification
 async function handleStaffPhoneVerification(req, res) {
   try {
+    const normalizedEmail = String(req.body?.email || "").toLowerCase().trim();
+    const normalizedCode = String(req.body?.code || "").trim();
+    const verifyServiceSid = String(process.env.TWILIO_VERIFY_SERVICE_SID || "").trim();
+
+    if (verifyServiceSid) {
+      const staff = await Staff.findOne({ email: normalizedEmail });
+
+      if (!staff) {
+        return res.status(404).json({
+          success: false,
+          message: "Staff account not found.",
+        });
+      }
+
+      const isApproved = await verifyStaffPhoneOtpCode({
+        to: staff.mobile,
+        code: normalizedCode,
+      });
+
+      if (!isApproved) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid phone verification code.",
+        });
+      }
+
+      const { token: setupToken, expiresAt: setupTokenExpires } =
+        createStaffSetupToken({ crypto });
+
+      staff.isVerified = true;
+      staff.verifyCode = "";
+      staff.verifyCodeExpires = null;
+      staff.setupToken = setupToken;
+      staff.setupTokenExpires = setupTokenExpires;
+
+      await staff.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "Phone number verified successfully.",
+        setupToken,
+      });
+    }
+
     const result = await verifyStaffPhoneOtp({
       Staff,
       email: req.body?.email,
