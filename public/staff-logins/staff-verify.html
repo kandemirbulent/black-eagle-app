@@ -99,8 +99,7 @@
   <p id="introText">Enter the code sent to your phone.</p>
 
   <form id="verifyForm">
-    <label>Email</label>
-    <input id="email" type="email" required readonly>
+    <input id="email" type="hidden">
 
     <label>Phone Verification Code</label>
     <input id="code" type="text" maxlength="6" required>
@@ -149,6 +148,11 @@
     const email = emailInput.value.trim().toLowerCase();
     const code = codeInput.value.trim();
 
+    if (!email) {
+      setStatus("Missing verification session. Please start the phone verification flow again.", "error");
+      return;
+    }
+
     try {
       setLoading(verifyBtn, true, "Verifying...", "Verify");
 
@@ -190,7 +194,7 @@
     const email = emailInput.value.trim().toLowerCase();
 
     if (!email) {
-      setStatus("Enter email first", "error");
+      setStatus("Missing verification session. Please start the phone verification flow again.", "error");
       return;
     }
 
