@@ -14,23 +14,26 @@
   <p id="msg"></p>
 
   <script>
-    // Formu yakala
     document.getElementById("forgotForm").addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      // Email değerini al
-      const email = document.getElementById("email").value;
+      const email = document.getElementById("email").value.trim().toLowerCase();
 
-      // Backend'e isteği gönder
-      const res = await fetch("/customer-forgot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email })
-      });
+      try {
+        const res = await fetch("/customer-forgot-password", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
 
-      // Sunucudan gelen mesajı ekrana yaz
-      const text = await res.text();
-      document.getElementById("msg").innerText = text;
+        const data = await res.json().catch(() => ({}));
+        document.getElementById("msg").innerText =
+          data.message || "If this email exists, a reset link has been sent.";
+      } catch (err) {
+        console.error("Forgot password error:", err);
+        document.getElementById("msg").innerText =
+          "Could not send reset link. Please try again.";
+      }
     });
   </script>
 </body>

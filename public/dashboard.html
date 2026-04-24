@@ -799,9 +799,14 @@
 
       try {
         const res = await fetch(`/approve-customer/${id}`, { method: "POST" });
-        const message = await res.text();
+        const data = await res.json().catch(() => ({}));
 
-        alert(message || "Customer approved.");
+        if (!res.ok || data.success === false) {
+          alert(data.message || "Error approving customer.");
+          return;
+        }
+
+        alert(data.message || "Customer approved.");
         btn.textContent = "Approved ✅";
         btn.classList.add("approved");
         btn.disabled = true;
@@ -819,9 +824,14 @@
 
       try {
         const res = await fetch(`/reject-customer/${id}`, { method: "POST" });
-        const message = await res.text();
+        const data = await res.json().catch(() => ({}));
 
-        alert(message || "Customer rejected.");
+        if (!res.ok || data.success === false) {
+          alert(data.message || "Error rejecting customer.");
+          return;
+        }
+
+        alert(data.message || "Customer rejected.");
         btn.textContent = "Rejected ❌";
         btn.classList.add("rejected");
         btn.disabled = true;

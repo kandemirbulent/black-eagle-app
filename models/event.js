@@ -50,6 +50,12 @@ const eventSchema = new mongoose.Schema(
       index: true,
     },
 
+    applicationDeadline: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+
     startTime: {
       type: String,
       default: "",
@@ -65,6 +71,16 @@ const eventSchema = new mongoose.Schema(
       enum: ["draft", "open", "closed", "cancelled", "completed"],
       default: "draft",
       index: true,
+    },
+
+    autoApprovalProcessed: {
+      type: Boolean,
+      default: false,
+    },
+
+    autoApprovalProcessedAt: {
+      type: Date,
+      default: null,
     },
 
     roleRequirements: {

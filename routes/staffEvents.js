@@ -7,6 +7,7 @@ const Event = require("../models/event");
 const Staff = require("../models/staff");
 const EventApplication = require("../models/eventApplication");
 const EventAssignment = require("../models/eventAssignment");
+const { normalizeRole } = require("../utils/event-utils");
 
 function getStaffId(req) {
   const fromBody = req.body?.staffId;
@@ -14,10 +15,6 @@ function getStaffId(req) {
   const fromHeader = req.headers["x-staff-id"];
 
   return fromBody || fromQuery || fromHeader || null;
-}
-
-function normalizeRole(value) {
-  return String(value || "").trim().toLowerCase();
 }
 
 function getStaffRoles(staff) {

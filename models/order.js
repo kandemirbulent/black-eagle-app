@@ -1,64 +1,86 @@
 const mongoose = require("mongoose");
+const { calculateOrderFinancials } = require("../utils/order-utils");
 
-// Her personel / görev detayı
 const StaffSchema = new mongoose.Schema({
-  staffId: { type: String, default: "" },      // Personel kimliği
-  staffName: { type: String, default: "" },    // Personel adı
-  service: String,
-  quantity: Number,
-  hours: Number,
-  rate: Number,
-  total: Number,
-  date: String,
-  startTime: String,
-  endTime: String
+  staffId: { type: String, default: "" },
+  staffName: { type: String, default: "" },
+  service: { type: String, default: "" },
+  quantity: { type: Number, default: 0 },
+  hours: { type: Number, default: 0 },
+  rate: { type: Number, default: 0 },
+  total: { type: Number, default: 0 },
+  date: { type: String, default: "" },
+  startTime: { type: String, default: "" },
+  endTime: { type: String, default: "" },
 });
 
-// Ana sipariş yapısı
 const orderSchema = new mongoose.Schema({
-  customerApplicationId: { type: String },
-  orderId: { type: String, unique: true },
+  customerApplicationId: { type: String, default: "", index: true },
+  customerCode: { type: String, default: "" },
+  customerName: { type: String, default: "" },
+  companyName: { type: String, default: "" },
+  orderId: { type: String, unique: true, index: true },
 
   clientRef: { type: String, default: "" },
+  eventName: { type: String, default: "" },
+  category: { type: String, default: "" },
+  eventDate: { type: Date, default: null },
+  phone: { type: String, default: "" },
+  email: { type: String, default: "", trim: true, lowercase: true },
+  location: { type: String, default: "" },
   description: { type: String, default: "Event Staff Service" },
-  staff: [StaffSchema],
-  totalAmount: { type: Number, default: 0 },
+  staff: { type: [StaffSchema], default: [] },
 
-  // 💰 Yeni eklenen satır:
+  subtotalAmount: { type: Number, default: 0 },
+  vatRate: { type: Number, default: 0.2 },
+  vatAmount: { type: Number, default: 0 },
+  totalAmount: { type: Number, default: 0 },
+  totalWithVat: { type: Number, default: 0 },
+  minimumPaymentAmount: { type: Number, default: 0 },
   amountPaid: { type: Number, default: 0 },
 
-  vatRate: { type: Number, default: 0.20 },
-  status: { type: String, default: "Pending" }, // Paid | Pending | Cancelled
-  notes: String,
-  createdAt: { type: Date, default: Date.now }
+  status: { type: String, default: "Pending" },
+  paymentStatus: { type: String, default: "Pending" },
+  orderStatus: { type: String, default: "Pending" },
+  isVisibleToCustomer: { type: Boolean, default: false },
+  applicationDeadline: { type: Date, default: null },
+  notes: { type: String, default: "" },
+  createdAt: { type: Date, default: Date.now },
 });
 
-// Order kaydedilmeden önce otomatik hesaplamalar
+async function generateUniqueOrderId(OrderModel) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = "BE" + Math.floor(100000 + Math.random() * 900000);
+    const exists = await OrderModel.exists({ orderId: candidate });
+
+    if (!exists) {
+      return candidate;
+    }
+  }
+
+  return "BE" + Date.now();
+}
+
 orderSchema.pre("save", async function (next) {
   try {
-    // 👇 TEST LOG — sadece teşhis amaçlı
-    console.log("💾 [models/order.js] Pre-save triggered for order. Current orderId:", this.orderId);
+    const financials = calculateOrderFinancials({
+      staff: this.staff,
+      subtotalAmount: this.subtotalAmount,
+      totalAmount: this.totalAmount,
+      vatRate: this.vatRate,
+      vatAmount: this.vatAmount,
+      totalWithVat: this.totalWithVat,
+    });
 
-    // staff kalemlerinden toplam hesapla
-    let subtotal = 0;
-    if (this.staff && this.staff.length > 0) {
-      this.staff.forEach((s) => {
-        const qty = s.quantity || 1;
-        const hrs = s.hours || 0;
-        const rate = s.rate || 0;
-        const lineTotal = s.total || qty * hrs * rate;
-        s.total = lineTotal;
-        subtotal += lineTotal;
-      });
-    }
+    this.staff = financials.staff;
+    this.subtotalAmount = financials.subtotalAmount;
+    this.totalAmount = financials.totalAmount;
+    this.vatRate = financials.vatRate;
+    this.vatAmount = financials.vatAmount;
+    this.totalWithVat = financials.totalWithVat;
 
-    // Eğer toplam manuel girilmediyse otomatik ata
-    if (!this.totalAmount || this.totalAmount <= 0) this.totalAmount = subtotal;
-
-    // orderId yoksa oluştur
     if (!this.orderId) {
-      const count = await this.constructor.countDocuments();
-      this.orderId = "BE" + (1000 + count + 1);
+      this.orderId = await generateUniqueOrderId(this.constructor);
     }
 
     next();
