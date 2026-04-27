@@ -574,7 +574,7 @@
   }
 
   function takeSelfie() {
-    if (!stream) {
+    if (!stream || !camera.srcObject) {
       cameraStatus.textContent = "Open the front camera first.";
       cameraStatus.className = "status error";
       return;
@@ -583,8 +583,8 @@
     const width = camera.videoWidth;
     const height = camera.videoHeight;
 
-    if (!width || !height) {
-      cameraStatus.textContent = "Camera is not ready yet. Try again in a moment.";
+    if (!width || !height || camera.readyState < 2) {
+      cameraStatus.textContent = "Camera is not ready yet. Wait 1-2 seconds, then tap Take Selfie again.";
       cameraStatus.className = "status error";
       return;
     }
@@ -593,14 +593,24 @@
     canvas.height = height;
 
     const ctx = canvas.getContext("2d");
+    ctx.save();
     ctx.translate(width, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(camera, 0, 0, width, height);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.restore();
 
-    const imageData = canvas.toDataURL("image/png");
+    const imageData = canvas.toDataURL("image/jpeg", 0.85);
+
+    if (!imageData || imageData.length < 1000) {
+      cameraStatus.textContent = "Selfie could not be captured. Please retake it.";
+      cameraStatus.className = "status error";
+      selfieData.value = "";
+      return;
+    }
+
     selfiePreview.src = imageData;
     selfiePreview.style.display = "block";
+    camera.style.display = "none";
     selfieData.value = imageData;
 
     cameraStatus.textContent = "Selfie captured successfully.";
@@ -611,6 +621,7 @@
     selfiePreview.src = "";
     selfiePreview.style.display = "none";
     selfieData.value = "";
+    camera.style.display = "block";
     cameraStatus.textContent = "Ready to take a new selfie.";
     cameraStatus.className = "status";
   }
@@ -631,6 +642,13 @@
   startCameraBtn.addEventListener("click", startFrontCamera);
   takePhotoBtn.addEventListener("click", takeSelfie);
   retakeBtn.addEventListener("click", retakeSelfie);
+
+  camera.addEventListener("loadedmetadata", () => {
+    if (stream && camera.videoWidth && camera.videoHeight) {
+      cameraStatus.textContent = "Front camera is ready. Tap Take Selfie.";
+      cameraStatus.className = "status ok";
+    }
+  });
 
   staffForm.addEventListener("submit", async function (e) {
     e.preventDefault();
@@ -682,18 +700,6 @@
       if (!res.ok) {
         cameraStatus.textContent = data.message || "Failed to create staff account.";
         cameraStatus.className = "status error";
-
-        if (data.email) {
-          stopCamera();
-          setTimeout(() => {
-            const nextUrl = new URL("/staff-logins/staff-verify.html", window.location.origin);
-            nextUrl.searchParams.set("email", data.email || payload.email);
-            nextUrl.searchParams.set("mobile", data.mobile || payload.mobile);
-            window.location.href = nextUrl.toString();
-          }, 1200);
-          return;
-        }
-
         setSubmitState(false, "Submit");
         return;
       }
