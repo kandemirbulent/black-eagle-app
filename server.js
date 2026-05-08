@@ -346,6 +346,18 @@ app.use(express.static(path.join(__dirname, "public")));
 app.use(cors());
 app.use("/api/staff-events", staffEvents);
 
+app.get("/delete-account.html", (req, res) => {
+  res.status(200).type("html").send(`<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Delete Your Black Eagle Staffing Account</title></head>
+<body>
+<h1>Delete Your Black Eagle Staffing Account</h1>
+<p>If you would like to delete your Black Eagle Staffing account and associated personal data, please email support@blackeagleuk.com with your registered email address.</p>
+<p>We will verify your request and delete your account and associated personal data within 7 days, unless retention is required for legal, security, or fraud prevention reasons.</p>
+</body>
+</html>`);
+});
+
 async function sendCustomerPasswordLink(customer, token, options = {}) {
   const mode = options.mode === "reset" ? "reset" : "setup";
   const baseUrl = getBaseUrl();
