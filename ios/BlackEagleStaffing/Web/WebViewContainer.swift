@@ -1,7 +1,6 @@
 import AVFoundation
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 import WebKit
 
 struct WebViewContainer: UIViewRepresentable {
@@ -46,12 +45,11 @@ struct WebViewContainer: UIViewRepresentable {
     }
 }
 
-final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, UIDocumentPickerDelegate {
+final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
     var store: WebViewStore
 
     private weak var webView: WKWebView?
     private var progressObservation: NSKeyValueObservation?
-    private var openPanelCompletion: (([URL]?) -> Void)?
 
     init(store: WebViewStore) {
         self.store = store
@@ -189,37 +187,6 @@ final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, UIDocumen
         @unknown default:
             decisionHandler(.prompt)
         }
-    }
-
-    @available(iOS 15.0, *)
-    func webView(
-        _ webView: WKWebView,
-        runOpenPanelWith parameters: WKOpenPanelParameters,
-        initiatedByFrame frame: WKFrameInfo,
-        completionHandler: @escaping ([URL]?) -> Void
-    ) {
-        openPanelCompletion = completionHandler
-
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.item], asCopy: true)
-        picker.allowsMultipleSelection = parameters.allowsMultipleSelection
-        picker.delegate = self
-
-        guard let presenter = topViewController() else {
-            completionHandler(nil)
-            return
-        }
-
-        presenter.present(picker, animated: true)
-    }
-
-    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        openPanelCompletion?(urls)
-        openPanelCompletion = nil
-    }
-
-    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        openPanelCompletion?(nil)
-        openPanelCompletion = nil
     }
 
     private func requestAccess(for mediaType: AVMediaType, completion: @escaping (Bool) -> Void) {
