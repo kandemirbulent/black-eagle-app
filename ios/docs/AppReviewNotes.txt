@@ -1,0 +1,1 @@
+This app is used by Black Eagle Staffing customers and staff to manage event bookings, staff applications, payments, verification and work assignments. It provides a mobile-optimised app experience and is not intended as a general website browser.

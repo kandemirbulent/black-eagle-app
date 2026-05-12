@@ -1,0 +1,60 @@
+workflows:
+  ios-simulator-debug:
+    name: Black Eagle Staffing iOS Simulator Debug
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+      vars:
+        XCODE_PROJECT: "ios/BlackEagleStaffing.xcodeproj"
+        XCODE_SCHEME: "BlackEagleStaffing"
+    scripts:
+      - name: Show Xcode version
+        script: xcodebuild -version
+      - name: Build for iOS Simulator (Debug)
+        script: |
+          xcodebuild \
+            -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+    artifacts:
+      - /tmp/xcodebuild_logs/*.log
+
+  ios-device-release-template:
+    name: Black Eagle Staffing iOS Device Release Template
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.blackeagle.staffing
+      vars:
+        XCODE_PROJECT: "ios/BlackEagleStaffing.xcodeproj"
+        XCODE_SCHEME: "BlackEagleStaffing"
+    scripts:
+      - name: Configure signing
+        script: |
+          echo "Add Apple signing first:"
+          echo "- App Store Connect integration"
+          echo "- certificate"
+          echo "- provisioning profile"
+          echo "- Apple Developer Team"
+      - name: Apply provisioning profiles
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
