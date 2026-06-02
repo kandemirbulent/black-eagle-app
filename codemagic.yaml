@@ -23,3 +23,48 @@ workflows:
             clean build
     artifacts:
       - /tmp/xcodebuild_logs/*.log
+
+  ios-release:
+    name: Black Eagle Staffing iOS Release
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+      vars:
+        XCODE_PROJECT: "ios/BlackEagleStaffing.xcodeproj"
+        XCODE_SCHEME: "BlackEagleStaffing"
+    scripts:
+      - name: Show Xcode version
+        script: xcodebuild -version
+      - name: Build iOS archive
+        script: |
+          xcodebuild \
+            -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
+            clean archive
+      - name: Export IPA
+        script: |
+          cat > "$CM_BUILD_DIR/exportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
+            -exportPath "$CM_BUILD_DIR/build/ios/ipa" \
+            -exportOptionsPlist "$CM_BUILD_DIR/exportOptions.plist"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
