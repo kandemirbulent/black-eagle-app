@@ -13,7 +13,7 @@ workflows:
         XCODE_PROJECT: "ios/BlackEagleStaffing.xcodeproj"
         XCODE_SCHEME: "BlackEagleStaffing"
         APPLE_TEAM_ID: "42FRQR444G"
-        PROFILE_NAME: "BlackEagleDistribution"
+        PROFILE_NAME: "BlackEagleProfile"
 
     scripts:
       - name: Show Xcode version
@@ -48,7 +48,7 @@ workflows:
             <key>provisioningProfiles</key>
             <dict>
               <key>com.blackeagle.staffing</key>
-              <string>BlackEagleDistribution</string>
+              <string>BlackEagleProfile</string>
             </dict>
           </dict>
           </plist>
