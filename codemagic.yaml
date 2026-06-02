@@ -11,10 +11,9 @@ workflows:
     scripts:
       - name: Show Xcode version
         script: xcodebuild -version
-      - name: Build for iOS Simulator (Debug)
+      - name: Build for iOS Simulator Debug
         script: |
           xcodebuild \
-            -allowProvisioningUpdates\            
             -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Debug \
@@ -44,6 +43,7 @@ workflows:
       - name: Build iOS archive
         script: |
           xcodebuild \
+            -allowProvisioningUpdates \
             -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
@@ -70,6 +70,7 @@ workflows:
           EOF
 
           xcodebuild \
+            -allowProvisioningUpdates \
             -exportArchive \
             -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
             -exportPath "$CM_BUILD_DIR/build/ios/ipa" \
