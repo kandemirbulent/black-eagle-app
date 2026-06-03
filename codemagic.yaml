@@ -1,66 +1,68 @@
 workflows:
-  ios-release:
-    name: Black Eagle Staffing iOS Release
-    max_build_duration: 60
-    instance_type: mac_mini_m2
+ios-release:
+name: Black Eagle Staffing iOS Release
+max_build_duration: 60
+instance_type: mac_mini_m2
 
-    environment:
-      xcode: latest
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.blackeagle.staffing
-      vars:
-        XCODE_PROJECT: "ios/BlackEagleStaffing.xcodeproj"
-        XCODE_SCHEME: "BlackEagleStaffing"
-        APPLE_TEAM_ID: "42FRQR444G"
-        PROFILE_NAME: "BlackEagleProfile"
+```
+environment:
+  xcode: latest
+  ios_signing:
+    distribution_type: app_store
+    bundle_identifier: com.blackeagle.staffing
+  vars:
+    XCODE_PROJECT: "ios/BlackEagleStaffing.xcodeproj"
+    XCODE_SCHEME: "BlackEagleStaffing"
+    APPLE_TEAM_ID: "42FRQR444G"
+    PROFILE_NAME: "BlackEagleProfile"
 
-    scripts:
-      - name: Show Xcode version
-        script: xcodebuild -version
+scripts:
+  - name: Show Xcode version
+    script: xcodebuild -version
 
-      - name: Build iOS archive
-        script: |
-          xcodebuild \
-            -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME" \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
-            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-            clean archive
+  - name: Build iOS archive
+    script: |
+      xcodebuild \
+        -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+        -scheme "$XCODE_SCHEME" \
+        -configuration Release \
+        -sdk iphoneos \
+        -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
+        DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+        CODE_SIGN_STYLE=Manual \
+        PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
+        clean archive
 
-      - name: Export IPA
-        script: |
-          cat > "$CM_BUILD_DIR/exportOptions.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store-connect</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>teamID</key>
-            <string>42FRQR444G</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.blackeagle.staffing</key>
-              <string>BlackEagleProfile</string>
-            </dict>
-          </dict>
-          </plist>
-          EOF
+  - name: Export IPA
+    script: |
+      cat > "$CM_BUILD_DIR/exportOptions.plist" <<EOF
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+        <key>method</key>
+        <string>app-store-connect</string>
+        <key>signingStyle</key>
+        <string>manual</string>
+        <key>teamID</key>
+        <string>42FRQR444G</string>
+        <key>provisioningProfiles</key>
+        <dict>
+          <key>com.blackeagle.staffing</key>
+          <string>BlackEagleProfile</string>
+        </dict>
+      </dict>
+      </plist>
+      EOF
 
-          xcodebuild \
-            -exportArchive \
-            -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
-            -exportPath "$CM_BUILD_DIR/build/ios/ipa" \
-            -exportOptionsPlist "$CM_BUILD_DIR/exportOptions.plist"
+      xcodebuild \
+        -exportArchive \
+        -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
+        -exportPath "$CM_BUILD_DIR/build/ios/ipa" \
+        -exportOptionsPlist "$CM_BUILD_DIR/exportOptions.plist"
 
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
-      - build/BlackEagleStaffing.xcarchive
+artifacts:
+  - build/ios/ipa/*.ipa
+  - /tmp/xcodebuild_logs/*.log
+  - build/BlackEagleStaffing.xcarchive
+```
