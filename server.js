@@ -277,8 +277,16 @@ async function ensureInitialSuperAdmin() {
     process.env.SUPER_ADMIN_EMAIL || "kandemirbulent@outlook.com"
   );
   const password = String(process.env.SUPER_ADMIN_PASSWORD || "205198Xyz,,>>").trim();
+  const hasEmail = Boolean(email);
+  const hasPassword = Boolean(password);
 
-  if (!email || !password) {
+  console.log("Superadmin seed check:", {
+    hasSuperAdminEmail: hasEmail,
+    email,
+    hasSuperAdminPassword: hasPassword,
+  });
+
+  if (!hasEmail || !hasPassword) {
     console.warn(
       "⚠️ SUPER_ADMIN_EMAIL or SUPER_ADMIN_PASSWORD missing. Initial superadmin seed skipped."
     );
@@ -286,9 +294,14 @@ async function ensureInitialSuperAdmin() {
   }
 
   const existingAdmin = await AdminUser.findOne({ email });
+  console.log("Superadmin existing email found:", {
+    email,
+    exists: Boolean(existingAdmin),
+  });
 
   if (existingAdmin) {
     let shouldSave = false;
+    let passwordHashRepaired = false;
 
     if (existingAdmin.role !== "superadmin") {
       existingAdmin.role = "superadmin";
@@ -303,11 +316,28 @@ async function ensureInitialSuperAdmin() {
     if (!existingAdmin.passwordHash && password) {
       existingAdmin.passwordHash = await hashAdminPassword(password);
       shouldSave = true;
+      passwordHashRepaired = true;
+    } else if (password) {
+      existingAdmin.passwordHash = await hashAdminPassword(password);
+      shouldSave = true;
+      passwordHashRepaired = true;
     }
 
     if (shouldSave) {
       await existingAdmin.save();
     }
+
+    console.log("Superadmin passwordHash repaired:", {
+      email,
+      passwordHashRepaired,
+    });
+    console.log("Superadmin ready:", {
+      email,
+      ready:
+        existingAdmin.role === "superadmin" &&
+        existingAdmin.status === "active" &&
+        Boolean(existingAdmin.passwordHash),
+    });
 
     return;
   }
@@ -322,6 +352,15 @@ async function ensureInitialSuperAdmin() {
     role: "superadmin",
     status: "active",
     createdBy: null,
+  });
+
+  console.log("Superadmin passwordHash repaired:", {
+    email,
+    passwordHashRepaired: true,
+  });
+  console.log("Superadmin ready:", {
+    email,
+    ready: true,
   });
 
   console.log(`✅ Initial superadmin created for ${email}`);
