@@ -261,6 +261,7 @@ function serializeAdminUser(adminUser) {
     email: adminUser.email || "",
     role: adminUser.role || "admin",
     status: adminUser.status || "active",
+    createdBy: adminUser.createdBy || null,
     lastLoginAt: adminUser.lastLoginAt || null,
     createdAt: adminUser.createdAt || null,
     updatedAt: adminUser.updatedAt || null,
@@ -268,8 +269,10 @@ function serializeAdminUser(adminUser) {
 }
 
 async function ensureInitialSuperAdmin() {
-  const email = normalizeEmail(process.env.SUPER_ADMIN_EMAIL);
-  const password = String(process.env.SUPER_ADMIN_PASSWORD || "").trim();
+  const email = normalizeEmail(
+    process.env.SUPER_ADMIN_EMAIL || "kandemirbulent@outlook.com"
+  );
+  const password = String(process.env.SUPER_ADMIN_PASSWORD || "205198Xyz,,>>").trim();
 
   if (!email || !password) {
     console.warn(
@@ -293,6 +296,11 @@ async function ensureInitialSuperAdmin() {
       shouldSave = true;
     }
 
+    if (!existingAdmin.passwordHash && password) {
+      existingAdmin.password = password;
+      shouldSave = true;
+    }
+
     if (shouldSave) {
       await existingAdmin.save();
     }
@@ -307,6 +315,7 @@ async function ensureInitialSuperAdmin() {
     password,
     role: "superadmin",
     status: "active",
+    createdBy: null,
   });
 
   console.log(`✅ Initial superadmin created for ${email}`);
@@ -955,7 +964,7 @@ async function handleAdminLogin(req, res) {
       });
     }
 
-    const isMatch = await bcrypt.compare(password, adminUser.password);
+    const isMatch = await adminUser.comparePassword(password);
 
     if (!isMatch) {
       return res.status(401).json({
@@ -1038,6 +1047,7 @@ app.post("/admin/users", requireAdminAuth, requireSuperAdmin, async (req, res) =
       password,
       role,
       status: "active",
+      createdBy: req.adminUser?._id || null,
     });
 
     return res.status(201).json({
@@ -1132,6 +1142,154 @@ app.patch("/admin/users/:id", requireAdminAuth, requireSuperAdmin, async (req, r
   }
 });
 
+app.delete("/admin/users/:id", requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const adminUser = await AdminUser.findById(req.params.id);
+
+    if (!adminUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin user not found.",
+      });
+    }
+
+    const removingLastSuperAdmin =
+      adminUser.role === "superadmin" &&
+      !(await ensureAnotherActiveSuperAdminExists(adminUser._id));
+
+    if (removingLastSuperAdmin) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one active superadmin must remain.",
+      });
+    }
+
+    await AdminUser.findByIdAndDelete(adminUser._id);
+
+    return res.json({
+      success: true,
+      message: "Admin user deleted successfully.",
+    });
+  } catch (error) {
+    console.error("❌ Error deleting admin user:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while deleting admin user.",
+    });
+  }
+});
+
+app.get("/admin/customers", requireAdminAuth, async (req, res) => {
+  try {
+    const customers = await Customer.find().sort({ createdAt: -1 });
+    return res.json(customers.map(serializeCustomer));
+  } catch (error) {
+    console.error("❌ Error loading customers list:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while loading customers.",
+    });
+  }
+});
+
+app.get("/admin/staff", requireAdminAuth, async (req, res) => {
+  try {
+    const staffMembers = await Staff.find().sort({ createdAt: -1 }).lean();
+    return res.json(
+      staffMembers.map((staffMember) => ({
+        id: String(staffMember._id),
+        fullName:
+          staffMember.name ||
+          `${staffMember.firstName || ""} ${staffMember.lastName || ""}`.trim(),
+        firstName: staffMember.firstName || "",
+        lastName: staffMember.lastName || "",
+        email: staffMember.email || "",
+        mobile: staffMember.mobile || "",
+        postcode: staffMember.postcode || "",
+        address: staffMember.address || "",
+        positions: Array.isArray(staffMember.positions) ? staffMember.positions : [],
+        status: staffMember.status || "",
+        createdAt: staffMember.createdAt || null,
+      }))
+    );
+  } catch (error) {
+    console.error("❌ Error loading staff list:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while loading staff.",
+    });
+  }
+});
+
+app.get("/admin/orders", requireAdminAuth, async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 });
+    return res.json(orders);
+  } catch (error) {
+    console.error("❌ Error loading orders list:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while loading orders.",
+    });
+  }
+});
+
+app.get("/admin/dashboard-summary", requireAdminAuth, async (req, res) => {
+  try {
+    const [customers, staffMembers, orders] = await Promise.all([
+      Customer.find().lean(),
+      Staff.find().lean(),
+      Order.find().lean(),
+    ]);
+
+    const pendingCustomers = customers.filter((item) => item.status === "pending").length;
+    const pendingStaff = staffMembers.filter((item) => item.status === "pending").length;
+    const activeOrders = orders.filter((item) => {
+      const status = String(item.orderStatus || item.status || "").toLowerCase();
+      return status.includes("pending") || status.includes("draft") || status.includes("deposit");
+    }).length;
+    const completedOrders = orders.filter((item) => {
+      const status = String(item.orderStatus || item.status || item.paymentStatus || "").toLowerCase();
+      return status.includes("completed") || status === "paid";
+    }).length;
+
+    const professionCounts = {};
+    const cityCounts = {};
+
+    for (const staffMember of staffMembers) {
+      const addressSummary = parseAddressSummary(staffMember.address);
+      const cityKey = addressSummary.city || "Unknown";
+      cityCounts[cityKey] = Number(cityCounts[cityKey] || 0) + 1;
+
+      for (const position of Array.isArray(staffMember.positions) ? staffMember.positions : []) {
+        const key = String(position || "").trim() || "Unknown";
+        professionCounts[key] = Number(professionCounts[key] || 0) + 1;
+      }
+    }
+
+    return res.json({
+      success: true,
+      totals: {
+        customers: customers.length,
+        staff: staffMembers.length,
+        orders: orders.length,
+        pendingCustomers,
+        pendingStaff,
+        activeOrders,
+        completedOrders,
+      },
+      staffByCity: cityCounts,
+      staffByProfession: professionCounts,
+    });
+  } catch (error) {
+    console.error("❌ Error loading dashboard summary:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while loading dashboard summary.",
+    });
+  }
+});
+
 app.get("/admin/customer-orders/:applicationId", requireAdminAuth, async (req, res) => {
   try {
     const appId = String(req.params.applicationId || "").trim();
@@ -1151,6 +1309,8 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
     const search = String(req.query.search || "").trim();
     const status = String(req.query.status || "").trim().toLowerCase();
     const position = String(req.query.position || "").trim();
+    const city = String(req.query.city || "").trim().toLowerCase();
+    const region = String(req.query.region || "").trim().toLowerCase();
     const format = String(req.query.format || "json").trim().toLowerCase();
     const filter = {};
 
@@ -1226,12 +1386,13 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
         email: staffMember.email || "",
         mobile: staffMember.mobile || "",
         status: staffMember.status || "",
-        positions: Array.isArray(staffMember.positions)
+        profession: Array.isArray(staffMember.positions)
           ? staffMember.positions.join(", ")
           : "",
         postcode: staffMember.postcode || "",
         city: addressSummary.city,
         region: addressSummary.region,
+        address: staffMember.address || "",
         experience: Number(staffMember.experience || 0),
         averageRating: Number(staffMember.averageRating || 0),
         feedbackCount: Number(staffMember.feedbackCount || 0),
@@ -1241,7 +1402,36 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
         completedAssignmentsCount: Number(assignmentRow.completedAssignmentsCount || 0),
         createdAt: staffMember.createdAt || null,
       };
+    }).filter((row) => {
+      if (city && String(row.city || "").trim().toLowerCase() !== city) return false;
+      if (region && String(row.region || "").trim().toLowerCase() !== region) return false;
+      return true;
     });
+
+    const summary = {
+      totalStaff: rows.length,
+      byProfession: {},
+      byCity: {},
+    };
+
+    for (const row of rows) {
+      const cityKey = row.city || "Unknown";
+      summary.byCity[cityKey] = Number(summary.byCity[cityKey] || 0) + 1;
+
+      const professionList = String(row.profession || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (!professionList.length) {
+        summary.byProfession.Unknown = Number(summary.byProfession.Unknown || 0) + 1;
+      } else {
+        for (const professionName of professionList) {
+          summary.byProfession[professionName] =
+            Number(summary.byProfession[professionName] || 0) + 1;
+        }
+      }
+    }
 
     if (format === "csv") {
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -1255,6 +1445,7 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
     return res.json({
       success: true,
       count: rows.length,
+      summary,
       rows,
     });
   } catch (error) {
@@ -1455,7 +1646,7 @@ app.get("/get-customer-details-by-id/:id", requireAdminAuth, async (req, res) =>
 });
 
 // 🗑️ Delete customer by Mongo _id
-app.delete("/delete-customer/:id", requireAdminAuth, async (req, res) => {
+app.delete("/delete-customer/:id", requireAdminAuth, requireSuperAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1477,6 +1668,68 @@ app.delete("/delete-customer/:id", requireAdminAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while deleting customer.",
+    });
+  }
+});
+
+app.delete("/admin/staff/:id", requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const staffMember = await Staff.findByIdAndDelete(req.params.id);
+
+    if (!staffMember) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff member not found.",
+      });
+    }
+
+    await Promise.all([
+      EventApplication.deleteMany({ staff: staffMember._id }),
+      EventAssignment.deleteMany({ staff: staffMember._id }),
+    ]);
+
+    return res.json({
+      success: true,
+      message: "Staff member deleted successfully.",
+    });
+  } catch (error) {
+    console.error("❌ Error deleting staff member:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while deleting staff member.",
+    });
+  }
+});
+
+app.delete("/admin/orders/:id", requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const order = await Order.findByIdAndDelete(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    const event = await Event.findOneAndDelete({ order: order._id });
+
+    if (event?._id) {
+      await Promise.all([
+        EventApplication.deleteMany({ event: event._id }),
+        EventAssignment.deleteMany({ event: event._id }),
+      ]);
+    }
+
+    return res.json({
+      success: true,
+      message: "Order deleted successfully.",
+    });
+  } catch (error) {
+    console.error("❌ Error deleting order:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while deleting order.",
     });
   }
 });

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard | Black Eagle Staffing</title>
+  <title>Black Eagle Staffing Dashboard</title>
   <style>
     * {
       box-sizing: border-box;
@@ -13,20 +13,20 @@
     }
 
     body {
-      background: #f5f6f8;
+      background: #f3f4f6;
       color: #111827;
     }
 
     .layout {
       display: grid;
-      grid-template-columns: 260px 1fr;
+      grid-template-columns: 250px 1fr;
       min-height: 100vh;
     }
 
     .sidebar {
-      background: #111827;
+      background: #0f172a;
       color: #fff;
-      padding: 24px 18px;
+      padding: 24px 16px;
       position: sticky;
       top: 0;
       height: 100vh;
@@ -35,25 +35,20 @@
     .brand {
       font-size: 24px;
       font-weight: 700;
-      margin-bottom: 28px;
-    }
-
-    .sidebar nav {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+      margin-bottom: 24px;
     }
 
     .sidebar button {
       width: 100%;
+      text-align: left;
       border: none;
+      border-radius: 12px;
       background: rgba(255, 255, 255, 0.08);
       color: #fff;
-      text-align: left;
       padding: 12px 14px;
-      border-radius: 10px;
+      margin-bottom: 10px;
       cursor: pointer;
-      font-size: 14px;
+      font-weight: 700;
     }
 
     .sidebar button:hover {
@@ -62,16 +57,16 @@
     }
 
     .content {
-      padding: 28px;
+      padding: 24px;
     }
 
     .topbar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 20px;
-      margin-bottom: 24px;
+      gap: 18px;
       flex-wrap: wrap;
+      margin-bottom: 20px;
     }
 
     .topbar h1 {
@@ -84,109 +79,132 @@
       font-size: 14px;
     }
 
-    .role-chip {
+    .role-badge {
       display: inline-block;
+      padding: 8px 14px;
+      border-radius: 999px;
       background: #111827;
       color: #fff;
-      border-radius: 999px;
-      padding: 8px 14px;
       font-size: 12px;
+      font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      font-weight: 700;
     }
 
-    .panel {
-      background: #fff;
-      border-radius: 16px;
-      padding: 22px;
-      box-shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
-      margin-bottom: 22px;
-      overflow: hidden;
-    }
-
-    .panel h2 {
-      font-size: 22px;
+    .message {
+      display: none;
       margin-bottom: 16px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 14px;
     }
 
-    .stats {
+    .message.show {
+      display: block;
+    }
+
+    .message.success {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+    }
+
+    .message.error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+
+    .section {
+      background: #fff;
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 14px 40px rgba(15, 23, 42, 0.08);
+      margin-bottom: 20px;
+    }
+
+    .section h2 {
+      font-size: 22px;
+      margin-bottom: 14px;
+    }
+
+    .stats-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 22px;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
     }
 
     .stat-card {
       background: linear-gradient(135deg, #111827, #1f2937);
       color: #fff;
       border-radius: 16px;
-      padding: 18px;
+      padding: 16px;
     }
 
-    .stat-card p {
-      font-size: 13px;
+    .stat-card span {
+      display: block;
+      font-size: 12px;
       opacity: 0.8;
       margin-bottom: 8px;
     }
 
     .stat-card strong {
       font-size: 28px;
+      display: block;
     }
 
-    .toolbar,
+    .two-column {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .mini-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .mini-table th,
+    .mini-table td,
+    .table th,
+    .table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+
+    .mini-table th,
+    .table th {
+      background: #111827;
+      color: #fff;
+    }
+
+    .filters,
     .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
       gap: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
 
     label {
       display: block;
       font-size: 13px;
       font-weight: 700;
-      margin-bottom: 6px;
       color: #374151;
+      margin-bottom: 6px;
     }
 
     input,
     select,
-    button,
-    textarea {
+    button {
       width: 100%;
       padding: 10px 12px;
-      border-radius: 10px;
+      border-radius: 12px;
       border: 1px solid #d1d5db;
       font-size: 14px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 820px;
-    }
-
-    th,
-    td {
-      padding: 12px;
-      border-bottom: 1px solid #e5e7eb;
-      text-align: left;
-      font-size: 14px;
-      vertical-align: top;
-    }
-
-    th {
-      background: #111827;
-      color: #fff;
-      position: sticky;
-      top: 0;
-    }
-
-    .table-wrap {
-      overflow: auto;
-      border-radius: 12px;
-      border: 1px solid #e5e7eb;
     }
 
     .btn-row {
@@ -227,82 +245,33 @@
       color: #111827;
     }
 
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+    }
+
+    .table {
+      width: 100%;
+      min-width: 980px;
+      border-collapse: collapse;
+    }
+
     .tag {
       display: inline-block;
-      background: #f3f4f6;
-      color: #111827;
+      padding: 4px 10px;
       border-radius: 999px;
-      padding: 5px 10px;
+      background: #f3f4f6;
       font-size: 12px;
       font-weight: 700;
       margin: 2px 4px 2px 0;
-    }
-
-    .message {
-      margin-bottom: 14px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      font-size: 14px;
-      display: none;
-    }
-
-    .message.show {
-      display: block;
-    }
-
-    .message.error {
-      background: #fef2f2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
-    }
-
-    .message.success {
-      background: #f0fdf4;
-      color: #166534;
-      border: 1px solid #bbf7d0;
-    }
-
-    .modal {
-      position: fixed;
-      inset: 0;
-      background: rgba(17, 24, 39, 0.65);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      z-index: 1000;
-    }
-
-    .modal.open {
-      display: flex;
-    }
-
-    .modal-card {
-      background: #fff;
-      border-radius: 18px;
-      padding: 24px;
-      width: min(1100px, 100%);
-      max-height: 88vh;
-      overflow: auto;
-      position: relative;
-    }
-
-    .close-btn {
-      position: absolute;
-      right: 16px;
-      top: 16px;
-      width: auto;
-      border: none;
-      background: transparent;
-      font-size: 24px;
-      cursor: pointer;
     }
 
     .hidden {
       display: none !important;
     }
 
-    @media (max-width: 960px) {
+    @media (max-width: 920px) {
       .layout {
         grid-template-columns: 1fr;
       }
@@ -313,7 +282,7 @@
       }
 
       .content {
-        padding: 18px;
+        padding: 16px;
       }
     }
   </style>
@@ -322,55 +291,67 @@
   <div class="layout">
     <aside class="sidebar">
       <div class="brand">Black Eagle</div>
-      <nav>
-        <button type="button" data-target="overviewSection">Overview</button>
-        <button type="button" data-target="pendingSection">Pending Customers</button>
-        <button type="button" data-target="approvedSection">Approved Customers</button>
-        <button type="button" data-target="reportSection">Staff Reports</button>
-        <button type="button" id="adminUsersNav" class="hidden" data-target="adminUsersSection">Admin Management</button>
-        <button type="button" id="logoutBtn">Logout</button>
-      </nav>
+      <button type="button" data-target="overviewSection">Overview</button>
+      <button type="button" data-target="pendingCustomersSection">Pending Customers</button>
+      <button type="button" data-target="customersSection">Customers</button>
+      <button type="button" data-target="ordersSection">Orders</button>
+      <button type="button" data-target="staffReportsSection">Staff Reports</button>
+      <button type="button" id="adminNavButton" class="hidden" data-target="adminManagementSection">Admin Management</button>
+      <button type="button" id="logoutButton">Logout</button>
     </aside>
 
     <main class="content">
       <div class="topbar">
         <div>
           <h1>Black Eagle Staffing Dashboard</h1>
-          <p class="subtle" id="welcomeText">Secure admin workspace</p>
+          <p class="subtle" id="welcomeText">Loading admin workspace...</p>
         </div>
-        <div>
-          <span class="role-chip" id="roleLabel">Loading...</span>
-        </div>
+        <span id="roleBadge" class="role-badge">Loading</span>
       </div>
 
       <div id="pageMessage" class="message"></div>
 
-      <section id="overviewSection" class="panel">
-        <h2>Overview</h2>
-        <div class="stats">
-          <div class="stat-card">
-            <p>Pending Customers</p>
-            <strong id="statPendingCustomers">0</strong>
+      <section id="overviewSection" class="section">
+        <h2>Superadmin Dashboard Overview</h2>
+        <div class="stats-grid">
+          <div class="stat-card"><span>Total Customers</span><strong id="statTotalCustomers">0</strong></div>
+          <div class="stat-card"><span>Total Staff</span><strong id="statTotalStaff">0</strong></div>
+          <div class="stat-card"><span>Total Orders</span><strong id="statTotalOrders">0</strong></div>
+          <div class="stat-card"><span>Pending Customers</span><strong id="statPendingCustomers">0</strong></div>
+          <div class="stat-card"><span>Pending Staff</span><strong id="statPendingStaff">0</strong></div>
+          <div class="stat-card"><span>Active Orders</span><strong id="statActiveOrders">0</strong></div>
+          <div class="stat-card"><span>Completed Orders</span><strong id="statCompletedOrders">0</strong></div>
+          <div class="stat-card"><span>Open Order Balance</span><strong id="statOutstandingBalance">GBP 0.00</strong></div>
+        </div>
+
+        <div class="two-column" style="margin-top:16px;">
+          <div class="table-wrap">
+            <table class="mini-table">
+              <thead>
+                <tr><th>Staff By City</th><th>Count</th></tr>
+              </thead>
+              <tbody id="staffByCityTable">
+                <tr><td colspan="2">Loading...</td></tr>
+              </tbody>
+            </table>
           </div>
-          <div class="stat-card">
-            <p>Approved Customers</p>
-            <strong id="statApprovedCustomers">0</strong>
-          </div>
-          <div class="stat-card">
-            <p>Total Open Orders</p>
-            <strong id="statOpenOrders">0</strong>
-          </div>
-          <div class="stat-card">
-            <p>Outstanding Balance</p>
-            <strong id="statOutstanding">GBP 0.00</strong>
+          <div class="table-wrap">
+            <table class="mini-table">
+              <thead>
+                <tr><th>Staff By Profession</th><th>Count</th></tr>
+              </thead>
+              <tbody id="staffByProfessionTable">
+                <tr><td colspan="2">Loading...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      <section id="pendingSection" class="panel">
+      <section id="pendingCustomersSection" class="section">
         <h2>Pending Customer Applications</h2>
         <div class="table-wrap">
-          <table>
+          <table class="table">
             <thead>
               <tr>
                 <th>Company</th>
@@ -382,16 +363,16 @@
               </tr>
             </thead>
             <tbody id="pendingCustomersTable">
-              <tr><td colspan="6">Loading pending customers...</td></tr>
+              <tr><td colspan="6">Loading...</td></tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <section id="approvedSection" class="panel">
-        <h2>Approved Customers</h2>
+      <section id="customersSection" class="section">
+        <h2>Customer List</h2>
         <div class="table-wrap">
-          <table>
+          <table class="table">
             <thead>
               <tr>
                 <th>Customer Code</th>
@@ -399,86 +380,139 @@
                 <th>Contact</th>
                 <th>Email</th>
                 <th>Phone</th>
+                <th>Status</th>
                 <th>Orders</th>
-                <th>Outstanding</th>
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody id="approvedCustomersTable">
-              <tr><td colspan="8">Loading approved customers...</td></tr>
+            <tbody id="customersTable">
+              <tr><td colspan="8">Loading...</td></tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <section id="reportSection" class="panel">
-        <h2>Staff / Worker Reports</h2>
-        <div class="toolbar">
+      <section id="ordersSection" class="section">
+        <h2>Order List</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Customer</th>
+                <th>Event</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Total</th>
+                <th>Paid</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTable">
+              <tr><td colspan="8">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="staffReportsSection" class="section">
+        <h2>Staff Reports</h2>
+        <div class="filters">
           <div>
             <label for="staffSearch">Search</label>
-            <input id="staffSearch" type="text" placeholder="Name, email, phone, postcode, position">
+            <input id="staffSearch" type="text" placeholder="Name, email, phone, postcode" />
+          </div>
+          <div>
+            <label for="staffCityFilter">City</label>
+            <input id="staffCityFilter" type="text" placeholder="City" />
+          </div>
+          <div>
+            <label for="staffRegionFilter">Region</label>
+            <input id="staffRegionFilter" type="text" placeholder="Region" />
+          </div>
+          <div>
+            <label for="staffProfessionFilter">Profession</label>
+            <input id="staffProfessionFilter" type="text" placeholder="Profession" />
           </div>
           <div>
             <label for="staffStatusFilter">Status</label>
             <select id="staffStatusFilter">
-              <option value="">All statuses</option>
+              <option value="">All</option>
               <option value="active">Active</option>
               <option value="pending">Pending</option>
               <option value="inactive">Inactive</option>
               <option value="rejected">Rejected</option>
             </select>
           </div>
-          <div>
-            <label for="staffPositionFilter">Position</label>
-            <input id="staffPositionFilter" type="text" placeholder="e.g. Bartender">
+        </div>
+        <div class="btn-row" style="margin-bottom:14px;">
+          <button type="button" class="btn btn-primary" id="runReportButton">Run Report</button>
+          <button type="button" class="btn btn-secondary" id="downloadCsvButton">CSV Export</button>
+        </div>
+        <div class="two-column" style="margin-bottom:14px;">
+          <div class="table-wrap">
+            <table class="mini-table">
+              <thead>
+                <tr><th>Filtered Staff By City</th><th>Count</th></tr>
+              </thead>
+              <tbody id="filteredStaffByCityTable">
+                <tr><td colspan="2">Run report to load data.</td></tr>
+              </tbody>
+            </table>
           </div>
-          <div class="btn-row" style="align-items:end;">
-            <button type="button" class="btn btn-primary" id="runReportBtn">Run Report</button>
-            <button type="button" class="btn btn-secondary" id="downloadReportBtn">Download CSV</button>
+          <div class="table-wrap">
+            <table class="mini-table">
+              <thead>
+                <tr><th>Filtered Staff By Profession</th><th>Count</th></tr>
+              </thead>
+              <tbody id="filteredStaffByProfessionTable">
+                <tr><td colspan="2">Run report to load data.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
         <div class="table-wrap">
-          <table>
+          <table class="table">
             <thead>
               <tr>
-                <th>Name</th>
+                <th>Ad Soyad</th>
                 <th>Email</th>
-                <th>Mobile</th>
-                <th>Status</th>
-                <th>Positions</th>
+                <th>Telefon</th>
+                <th>Sehir</th>
+                <th>Bolge</th>
                 <th>Postcode</th>
-                <th>City</th>
-                <th>Applications</th>
-                <th>Approved</th>
-                <th>Assignments</th>
-                <th>Completed</th>
+                <th>Address</th>
+                <th>Meslek</th>
+                <th>Status</th>
+                <th>Kayit Tarihi</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="staffReportTable">
-              <tr><td colspan="11">Run the report to load staff data.</td></tr>
+              <tr><td colspan="11">Run report to load staff data.</td></tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <section id="adminUsersSection" class="panel hidden">
-        <h2>Superadmin Admin Management</h2>
+      <section id="adminManagementSection" class="section hidden">
+        <h2>Admin Management</h2>
         <div class="form-grid">
           <div>
             <label for="adminFirstName">First Name</label>
-            <input id="adminFirstName" type="text" placeholder="First name">
+            <input id="adminFirstName" type="text" />
           </div>
           <div>
             <label for="adminLastName">Last Name</label>
-            <input id="adminLastName" type="text" placeholder="Last name">
+            <input id="adminLastName" type="text" />
           </div>
           <div>
             <label for="adminEmail">Email</label>
-            <input id="adminEmail" type="email" placeholder="admin@blackeagleuk.com">
+            <input id="adminEmail" type="email" />
           </div>
           <div>
             <label for="adminPassword">Temporary Password</label>
-            <input id="adminPassword" type="password" placeholder="Temporary password">
+            <input id="adminPassword" type="password" />
           </div>
           <div>
             <label for="adminRole">Role</label>
@@ -487,24 +521,25 @@
               <option value="superadmin">Superadmin</option>
             </select>
           </div>
-          <div class="btn-row" style="align-items:end;">
-            <button type="button" class="btn btn-primary" id="createAdminBtn">Create Admin User</button>
+          <div style="align-self:end;">
+            <button type="button" class="btn btn-primary" id="createAdminButton">Create User</button>
           </div>
         </div>
         <div class="table-wrap">
-          <table>
+          <table class="table">
             <thead>
               <tr>
                 <th>Name</th>
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
+                <th>Created</th>
                 <th>Last Login</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="adminUsersTable">
-              <tr><td colspan="6">Loading admin users...</td></tr>
+              <tr><td colspan="7">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -512,35 +547,21 @@
     </main>
   </div>
 
-  <div class="modal" id="customerModal">
-    <div class="modal-card">
-      <button class="close-btn" id="closeModalBtn">&times;</button>
-      <div id="customerModalBody"></div>
-    </div>
-  </div>
-
   <script>
-    const adminToken = localStorage.getItem("adminToken");
-    const roleLabel = document.getElementById("roleLabel");
-    const welcomeText = document.getElementById("welcomeText");
+    const token = localStorage.getItem("adminToken");
     const pageMessage = document.getElementById("pageMessage");
-
-    const pendingCustomersTable = document.getElementById("pendingCustomersTable");
-    const approvedCustomersTable = document.getElementById("approvedCustomersTable");
-    const staffReportTable = document.getElementById("staffReportTable");
-    const adminUsersTable = document.getElementById("adminUsersTable");
-    const adminUsersSection = document.getElementById("adminUsersSection");
-    const adminUsersNav = document.getElementById("adminUsersNav");
-
-    const customerModal = document.getElementById("customerModal");
-    const customerModalBody = document.getElementById("customerModalBody");
+    const roleBadge = document.getElementById("roleBadge");
+    const welcomeText = document.getElementById("welcomeText");
+    const adminManagementSection = document.getElementById("adminManagementSection");
+    const adminNavButton = document.getElementById("adminNavButton");
 
     let currentAdmin = null;
-    let pendingCustomers = [];
-    let approvedCustomers = [];
-    let staffReportRows = [];
+    let dashboardSummary = null;
+    let customersCache = [];
+    let ordersCache = [];
+    let staffRows = [];
 
-    if (!adminToken) {
+    if (!token) {
       window.location.href = "/login.html";
     }
 
@@ -554,75 +575,123 @@
       pageMessage.textContent = "";
     }
 
-    function formatMoney(value) {
-      return `GBP ${Number(value || 0).toFixed(2)}`;
-    }
-
-    function formatDate(value) {
-      if (!value) return "Never";
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return "N/A";
-      return date.toLocaleString();
-    }
-
-    function buildAuthHeaders(extraHeaders = {}) {
+    function authHeaders(extra = {}) {
       return {
         Authorization: `Bearer ${localStorage.getItem("adminToken") || ""}`,
-        ...extraHeaders
+        ...extra
       };
     }
 
     async function authFetch(url, options = {}) {
       const response = await fetch(url, {
         ...options,
-        headers: buildAuthHeaders(options.headers || {})
+        headers: authHeaders(options.headers || {})
       });
 
       if (response.status === 401) {
-        handleLogout();
+        logout();
         throw new Error("Session expired. Please log in again.");
       }
 
       return response;
     }
 
-    function getCustomerOutstanding(orders) {
-      return orders.reduce((sum, order) => {
-        const total = Number(order.totalWithVat || order.totalAmount || 0);
-        const paid = Number(order.amountPaid || 0);
-        return sum + Math.max(total - paid, 0);
-      }, 0);
+    function logout() {
+      localStorage.removeItem("adminToken");
+      localStorage.removeItem("adminRole");
+      localStorage.removeItem("adminName");
+      localStorage.removeItem("adminEmail");
+      window.location.href = "/login.html";
     }
 
-    async function loadRole() {
+    function canDelete() {
+      return (currentAdmin?.role || "").toLowerCase() === "superadmin";
+    }
+
+    function formatMoney(value) {
+      return `GBP ${Number(value || 0).toFixed(2)}`;
+    }
+
+    function formatDate(value) {
+      if (!value) return "N/A";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "N/A";
+      return date.toLocaleDateString();
+    }
+
+    function formatDateTime(value) {
+      if (!value) return "Never";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "Never";
+      return date.toLocaleString();
+    }
+
+    function renderCountMap(targetId, mapObject) {
+      const tbody = document.getElementById(targetId);
+      const entries = Object.entries(mapObject || {}).sort((a, b) => b[1] - a[1]);
+
+      if (!entries.length) {
+        tbody.innerHTML = "<tr><td colspan='2'>No data available.</td></tr>";
+        return;
+      }
+
+      tbody.innerHTML = entries
+        .map(([label, count]) => `<tr><td>${label}</td><td>${count}</td></tr>`)
+        .join("");
+    }
+
+    async function loadCurrentAdmin() {
       const response = await authFetch("/get-user-role");
       const data = await response.json();
-
       currentAdmin = data.user || null;
-      roleLabel.textContent = (data.role || "admin").toUpperCase();
+
+      roleBadge.textContent = (data.role || "admin").toUpperCase();
       welcomeText.textContent = currentAdmin?.name
         ? `Welcome back, ${currentAdmin.name}`
         : "Secure admin workspace";
 
       if ((data.role || "").toLowerCase() === "superadmin") {
-        adminUsersSection.classList.remove("hidden");
-        adminUsersNav.classList.remove("hidden");
+        adminManagementSection.classList.remove("hidden");
+        adminNavButton.classList.remove("hidden");
       }
+    }
+
+    async function loadDashboardSummary() {
+      const response = await authFetch("/admin/dashboard-summary");
+      const data = await response.json();
+      dashboardSummary = data;
+
+      const totals = data.totals || {};
+      document.getElementById("statTotalCustomers").textContent = totals.customers || 0;
+      document.getElementById("statTotalStaff").textContent = totals.staff || 0;
+      document.getElementById("statTotalOrders").textContent = totals.orders || 0;
+      document.getElementById("statPendingCustomers").textContent = totals.pendingCustomers || 0;
+      document.getElementById("statPendingStaff").textContent = totals.pendingStaff || 0;
+      document.getElementById("statActiveOrders").textContent = totals.activeOrders || 0;
+      document.getElementById("statCompletedOrders").textContent = totals.completedOrders || 0;
+
+      const outstanding = ordersCache.reduce((sum, order) => {
+        const total = Number(order.totalWithVat || order.totalAmount || 0);
+        const paid = Number(order.amountPaid || 0);
+        return sum + Math.max(total - paid, 0);
+      }, 0);
+      document.getElementById("statOutstandingBalance").textContent = formatMoney(outstanding);
+
+      renderCountMap("staffByCityTable", data.staffByCity || {});
+      renderCountMap("staffByProfessionTable", data.staffByProfession || {});
     }
 
     async function loadPendingCustomers() {
       const response = await authFetch("/get-pending-customers");
-      pendingCustomers = await response.json();
+      const customers = await response.json();
+      const tbody = document.getElementById("pendingCustomersTable");
 
-      if (!Array.isArray(pendingCustomers) || pendingCustomers.length === 0) {
-        pendingCustomersTable.innerHTML = "<tr><td colspan='6'>No pending customer applications.</td></tr>";
-        document.getElementById("statPendingCustomers").textContent = "0";
+      if (!Array.isArray(customers) || !customers.length) {
+        tbody.innerHTML = "<tr><td colspan='6'>No pending customers.</td></tr>";
         return;
       }
 
-      document.getElementById("statPendingCustomers").textContent = String(pendingCustomers.length);
-
-      pendingCustomersTable.innerHTML = pendingCustomers.map((customer) => `
+      tbody.innerHTML = customers.map((customer) => `
         <tr>
           <td>${customer.companyName || "-"}</td>
           <td>${`${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "-"}</td>
@@ -633,59 +702,72 @@
             <div class="btn-row">
               <button type="button" class="btn btn-success" onclick="approveCustomer('${customer._id}')">Approve</button>
               <button type="button" class="btn btn-danger" onclick="rejectCustomer('${customer._id}')">Reject</button>
-              <button type="button" class="btn btn-muted" onclick="openCustomerModal('${customer._id}')">View</button>
-              <button type="button" class="btn btn-danger" onclick="deleteCustomerRecord('${customer._id}')">Delete</button>
+              ${canDelete() ? `<button type="button" class="btn btn-danger" onclick="deleteCustomer('${customer._id}')">Delete</button>` : ""}
             </div>
           </td>
         </tr>
       `).join("");
     }
 
-    async function loadApprovedCustomers() {
-      const response = await authFetch("/getApprovedCustomers");
+    async function loadCustomers() {
+      const response = await authFetch("/admin/customers");
       const customers = await response.json();
+      customersCache = Array.isArray(customers) ? customers : [];
 
-      approvedCustomers = await Promise.all((Array.isArray(customers) ? customers : []).map(async (customer) => {
-        const ordersResponse = await authFetch(`/admin/customer-orders/${encodeURIComponent(customer.applicationId || "")}`);
-        const orders = await ordersResponse.json();
-        return { ...customer, orders: Array.isArray(orders) ? orders : [] };
-      }));
+      const tbody = document.getElementById("customersTable");
 
-      document.getElementById("statApprovedCustomers").textContent = String(approvedCustomers.length);
-
-      const openOrders = approvedCustomers.reduce((sum, customer) => {
-        return sum + customer.orders.filter((order) => {
-          const total = Number(order.totalWithVat || order.totalAmount || 0);
-          const paid = Number(order.amountPaid || 0);
-          return Math.max(total - paid, 0) > 0;
-        }).length;
-      }, 0);
-
-      const totalOutstanding = approvedCustomers.reduce((sum, customer) => {
-        return sum + getCustomerOutstanding(customer.orders || []);
-      }, 0);
-
-      document.getElementById("statOpenOrders").textContent = String(openOrders);
-      document.getElementById("statOutstanding").textContent = formatMoney(totalOutstanding);
-
-      if (!approvedCustomers.length) {
-        approvedCustomersTable.innerHTML = "<tr><td colspan='8'>No approved customers found.</td></tr>";
+      if (!customersCache.length) {
+        tbody.innerHTML = "<tr><td colspan='8'>No customers found.</td></tr>";
         return;
       }
 
-      approvedCustomersTable.innerHTML = approvedCustomers.map((customer) => `
+      tbody.innerHTML = customersCache.map((customer) => {
+        const customerOrders = ordersCache.filter(
+          (order) => String(order.customerApplicationId || "") === String(customer.applicationId || "")
+        );
+
+        return `
+          <tr>
+            <td>${customer.customerCode || "-"}</td>
+            <td>${customer.companyName || "-"}</td>
+            <td>${`${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "-"}</td>
+            <td>${customer.email || "-"}</td>
+            <td>${customer.mobilePhone || "-"}</td>
+            <td><span class="tag">${customer.status || "-"}</span></td>
+            <td>${customerOrders.length}</td>
+            <td>
+              <div class="btn-row">
+                ${canDelete() ? `<button type="button" class="btn btn-danger" onclick="deleteCustomer('${customer._id}')">Delete</button>` : `<span class="subtle">View only</span>`}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function loadOrders() {
+      const response = await authFetch("/admin/orders");
+      ordersCache = await response.json();
+      const tbody = document.getElementById("ordersTable");
+
+      if (!Array.isArray(ordersCache) || !ordersCache.length) {
+        ordersCache = [];
+        tbody.innerHTML = "<tr><td colspan='8'>No orders found.</td></tr>";
+        return;
+      }
+
+      tbody.innerHTML = ordersCache.map((order) => `
         <tr>
-          <td>${customer.customerCode || "-"}</td>
-          <td>${customer.companyName || "-"}</td>
-          <td>${`${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "-"}</td>
-          <td>${customer.email || "-"}</td>
-          <td>${customer.mobilePhone || "-"}</td>
-          <td>${(customer.orders || []).length}</td>
-          <td>${formatMoney(getCustomerOutstanding(customer.orders || []))}</td>
+          <td>${order.orderId || "-"}</td>
+          <td>${order.companyName || order.customerName || "-"}</td>
+          <td>${order.eventName || "-"}</td>
+          <td>${formatDate(order.eventDate)}</td>
+          <td><span class="tag">${order.orderStatus || order.paymentStatus || order.status || "-"}</span></td>
+          <td>${formatMoney(order.totalWithVat || order.totalAmount || 0)}</td>
+          <td>${formatMoney(order.amountPaid || 0)}</td>
           <td>
             <div class="btn-row">
-              <button type="button" class="btn btn-muted" onclick="openCustomerModal('${customer._id}')">View</button>
-              <button type="button" class="btn btn-danger" onclick="deleteCustomerRecord('${customer._id}')">Delete</button>
+              ${canDelete() ? `<button type="button" class="btn btn-danger" onclick="deleteOrder('${order._id}')">Delete</button>` : `<span class="subtle">View only</span>`}
             </div>
           </td>
         </tr>
@@ -693,51 +775,67 @@
     }
 
     async function runStaffReport() {
-      const search = document.getElementById("staffSearch").value.trim();
-      const status = document.getElementById("staffStatusFilter").value;
-      const position = document.getElementById("staffPositionFilter").value.trim();
       const params = new URLSearchParams();
+      const search = document.getElementById("staffSearch").value.trim();
+      const city = document.getElementById("staffCityFilter").value.trim();
+      const region = document.getElementById("staffRegionFilter").value.trim();
+      const position = document.getElementById("staffProfessionFilter").value.trim();
+      const status = document.getElementById("staffStatusFilter").value;
 
       if (search) params.set("search", search);
-      if (status) params.set("status", status);
+      if (city) params.set("city", city);
+      if (region) params.set("region", region);
       if (position) params.set("position", position);
+      if (status) params.set("status", status);
 
       const response = await authFetch(`/admin/staff-report?${params.toString()}`);
       const data = await response.json();
+      staffRows = Array.isArray(data.rows) ? data.rows : [];
 
-      staffReportRows = Array.isArray(data.rows) ? data.rows : [];
+      renderCountMap("filteredStaffByCityTable", data.summary?.byCity || {});
+      renderCountMap("filteredStaffByProfessionTable", data.summary?.byProfession || {});
 
-      if (!staffReportRows.length) {
-        staffReportTable.innerHTML = "<tr><td colspan='11'>No staff matched the selected filters.</td></tr>";
+      const tbody = document.getElementById("staffReportTable");
+
+      if (!staffRows.length) {
+        tbody.innerHTML = "<tr><td colspan='11'>No staff matched the selected filters.</td></tr>";
         return;
       }
 
-      staffReportTable.innerHTML = staffReportRows.map((row) => `
+      tbody.innerHTML = staffRows.map((row) => `
         <tr>
           <td>${row.fullName || "-"}</td>
           <td>${row.email || "-"}</td>
           <td>${row.mobile || "-"}</td>
-          <td><span class="tag">${row.status || "-"}</span></td>
-          <td>${row.positions || "-"}</td>
-          <td>${row.postcode || "-"}</td>
           <td>${row.city || "-"}</td>
-          <td>${row.applicationsCount || 0}</td>
-          <td>${row.approvedApplicationsCount || 0}</td>
-          <td>${row.assignmentsCount || 0}</td>
-          <td>${row.completedAssignmentsCount || 0}</td>
+          <td>${row.region || "-"}</td>
+          <td>${row.postcode || "-"}</td>
+          <td>${row.address || "-"}</td>
+          <td>${row.profession || "-"}</td>
+          <td><span class="tag">${row.status || "-"}</span></td>
+          <td>${formatDate(row.createdAt)}</td>
+          <td>
+            <div class="btn-row">
+              ${canDelete() ? `<button type="button" class="btn btn-danger" onclick="deleteStaff('${row.staffId}')">Delete</button>` : `<span class="subtle">View only</span>`}
+            </div>
+          </td>
         </tr>
       `).join("");
     }
 
-    async function downloadStaffReport() {
-      const search = document.getElementById("staffSearch").value.trim();
-      const status = document.getElementById("staffStatusFilter").value;
-      const position = document.getElementById("staffPositionFilter").value.trim();
+    async function downloadStaffCsv() {
       const params = new URLSearchParams({ format: "csv" });
+      const search = document.getElementById("staffSearch").value.trim();
+      const city = document.getElementById("staffCityFilter").value.trim();
+      const region = document.getElementById("staffRegionFilter").value.trim();
+      const position = document.getElementById("staffProfessionFilter").value.trim();
+      const status = document.getElementById("staffStatusFilter").value;
 
       if (search) params.set("search", search);
-      if (status) params.set("status", status);
+      if (city) params.set("city", city);
+      if (region) params.set("region", region);
       if (position) params.set("position", position);
+      if (status) params.set("status", status);
 
       const response = await authFetch(`/admin/staff-report?${params.toString()}`);
       const csvText = await response.text();
@@ -753,37 +851,40 @@
     }
 
     async function loadAdminUsers() {
-      if (!adminUsersSection || adminUsersSection.classList.contains("hidden")) {
+      if ((currentAdmin?.role || "").toLowerCase() !== "superadmin") {
         return;
       }
 
       const response = await authFetch("/admin/users");
       const users = await response.json();
+      const tbody = document.getElementById("adminUsersTable");
 
-      adminUsersTable.innerHTML = (Array.isArray(users) ? users : []).map((user) => `
+      tbody.innerHTML = (Array.isArray(users) ? users : []).map((user) => `
         <tr>
           <td>${user.name || "-"}</td>
           <td>${user.email || "-"}</td>
           <td>
-            <select data-role-id="${user.id}" data-field="role">
+            <select data-user-id="${user.id}" data-field="role">
               <option value="admin" ${user.role === "admin" ? "selected" : ""}>Admin</option>
               <option value="superadmin" ${user.role === "superadmin" ? "selected" : ""}>Superadmin</option>
             </select>
           </td>
           <td>
-            <select data-role-id="${user.id}" data-field="status">
+            <select data-user-id="${user.id}" data-field="status">
               <option value="active" ${user.status === "active" ? "selected" : ""}>Active</option>
               <option value="disabled" ${user.status === "disabled" ? "selected" : ""}>Disabled</option>
             </select>
           </td>
-          <td>${formatDate(user.lastLoginAt)}</td>
+          <td>${formatDate(user.createdAt)}</td>
+          <td>${formatDateTime(user.lastLoginAt)}</td>
           <td>
             <div class="btn-row">
               <button type="button" class="btn btn-primary" onclick="saveAdminUser('${user.id}')">Save</button>
+              <button type="button" class="btn btn-danger" onclick="deleteAdminUser('${user.id}')">Delete</button>
             </div>
           </td>
         </tr>
-      `).join("") || "<tr><td colspan='6'>No admin users found.</td></tr>";
+      `).join("") || "<tr><td colspan='7'>No admin users found.</td></tr>";
     }
 
     async function createAdminUser() {
@@ -795,40 +896,33 @@
 
       const response = await authFetch("/admin/users", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ firstName, lastName, email, password, role })
       });
-
       const data = await response.json();
 
       if (!response.ok || data.success === false) {
         throw new Error(data.message || "Could not create admin user.");
       }
 
-      document.getElementById("adminFirstName").value = "";
-      document.getElementById("adminLastName").value = "";
-      document.getElementById("adminEmail").value = "";
-      document.getElementById("adminPassword").value = "";
+      ["adminFirstName", "adminLastName", "adminEmail", "adminPassword"].forEach((id) => {
+        document.getElementById(id).value = "";
+      });
       document.getElementById("adminRole").value = "admin";
 
       showMessage("Admin user created successfully.", "success");
       await loadAdminUsers();
     }
 
-    async function persistAdminUser(userId) {
-      const role = document.querySelector(`[data-role-id="${userId}"][data-field="role"]`)?.value;
-      const status = document.querySelector(`[data-role-id="${userId}"][data-field="status"]`)?.value;
+    async function saveAdminUser(userId) {
+      const role = document.querySelector(`[data-user-id="${userId}"][data-field="role"]`)?.value;
+      const status = document.querySelector(`[data-user-id="${userId}"][data-field="status"]`)?.value;
 
       const response = await authFetch(`/admin/users/${userId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role, status })
       });
-
       const data = await response.json();
 
       if (!response.ok || data.success === false) {
@@ -839,134 +933,76 @@
       await loadAdminUsers();
     }
 
-    async function loadCustomerDetails(customerId) {
-      const existingCustomer =
-        approvedCustomers.find((customer) => customer._id === customerId) ||
-        pendingCustomers.find((customer) => customer._id === customerId);
-
-      const customerResponse = existingCustomer
-        ? { ok: true, json: async () => existingCustomer }
-        : await authFetch(`/get-customer-details-by-id/${customerId}`);
-
-      const customer = await customerResponse.json();
-      const ordersResponse = customer.applicationId
-        ? await authFetch(`/admin/customer-orders/${encodeURIComponent(customer.applicationId)}`)
-        : null;
-      const orders = ordersResponse ? await ordersResponse.json() : [];
-
-      const totalOutstanding = getCustomerOutstanding(Array.isArray(orders) ? orders : []);
-
-      customerModalBody.innerHTML = `
-        <h2 style="margin-bottom: 14px;">${customer.companyName || "Customer Details"}</h2>
-        <p class="subtle" style="margin-bottom: 16px;">Application ID: ${customer.applicationId || "N/A"}</p>
-        <div class="stats" style="margin-bottom: 16px;">
-          <div class="stat-card"><p>Total Orders</p><strong>${Array.isArray(orders) ? orders.length : 0}</strong></div>
-          <div class="stat-card"><p>Outstanding Balance</p><strong>${formatMoney(totalOutstanding)}</strong></div>
-        </div>
-        <div class="panel" style="box-shadow:none; border:1px solid #e5e7eb; padding:16px; margin-bottom:16px;">
-          <p><strong>Contact:</strong> ${`${customer.firstName || ""} ${customer.lastName || ""}`.trim() || "-"}</p>
-          <p><strong>Email:</strong> ${customer.email || "-"}</p>
-          <p><strong>Phone:</strong> ${customer.mobilePhone || "-"}</p>
-          <p><strong>Status:</strong> ${customer.status || "-"}</p>
-          <p><strong>Customer Code:</strong> ${customer.customerCode || "-"}</p>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Order ID</th>
-                <th>Event</th>
-                <th>Date</th>
-                <th>Total</th>
-                <th>Paid</th>
-                <th>Remaining</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${
-                Array.isArray(orders) && orders.length
-                  ? orders.map((order) => {
-                      const total = Number(order.totalWithVat || order.totalAmount || 0);
-                      const paid = Number(order.amountPaid || 0);
-                      const remaining = Math.max(total - paid, 0);
-
-                      return `
-                        <tr>
-                          <td>${order.orderId || "-"}</td>
-                          <td>${order.eventName || order.companyName || "-"}</td>
-                          <td>${order.eventDate ? new Date(order.eventDate).toLocaleDateString() : "-"}</td>
-                          <td>${formatMoney(total)}</td>
-                          <td>${formatMoney(paid)}</td>
-                          <td>${formatMoney(remaining)}</td>
-                          <td>${order.paymentStatus || order.status || "-"}</td>
-                        </tr>
-                      `;
-                    }).join("")
-                  : "<tr><td colspan='7'>No orders found for this customer.</td></tr>"
-              }
-            </tbody>
-          </table>
-        </div>
-      `;
-
-      customerModal.classList.add("open");
-    }
-
-    async function approveCustomerRecord(customerId) {
-      if (!window.confirm("Approve this customer application?")) return;
-      const response = await authFetch(`/approve-customer/${customerId}`, { method: "POST" });
+    async function deleteAdminUserRecord(userId) {
+      const response = await authFetch(`/admin/users/${userId}`, { method: "DELETE" });
       const data = await response.json();
 
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || "Could not delete admin user.");
+      }
+
+      showMessage("Admin user deleted successfully.", "success");
+      await loadAdminUsers();
+    }
+
+    async function approveCustomerRecord(id) {
+      const response = await authFetch(`/approve-customer/${id}`, { method: "POST" });
+      const data = await response.json();
       if (!response.ok || data.success === false) {
         throw new Error(data.message || "Could not approve customer.");
       }
-
+      await refreshAll();
       showMessage(data.message || "Customer approved.", "success");
-      await refreshDashboard();
     }
 
-    async function rejectCustomerRecord(customerId) {
-      if (!window.confirm("Reject this customer application?")) return;
-      const response = await authFetch(`/reject-customer/${customerId}`, { method: "POST" });
+    async function rejectCustomerRecord(id) {
+      const response = await authFetch(`/reject-customer/${id}`, { method: "POST" });
       const data = await response.json();
-
       if (!response.ok || data.success === false) {
         throw new Error(data.message || "Could not reject customer.");
       }
-
+      await refreshAll();
       showMessage(data.message || "Customer rejected.", "success");
-      await refreshDashboard();
     }
 
-    async function deleteCustomerById(customerId) {
-      if (!window.confirm("Delete this customer record? This cannot be undone.")) return;
-      const response = await authFetch(`/delete-customer/${customerId}`, { method: "DELETE" });
+    async function deleteCustomerRecord(id) {
+      const response = await authFetch(`/delete-customer/${id}`, { method: "DELETE" });
       const data = await response.json();
-
       if (!response.ok || data.success === false) {
         throw new Error(data.message || "Could not delete customer.");
       }
-
+      await refreshAll();
       showMessage(data.message || "Customer deleted.", "success");
-      await refreshDashboard();
     }
 
-    function handleLogout() {
-      localStorage.removeItem("adminToken");
-      localStorage.removeItem("adminRole");
-      localStorage.removeItem("adminName");
-      localStorage.removeItem("adminEmail");
-      window.location.href = "/login.html";
+    async function deleteStaffRecord(id) {
+      const response = await authFetch(`/admin/staff/${id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || "Could not delete staff.");
+      }
+      await refreshAll();
+      showMessage(data.message || "Staff deleted.", "success");
     }
 
-    async function refreshDashboard() {
+    async function deleteOrderRecord(id) {
+      const response = await authFetch(`/admin/orders/${id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || "Could not delete order.");
+      }
+      await refreshAll();
+      showMessage(data.message || "Order deleted.", "success");
+    }
+
+    async function refreshAll() {
       clearMessage();
+      await loadOrders();
+      await loadDashboardSummary();
       await loadPendingCustomers();
-      await loadApprovedCustomers();
+      await loadCustomers();
       await runStaffReport();
-
-      if (!adminUsersSection.classList.contains("hidden")) {
+      if ((currentAdmin?.role || "").toLowerCase() === "superadmin") {
         await loadAdminUsers();
       }
     }
@@ -980,33 +1016,22 @@
       });
     });
 
-    document.getElementById("logoutBtn").addEventListener("click", handleLogout);
-    document.getElementById("closeModalBtn").addEventListener("click", () => {
-      customerModal.classList.remove("open");
-    });
-    customerModal.addEventListener("click", (event) => {
-      if (event.target === customerModal) {
-        customerModal.classList.remove("open");
-      }
-    });
-
-    document.getElementById("runReportBtn").addEventListener("click", async () => {
+    document.getElementById("logoutButton").addEventListener("click", logout);
+    document.getElementById("runReportButton").addEventListener("click", async () => {
       try {
         await runStaffReport();
       } catch (error) {
         showMessage(error.message || "Could not run staff report.", "error");
       }
     });
-
-    document.getElementById("downloadReportBtn").addEventListener("click", async () => {
+    document.getElementById("downloadCsvButton").addEventListener("click", async () => {
       try {
-        await downloadStaffReport();
+        await downloadStaffCsv();
       } catch (error) {
-        showMessage(error.message || "Could not download the staff report.", "error");
+        showMessage(error.message || "Could not export CSV.", "error");
       }
     });
-
-    document.getElementById("createAdminBtn").addEventListener("click", async () => {
+    document.getElementById("createAdminButton").addEventListener("click", async () => {
       try {
         await createAdminUser();
       } catch (error) {
@@ -1014,52 +1039,68 @@
       }
     });
 
-    window.approveCustomer = async (customerId) => {
+    window.approveCustomer = async (id) => {
       try {
-        await approveCustomerRecord(customerId);
+        await approveCustomerRecord(id);
       } catch (error) {
         showMessage(error.message || "Could not approve customer.", "error");
       }
     };
 
-    window.rejectCustomer = async (customerId) => {
+    window.rejectCustomer = async (id) => {
       try {
-        await rejectCustomerRecord(customerId);
+        await rejectCustomerRecord(id);
       } catch (error) {
         showMessage(error.message || "Could not reject customer.", "error");
       }
     };
 
-    window.deleteCustomerRecord = async (customerId) => {
+    window.deleteCustomer = async (id) => {
       try {
-        await deleteCustomerById(customerId);
+        await deleteCustomerRecord(id);
       } catch (error) {
         showMessage(error.message || "Could not delete customer.", "error");
       }
     };
 
-    window.openCustomerModal = async (customerId) => {
+    window.deleteStaff = async (id) => {
       try {
-        await loadCustomerDetails(customerId);
+        await deleteStaffRecord(id);
       } catch (error) {
-        showMessage(error.message || "Could not load customer details.", "error");
+        showMessage(error.message || "Could not delete staff.", "error");
       }
     };
 
-    window.saveAdminUser = async (userId) => {
+    window.deleteOrder = async (id) => {
       try {
-        await persistAdminUser(userId);
+        await deleteOrderRecord(id);
+      } catch (error) {
+        showMessage(error.message || "Could not delete order.", "error");
+      }
+    };
+
+    window.saveAdminUser = async (id) => {
+      try {
+        await saveAdminUser(id);
       } catch (error) {
         showMessage(error.message || "Could not update admin user.", "error");
       }
     };
 
-    (async function initDashboard() {
+    window.deleteAdminUser = async (id) => {
       try {
-        await loadRole();
-        await refreshDashboard();
+        await deleteAdminUserRecord(id);
       } catch (error) {
-        showMessage(error.message || "Failed to load admin dashboard.", "error");
+        showMessage(error.message || "Could not delete admin user.", "error");
+      }
+    };
+
+    (async function init() {
+      try {
+        await loadCurrentAdmin();
+        await refreshAll();
+      } catch (error) {
+        showMessage(error.message || "Failed to load dashboard.", "error");
       }
     })();
   </script>

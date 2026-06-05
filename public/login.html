@@ -3,113 +3,180 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Black Eagle Login | Client & Staff Access</title>
-  <meta
-    name="description"
-    content="Secure customer and staff login for the Black Eagle Agency operations platform."
-  />
-  <meta name="theme-color" content="#0a0d12" />
-  <link rel="stylesheet" href="/css/brand.css" />
+  <title>Black Eagle Staffing Login</title>
+  <meta name="theme-color" content="#0f172a" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(180deg, #0f172a 0%, #111827 52%, #1f2937 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #111827;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 420px;
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 28px 22px;
+      box-shadow: 0 25px 70px rgba(15, 23, 42, 0.35);
+    }
+
+    .logo-wrap {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 18px;
+    }
+
+    .logo-wrap img {
+      width: 92px;
+      height: 92px;
+      object-fit: contain;
+      border-radius: 50%;
+      background: #fff;
+      border: 3px solid #111827;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 24px;
+      margin-bottom: 20px;
+      color: #0f172a;
+    }
+
+    .form-row {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #374151;
+    }
+
+    input {
+      width: 100%;
+      padding: 13px 14px;
+      border-radius: 12px;
+      border: 1px solid #d1d5db;
+      font-size: 15px;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #111827;
+      box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
+    }
+
+    .btn {
+      width: 100%;
+      border: none;
+      border-radius: 12px;
+      padding: 13px 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .btn-primary {
+      background: #111827;
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: #f3f4f6;
+      color: #111827;
+      border: 1px solid #e5e7eb;
+    }
+
+    .link-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .footer-links a {
+      color: #4b5563;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .message {
+      min-height: 20px;
+      margin-top: 12px;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .message.error {
+      color: #b91c1c;
+    }
+
+    .message.success {
+      color: #166534;
+    }
+  </style>
 </head>
-<body class="auth-page">
-  <div class="page-shell">
-    <header class="topbar">
-      <div class="topbar-inner">
-        <a class="brand" href="/">
-          <img class="brand-logo" src="/img/blackeaglelogo.png" alt="Black Eagle Agency logo" />
-          <span>
-            <span class="brand-title">Black Eagle</span>
-            <span class="brand-subtitle">Client & Staff Access</span>
-          </span>
-        </a>
+<body>
+  <main class="card">
+    <div class="logo-wrap">
+      <img src="/img/blackeaglelogo.png" alt="Black Eagle Staffing logo" />
+    </div>
 
-        <div class="nav-actions">
-          <a class="button button-ghost" href="/">Back to Site</a>
-          <a class="button button-secondary" href="/privacy.html">Privacy</a>
-          <a class="button button-secondary" href="/terms.html">Terms</a>
-        </div>
+    <h1>Login</h1>
+
+    <form id="unifiedLoginForm">
+      <div class="form-row">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" autocomplete="email" required />
       </div>
-    </header>
 
-    <main class="auth-shell">
-      <section class="auth-panel">
-        <span class="eyebrow">Platform access</span>
-        <h1>Continue into the <span>Black Eagle</span> workspace.</h1>
-        <p>
-          Customers can manage live events, payments, and confirmed staff. Team members can track approvals,
-          suitable opportunities, assignments, and profile completion in one place.
-        </p>
-
-        <div class="pill-row">
-          <span class="pill">Verified sign-up flow</span>
-          <span class="pill">Client dashboard</span>
-          <span class="pill">Staff event access</span>
-          <span class="pill">Desktop admin control</span>
-        </div>
-
-        <div class="support-grid">
-          <div class="support-card">
-            <strong>Client access</strong>
-            <span>Create staffing requests, track payments, and review the assigned team before the event.</span>
-          </div>
-          <div class="support-card">
-            <strong>Staff access</strong>
-            <span>See relevant roles, apply to live work, and track assignments after approval.</span>
-          </div>
-          <div class="support-card">
-            <strong>Approval process</strong>
-            <span>Every account still goes through review so the platform remains credible and controlled.</span>
-          </div>
-          <div class="support-card">
-            <strong>Need a new account?</strong>
-            <span>Choose the correct registration route below and return here once your access is approved.</span>
-          </div>
-        </div>
-      </section>
-
-      <section class="auth-card">
-        <h2>Login</h2>
-        <p>Use the email and password attached to your approved Black Eagle account.</p>
-
-        <form id="unifiedLoginForm" class="auth-form">
-          <div class="form-row">
-            <label for="email">Email address</label>
-            <input type="email" id="email" name="email" autocomplete="email" required />
-          </div>
-
-          <div class="form-row">
-            <label for="password">Password</label>
-            <input type="password" id="password" name="password" autocomplete="current-password" required />
-          </div>
-
-          <button class="button button-primary button-block" id="loginBtn" type="submit">Login</button>
-          <div id="messageBox" class="message" aria-live="polite"></div>
-        </form>
-
-        <div class="auth-links">
-          <a class="button button-secondary button-block" href="/Customer-logins/customer-login-create.html">Create Customer Account</a>
-          <a class="button button-secondary button-block" href="/staff-logins/staff-login-create.html">Create Staff Account</a>
-          <a class="button button-ghost button-block" href="/forgot/forgot.html">Forgot password</a>
-        </div>
-
-        <p class="muted-note">
-          Admin operations remain on desktop. This login page is intended for customer and staff access only.
-        </p>
-      </section>
-    </main>
-
-    <footer class="footer">
-      <div class="footer-inner">
-        <span>Black Eagle Agency. Client and staff platform access.</span>
-        <div class="footer-links">
-          <a href="/about.html">About</a>
-          <a href="/contact.html">Contact</a>
-          <a href="/privacy.html">Privacy</a>
-          <a href="/terms.html">Terms</a>
-        </div>
+      <div class="form-row">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password" required />
       </div>
-    </footer>
-  </div>
+
+      <button id="loginBtn" class="btn btn-primary" type="submit">Login</button>
+      <div id="messageBox" class="message" aria-live="polite"></div>
+    </form>
+
+    <div class="link-list">
+      <a class="btn btn-secondary" href="/Customer-logins/customer-login-create.html">Create Customer Account</a>
+      <a class="btn btn-secondary" href="/staff-logins/staff-login-create.html">Create Staff Account</a>
+      <a class="btn btn-secondary" href="/forgot/forgot.html">Forgot Password</a>
+      <a class="btn btn-secondary" href="/">Back to Site</a>
+    </div>
+
+    <div class="footer-links">
+      <a href="/privacy.html">Privacy</a>
+      <a href="/terms.html">Terms</a>
+    </div>
+  </main>
 
   <script src="/js/unified-login.js"></script>
 </body>

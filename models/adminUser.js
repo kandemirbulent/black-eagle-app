@@ -3,11 +3,17 @@ const bcrypt = require("bcryptjs");
 
 const adminUserSchema = new mongoose.Schema(
   {
-    firstName: { type: String, required: true, trim: true },
-    lastName: { type: String, default: "", trim: true },
-    name: { type: String, default: "", trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    password: { type: String, required: true },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    passwordHash: {
+      type: String,
+      required: true,
+    },
     role: {
       type: String,
       enum: ["superadmin", "admin"],
@@ -20,10 +26,39 @@ const adminUserSchema = new mongoose.Schema(
       default: "active",
       index: true,
     },
-    lastLoginAt: { type: Date, default: null },
+    firstName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    lastName: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    name: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AdminUser",
+      default: null,
+      index: true,
+    },
+    lastLoginAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );
+
+adminUserSchema.virtual("password")
+  .set(function setPassword(password) {
+    this._plainPassword = String(password || "");
+  });
 
 adminUserSchema.pre("save", async function (next) {
   try {
@@ -32,8 +67,9 @@ adminUserSchema.pre("save", async function (next) {
     this.name = `${this.firstName} ${this.lastName}`.trim();
     this.email = String(this.email || "").trim().toLowerCase();
 
-    if (this.isModified("password")) {
-      this.password = await bcrypt.hash(String(this.password), 10);
+    if (typeof this._plainPassword === "string" && this._plainPassword.trim()) {
+      this.passwordHash = await bcrypt.hash(this._plainPassword.trim(), 10);
+      this._plainPassword = "";
     }
 
     next();
@@ -41,5 +77,10 @@ adminUserSchema.pre("save", async function (next) {
     next(error);
   }
 });
+
+adminUserSchema.methods.comparePassword = async function comparePassword(candidatePassword) {
+  if (!this.passwordHash) return false;
+  return bcrypt.compare(String(candidatePassword || ""), this.passwordHash);
+};
 
 module.exports = mongoose.model("AdminUser", adminUserSchema);
