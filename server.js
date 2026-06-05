@@ -15,8 +15,10 @@ const crypto = require("crypto");
 const Order = require("./models/order");
 const Customer = require("./models/customer");
 const Staff = require("./models/staff");
+const AdminUser = require("./models/adminUser");
 const Event = require("./models/event");
 const EventApplication = require("./models/eventApplication");
+const EventAssignment = require("./models/eventAssignment");
 const staffEvents = require("./routes/staffEvents");
 const {
   normalizeEmail,
@@ -29,6 +31,9 @@ const {
   getRequiredQuantityForRole,
   canAutoApprovalStart,
 } = require("./utils/event-utils");
+const {
+  calculateOrderFinancials,
+} = require("./utils/order-utils");
 const {
   approveCustomer,
   rejectCustomer,
@@ -181,10 +186,222 @@ async function verifyStaffPhoneOtpCode({ to, code }) {
   return payload?.status === "approved";
 }
 
+const ADMIN_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+
+function getAdminJwtSecret() {
+  return String(process.env.JWT_SECRET || "").trim();
+}
+
+function encodeTokenPayload(payload) {
+  return Buffer.from(JSON.stringify(payload)).toString("base64url");
+}
+
+function signAdminToken(payload) {
+  const secret = getAdminJwtSecret();
+
+  if (!secret) {
+    throw new Error("JWT_SECRET is required for admin authentication.");
+  }
+
+  const encodedPayload = encodeTokenPayload(payload);
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(encodedPayload)
+    .digest("base64url");
+
+  return `${encodedPayload}.${signature}`;
+}
+
+function verifyAdminToken(token) {
+  const secret = getAdminJwtSecret();
+
+  if (!secret || !token || typeof token !== "string" || !token.includes(".")) {
+    return null;
+  }
+
+  const [encodedPayload, providedSignature] = token.split(".");
+  const expectedSignature = crypto
+    .createHmac("sha256", secret)
+    .update(encodedPayload)
+    .digest("base64url");
+
+  if (providedSignature !== expectedSignature) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+
+    if (!payload?.sub || !payload?.exp || Date.now() > Number(payload.exp)) {
+      return null;
+    }
+
+    return payload;
+  } catch (error) {
+    return null;
+  }
+}
+
+function buildAdminAuthToken(adminUser) {
+  return signAdminToken({
+    sub: String(adminUser._id),
+    email: adminUser.email,
+    role: adminUser.role,
+    name: adminUser.name,
+    exp: Date.now() + ADMIN_TOKEN_TTL_MS,
+  });
+}
+
+function serializeAdminUser(adminUser) {
+  return {
+    id: adminUser._id,
+    firstName: adminUser.firstName || "",
+    lastName: adminUser.lastName || "",
+    name: adminUser.name || "",
+    email: adminUser.email || "",
+    role: adminUser.role || "admin",
+    status: adminUser.status || "active",
+    lastLoginAt: adminUser.lastLoginAt || null,
+    createdAt: adminUser.createdAt || null,
+    updatedAt: adminUser.updatedAt || null,
+  };
+}
+
+async function ensureInitialSuperAdmin() {
+  const email = normalizeEmail(process.env.SUPER_ADMIN_EMAIL);
+  const password = String(process.env.SUPER_ADMIN_PASSWORD || "").trim();
+
+  if (!email || !password) {
+    console.warn(
+      "⚠️ SUPER_ADMIN_EMAIL or SUPER_ADMIN_PASSWORD missing. Initial superadmin seed skipped."
+    );
+    return;
+  }
+
+  const existingAdmin = await AdminUser.findOne({ email });
+
+  if (existingAdmin) {
+    let shouldSave = false;
+
+    if (existingAdmin.role !== "superadmin") {
+      existingAdmin.role = "superadmin";
+      shouldSave = true;
+    }
+
+    if (existingAdmin.status !== "active") {
+      existingAdmin.status = "active";
+      shouldSave = true;
+    }
+
+    if (shouldSave) {
+      await existingAdmin.save();
+    }
+
+    return;
+  }
+
+  await AdminUser.create({
+    firstName: "Black Eagle",
+    lastName: "Superadmin",
+    email,
+    password,
+    role: "superadmin",
+    status: "active",
+  });
+
+  console.log(`✅ Initial superadmin created for ${email}`);
+}
+
+async function requireAdminAuth(req, res, next) {
+  try {
+    const authHeader = String(req.headers.authorization || "");
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    const payload = verifyAdminToken(token);
+
+    if (!payload?.sub) {
+      return res.status(401).json({
+        success: false,
+        message: "Admin authentication required.",
+      });
+    }
+
+    const adminUser = await AdminUser.findById(payload.sub);
+
+    if (!adminUser || adminUser.status !== "active") {
+      return res.status(401).json({
+        success: false,
+        message: "Admin account is not available.",
+      });
+    }
+
+    req.adminUser = adminUser;
+    next();
+  } catch (error) {
+    console.error("❌ Admin auth middleware error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while validating admin session.",
+    });
+  }
+}
+
+function requireSuperAdmin(req, res, next) {
+  if (!req.adminUser || req.adminUser.role !== "superadmin") {
+    return res.status(403).json({
+      success: false,
+      message: "Superadmin access is required.",
+    });
+  }
+
+  return next();
+}
+
+function parseAddressSummary(address = "") {
+  const segments = String(address || "")
+    .split(",")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  if (!segments.length) {
+    return {
+      city: "",
+      region: "",
+    };
+  }
+
+  return {
+    city: segments.length >= 2 ? segments[segments.length - 2] : segments[0],
+    region: segments[segments.length - 1] || "",
+  };
+}
+
+function toCsvValue(value) {
+  const text = String(value ?? "");
+  if (/[",\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function buildCsv(rows = []) {
+  if (!rows.length) {
+    return "";
+  }
+
+  const headers = Object.keys(rows[0]);
+  const lines = [
+    headers.join(","),
+    ...rows.map((row) => headers.map((header) => toCsvValue(row[header])).join(",")),
+  ];
+
+  return lines.join("\n");
+}
+
 mongoose
   .connect(process.env.MONGO_URI)
-  .then(() => {
+  .then(async () => {
     console.log("✅ MongoDB Atlas connected successfully");
+    await ensureInitialSuperAdmin();
   })
   .catch((err) => {
     console.error("❌ MongoDB connection failed:", err);
@@ -612,12 +829,15 @@ const users = [
 ];
 
 // ✅ Basit role endpoint (dashboard için)
-app.get("/get-user-role", (req, res) => {
-  res.json({ role: "admin" });
+app.get("/get-user-role", requireAdminAuth, (req, res) => {
+  res.json({
+    role: req.adminUser.role,
+    user: serializeAdminUser(req.adminUser),
+  });
 });
 
 // ✅ Get pending customers (for dashboard)
-app.get("/get-pending-customers", async (req, res) => {
+app.get("/get-pending-customers", requireAdminAuth, async (req, res) => {
   try {
     const pendingCustomers = await Customer.find({ status: "pending" }).sort({ createdAt: -1 });
     res.json(pendingCustomers.map(serializeCustomer));
@@ -643,7 +863,7 @@ app.get("/test-email", async (req, res) => {
 });
 
 // ✅ Approve customer and send email with password setup link
-app.post("/approve-customer/:id", async (req, res) => {
+app.post("/approve-customer/:id", requireAdminAuth, async (req, res) => {
   try {
     const result = await approveCustomer({
       Customer,
@@ -659,7 +879,7 @@ app.post("/approve-customer/:id", async (req, res) => {
   }
 });
 
-app.post("/reject-customer/:id", async (req, res) => {
+app.post("/reject-customer/:id", requireAdminAuth, async (req, res) => {
   try {
     const result = await rejectCustomer({
       Customer,
@@ -705,15 +925,345 @@ app.get("/get-customer-by-email/:email", async (req, res) => {
 });
 
 // 🔑 Login simülasyonu
-app.post("/login", (req, res) => {
-  const { email } = req.body;
-  const user = users.find((u) => u.email === email);
+app.post("/login", handleAdminLogin);
 
-  if (!user) {
-    return res.status(404).json({ success: false, message: "User not found" });
+async function handleAdminLogin(req, res) {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required.",
+      });
+    }
+
+    if (!getAdminJwtSecret()) {
+      return res.status(500).json({
+        success: false,
+        message: "Admin authentication is not configured. Please set JWT_SECRET.",
+      });
+    }
+
+    const adminUser = await AdminUser.findOne({ email });
+
+    if (!adminUser || adminUser.status !== "active") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid admin credentials.",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, adminUser.password);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid admin credentials.",
+      });
+    }
+
+    adminUser.lastLoginAt = new Date();
+    await adminUser.save();
+
+    return res.json({
+      success: true,
+      token: buildAdminAuthToken(adminUser),
+      redirect: "/dashboard.html",
+      user: serializeAdminUser(adminUser),
+    });
+  } catch (error) {
+    console.error("❌ Admin login error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while logging in admin user.",
+    });
   }
+}
 
-  res.json({ success: true, user });
+async function ensureAnotherActiveSuperAdminExists(excludedAdminId) {
+  const count = await AdminUser.countDocuments({
+    _id: { $ne: excludedAdminId },
+    role: "superadmin",
+    status: "active",
+  });
+
+  return count > 0;
+}
+
+app.post("/admin/login", handleAdminLogin);
+
+app.get("/admin/users", requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const users = await AdminUser.find().sort({ role: 1, createdAt: -1 });
+    return res.json(users.map(serializeAdminUser));
+  } catch (error) {
+    console.error("❌ Error loading admin users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while loading admin users.",
+    });
+  }
+});
+
+app.post("/admin/users", requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const firstName = String(req.body?.firstName || "").trim();
+    const lastName = String(req.body?.lastName || "").trim();
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || "");
+    const role = req.body?.role === "superadmin" ? "superadmin" : "admin";
+
+    if (!firstName || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "First name, email and password are required.",
+      });
+    }
+
+    const existing = await AdminUser.findOne({ email });
+
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: "An admin user with this email already exists.",
+      });
+    }
+
+    const adminUser = await AdminUser.create({
+      firstName,
+      lastName,
+      email,
+      password,
+      role,
+      status: "active",
+    });
+
+    return res.status(201).json({
+      success: true,
+      user: serializeAdminUser(adminUser),
+    });
+  } catch (error) {
+    console.error("❌ Error creating admin user:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while creating admin user.",
+    });
+  }
+});
+
+app.patch("/admin/users/:id", requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const adminUser = await AdminUser.findById(req.params.id);
+
+    if (!adminUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin user not found.",
+      });
+    }
+
+    const nextRole =
+      typeof req.body?.role === "string" && ["admin", "superadmin"].includes(req.body.role)
+        ? req.body.role
+        : adminUser.role;
+    const nextStatus =
+      typeof req.body?.status === "string" && ["active", "disabled"].includes(req.body.status)
+        ? req.body.status
+        : adminUser.status;
+
+    const wouldRemoveLastSuperAdmin =
+      adminUser.role === "superadmin" &&
+      (nextRole !== "superadmin" || nextStatus !== "active") &&
+      !(await ensureAnotherActiveSuperAdminExists(adminUser._id));
+
+    if (wouldRemoveLastSuperAdmin) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one active superadmin must remain.",
+      });
+    }
+
+    if (typeof req.body?.firstName === "string") {
+      adminUser.firstName = req.body.firstName.trim() || adminUser.firstName;
+    }
+
+    if (typeof req.body?.lastName === "string") {
+      adminUser.lastName = req.body.lastName.trim();
+    }
+
+    if (typeof req.body?.email === "string" && normalizeEmail(req.body.email)) {
+      const nextEmail = normalizeEmail(req.body.email);
+      const duplicate = await AdminUser.findOne({
+        _id: { $ne: adminUser._id },
+        email: nextEmail,
+      });
+
+      if (duplicate) {
+        return res.status(409).json({
+          success: false,
+          message: "Another admin user already uses this email.",
+        });
+      }
+
+      adminUser.email = nextEmail;
+    }
+
+    if (typeof req.body?.password === "string" && req.body.password.trim()) {
+      adminUser.password = req.body.password.trim();
+    }
+
+    adminUser.role = nextRole;
+    adminUser.status = nextStatus;
+
+    await adminUser.save();
+
+    return res.json({
+      success: true,
+      user: serializeAdminUser(adminUser),
+    });
+  } catch (error) {
+    console.error("❌ Error updating admin user:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating admin user.",
+    });
+  }
+});
+
+app.get("/admin/customer-orders/:applicationId", requireAdminAuth, async (req, res) => {
+  try {
+    const appId = String(req.params.applicationId || "").trim();
+    const orders = await Order.find({ customerApplicationId: appId }).sort({ createdAt: -1 });
+    return res.json(orders);
+  } catch (error) {
+    console.error("❌ Error loading admin customer orders:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load customer orders.",
+    });
+  }
+});
+
+app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
+  try {
+    const search = String(req.query.search || "").trim();
+    const status = String(req.query.status || "").trim().toLowerCase();
+    const position = String(req.query.position || "").trim();
+    const format = String(req.query.format || "json").trim().toLowerCase();
+    const filter = {};
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (position) {
+      filter.positions = position;
+    }
+
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      filter.$or = [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { name: searchRegex },
+        { email: searchRegex },
+        { mobile: searchRegex },
+        { postcode: searchRegex },
+        { address: searchRegex },
+        { positions: searchRegex },
+      ];
+    }
+
+    const [staffMembers, applicationStats, assignmentStats] = await Promise.all([
+      Staff.find(filter).sort({ createdAt: -1 }).lean(),
+      EventApplication.aggregate([
+        {
+          $group: {
+            _id: "$staff",
+            applicationsCount: { $sum: 1 },
+            approvedApplicationsCount: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "approved"] }, 1, 0],
+              },
+            },
+          },
+        },
+      ]),
+      EventAssignment.aggregate([
+        {
+          $group: {
+            _id: "$staff",
+            assignmentsCount: { $sum: 1 },
+            completedAssignmentsCount: {
+              $sum: {
+                $cond: [{ $eq: ["$status", "completed"] }, 1, 0],
+              },
+            },
+          },
+        },
+      ]),
+    ]);
+
+    const applicationMap = new Map(
+      applicationStats.map((item) => [String(item._id), item])
+    );
+    const assignmentMap = new Map(
+      assignmentStats.map((item) => [String(item._id), item])
+    );
+
+    const rows = staffMembers.map((staffMember) => {
+      const applicationRow = applicationMap.get(String(staffMember._id)) || {};
+      const assignmentRow = assignmentMap.get(String(staffMember._id)) || {};
+      const addressSummary = parseAddressSummary(staffMember.address);
+
+      return {
+        staffId: String(staffMember._id),
+        fullName:
+          staffMember.name ||
+          `${staffMember.firstName || ""} ${staffMember.lastName || ""}`.trim(),
+        email: staffMember.email || "",
+        mobile: staffMember.mobile || "",
+        status: staffMember.status || "",
+        positions: Array.isArray(staffMember.positions)
+          ? staffMember.positions.join(", ")
+          : "",
+        postcode: staffMember.postcode || "",
+        city: addressSummary.city,
+        region: addressSummary.region,
+        experience: Number(staffMember.experience || 0),
+        averageRating: Number(staffMember.averageRating || 0),
+        feedbackCount: Number(staffMember.feedbackCount || 0),
+        applicationsCount: Number(applicationRow.applicationsCount || 0),
+        approvedApplicationsCount: Number(applicationRow.approvedApplicationsCount || 0),
+        assignmentsCount: Number(assignmentRow.assignmentsCount || 0),
+        completedAssignmentsCount: Number(assignmentRow.completedAssignmentsCount || 0),
+        createdAt: staffMember.createdAt || null,
+      };
+    });
+
+    if (format === "csv") {
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=black-eagle-staff-report.csv"
+      );
+      return res.send(buildCsv(rows));
+    }
+
+    return res.json({
+      success: true,
+      count: rows.length,
+      rows,
+    });
+  } catch (error) {
+    console.error("❌ Error generating staff report:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while generating staff report.",
+    });
+  }
 });
 
 async function handleCustomerForgotPassword(req, res) {
@@ -786,7 +1336,21 @@ app.post("/api/staff/reset-password", async (req, res) => {
 // 🧾 Yeni sipariş
 app.post("/orders", async (req, res) => {
   try {
-    const newOrder = new Order(req.body);
+    const financials = calculateOrderFinancials({
+      ...req.body,
+      staff: req.body?.staff,
+      subtotalAmount: req.body?.subtotalAmount,
+      totalAmount: req.body?.totalAmount,
+      vatRate: req.body?.vatRate,
+      vatAmount: req.body?.vatAmount,
+      totalWithVat: req.body?.totalWithVat,
+      minimumPaymentAmount: req.body?.minimumPaymentAmount,
+    });
+
+    const newOrder = new Order({
+      ...req.body,
+      ...financials,
+    });
     await newOrder.save();
 
     // 🔥 EKLEDİĞİN SATIR
@@ -851,7 +1415,7 @@ app.get("/get-customer-orders/:applicationId", async (req, res) => {
 });
 
 // ✅ Approved müşterileri getir
-app.get("/getApprovedCustomers", async (req, res) => {
+app.get("/getApprovedCustomers", requireAdminAuth, async (req, res) => {
   try {
     const customers = await Customer.find({ status: "approved" }).sort({ createdAt: -1 });
     res.json(customers.map(serializeCustomer));
@@ -877,7 +1441,7 @@ app.get("/get-customer-details/:appId", async (req, res) => {
 });
 
 // 🔍 Yeni route: dashboard View butonu için _id ile customer details
-app.get("/get-customer-details-by-id/:id", async (req, res) => {
+app.get("/get-customer-details-by-id/:id", requireAdminAuth, async (req, res) => {
   try {
     const customer = await Customer.findById(req.params.id);
     if (!customer) {
@@ -891,7 +1455,7 @@ app.get("/get-customer-details-by-id/:id", async (req, res) => {
 });
 
 // 🗑️ Delete customer by Mongo _id
-app.delete("/delete-customer/:id", async (req, res) => {
+app.delete("/delete-customer/:id", requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1903,7 +2467,18 @@ app.post("/create-checkout-session", async (req, res) => {
       paymentType === "deposit" &&
       orderDraft
     ) {
-      amountToCharge = Number(totalAmount);
+      const normalizedDraft = calculateOrderFinancials({
+        ...orderDraft,
+        staff: Array.isArray(orderDraft.staff) ? orderDraft.staff : [],
+        subtotalAmount: Number(orderDraft.subtotalAmount || 0),
+        totalAmount: Number(orderDraft.totalAmount || 0),
+        vatRate: Number(orderDraft.vatRate || 0.2),
+        vatAmount: Number(orderDraft.vatAmount || 0),
+        totalWithVat: Number(orderDraft.totalWithVat || orderDraft.totalAmount || 0),
+        minimumPaymentAmount: Number(orderDraft.minimumPaymentAmount || 0),
+      });
+
+      amountToCharge = Number(normalizedDraft.minimumPaymentAmount || totalAmount);
 
       paymentTitle = `Deposit for Order ${orderId || "BlackEagle"}`;
       paymentDescription = `Application ID: ${appId || "N/A"} | New Booking Deposit`;
@@ -1930,14 +2505,14 @@ app.post("/create-checkout-session", async (req, res) => {
           phone: orderDraft.phone || "",
           email: orderDraft.email || email || "",
           location: orderDraft.location || "",
-          staff: Array.isArray(orderDraft.staff) ? orderDraft.staff : [],
+          staff: normalizedDraft.staff,
           notes: orderDraft.notes || "",
-          subtotalAmount: Number(orderDraft.subtotalAmount || 0),
-          vatRate: Number(orderDraft.vatRate || 0),
-          vatAmount: Number(orderDraft.vatAmount || 0),
-          totalAmount: Number(orderDraft.totalAmount || 0),
-          totalWithVat: Number(orderDraft.totalWithVat || orderDraft.totalAmount || 0),
-          minimumPaymentAmount: Number(orderDraft.minimumPaymentAmount || 0),
+          subtotalAmount: normalizedDraft.subtotalAmount,
+          vatRate: normalizedDraft.vatRate,
+          vatAmount: normalizedDraft.vatAmount,
+          totalAmount: normalizedDraft.totalAmount,
+          totalWithVat: normalizedDraft.totalWithVat,
+          minimumPaymentAmount: normalizedDraft.minimumPaymentAmount,
           amountPaid: 0,
           status: "Pending",
           paymentStatus: orderDraft.paymentStatus || "Awaiting Deposit",

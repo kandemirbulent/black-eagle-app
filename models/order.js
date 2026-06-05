@@ -70,6 +70,7 @@ orderSchema.pre("save", async function (next) {
       vatRate: this.vatRate,
       vatAmount: this.vatAmount,
       totalWithVat: this.totalWithVat,
+      minimumPaymentAmount: this.minimumPaymentAmount,
     });
 
     this.staff = financials.staff;
@@ -78,6 +79,7 @@ orderSchema.pre("save", async function (next) {
     this.vatRate = financials.vatRate;
     this.vatAmount = financials.vatAmount;
     this.totalWithVat = financials.totalWithVat;
+    this.minimumPaymentAmount = financials.minimumPaymentAmount;
 
     if (!this.orderId) {
       this.orderId = await generateUniqueOrderId(this.constructor);

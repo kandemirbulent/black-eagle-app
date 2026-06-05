@@ -19,6 +19,26 @@
     loginBtn.textContent = isLoading ? "Logging in..." : "Login";
   }
 
+  function clearAdminSession() {
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("adminRole");
+    localStorage.removeItem("adminName");
+    localStorage.removeItem("adminEmail");
+  }
+
+  async function tryAdminLogin(email, password) {
+    const response = await fetch("/admin/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    return { response, data };
+  }
+
   async function tryStaffLogin(email, password) {
     const response = await fetch("/api/staff/login", {
       method: "POST",
@@ -61,9 +81,27 @@
     try {
       setLoading(true);
 
+      const adminResult = await tryAdminLogin(email, password);
+
+      if (adminResult.response.ok && adminResult.data.success) {
+        localStorage.setItem("adminToken", adminResult.data.token || "");
+        localStorage.setItem("adminRole", adminResult.data.user?.role || "admin");
+        localStorage.setItem("adminName", adminResult.data.user?.name || "");
+        localStorage.setItem("adminEmail", adminResult.data.user?.email || email);
+
+        setMessage("Admin login successful. Redirecting...", "success");
+
+        setTimeout(() => {
+          window.location.href = adminResult.data.redirect || "/dashboard.html";
+        }, 500);
+
+        return;
+      }
+
       const staffResult = await tryStaffLogin(email, password);
 
       if (staffResult.response.ok && staffResult.data.success) {
+        clearAdminSession();
         localStorage.setItem("staffEmail", email);
 
         if (staffResult.data.staff?.name) {
@@ -83,6 +121,7 @@
       const customerResult = await tryCustomerLogin(email, password);
 
       if (customerResult.response.ok && customerResult.data.success) {
+        clearAdminSession();
         localStorage.setItem("customerEmail", email);
 
         if (customerResult.data.customer?.name) {
@@ -112,7 +151,8 @@
       }
 
       setMessage(
-        staffResult.data.message ||
+        adminResult.data.message ||
+          staffResult.data.message ||
           customerResult.data.message ||
           "User not found or password is incorrect."
       );

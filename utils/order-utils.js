@@ -1,17 +1,41 @@
-function calculateLineTotal(item = {}) {
-  const qty = Number(item.quantity || 0);
-  const hrs = Number(item.hours || 0);
-  const rate = Number(item.rate || 0);
+const CLEANING_SERVICES = new Set([
+  "House Cleaning",
+  "Office Cleaning",
+  "Deep Cleaning",
+  "End of Tenancy Cleaning",
+  "Window Cleaner",
+]);
 
-  return Number(item.total || qty * hrs * rate);
+function getMinimumHoursForService(service = "") {
+  return CLEANING_SERVICES.has(String(service || "").trim()) ? 3 : 6;
+}
+
+function normalizeStaffLineItem(item = {}) {
+  const quantity = Number(item.quantity || 0);
+  const requestedHours = Number(item.hours || item.originalHours || 0);
+  const rate = Number(item.rate || 0);
+  const minimumHours = getMinimumHoursForService(item.service);
+  const billableHours = Math.max(requestedHours, minimumHours);
+  const total = Number((quantity * billableHours * rate).toFixed(2));
+
+  return {
+    ...item,
+    quantity,
+    hours: billableHours,
+    originalHours:
+      Number.isFinite(requestedHours) && requestedHours > 0 ? requestedHours : billableHours,
+    rate,
+    total,
+  };
+}
+
+function calculateLineTotal(item = {}) {
+  return normalizeStaffLineItem(item).total;
 }
 
 function calculateOrderFinancials(orderLike = {}) {
   const sourceStaff = Array.isArray(orderLike.staff) ? orderLike.staff : [];
-  const staff = sourceStaff.map((item) => {
-    const total = calculateLineTotal(item);
-    return { ...item, total };
-  });
+  const staff = sourceStaff.map((item) => normalizeStaffLineItem(item));
 
   const computedSubtotal = staff.reduce(
     (sum, item) => sum + Number(item.total || 0),
@@ -39,6 +63,11 @@ function calculateOrderFinancials(orderLike = {}) {
       ? Number(orderLike.totalWithVat)
       : Number((totalAmount + vatAmount).toFixed(2));
 
+  const minimumPaymentAmount =
+    Number(orderLike.minimumPaymentAmount || 0) > 0
+      ? Number(orderLike.minimumPaymentAmount)
+      : Number((totalWithVat * 0.33).toFixed(2));
+
   return {
     staff,
     subtotalAmount,
@@ -46,10 +75,14 @@ function calculateOrderFinancials(orderLike = {}) {
     vatRate,
     vatAmount,
     totalWithVat,
+    minimumPaymentAmount,
   };
 }
 
 module.exports = {
+  CLEANING_SERVICES,
   calculateLineTotal,
   calculateOrderFinancials,
+  getMinimumHoursForService,
+  normalizeStaffLineItem,
 };

@@ -20,7 +20,7 @@
       background: #fff;
       padding: 25px;
       border-radius: 12px;
-      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
       width: 100%;
       max-width: 700px;
       margin-top: 30px;
@@ -40,7 +40,10 @@
       color: #333;
     }
 
-    input, select, textarea, button {
+    input,
+    select,
+    textarea,
+    button {
       width: 100%;
       padding: 10px;
       margin-top: 5px;
@@ -90,7 +93,8 @@
       font-size: 13.5px;
     }
 
-    th, td {
+    th,
+    td {
       border: 1px solid #ccc;
       padding: 6px;
       text-align: center;
@@ -214,50 +218,34 @@
     <label for="service">Service Type</label>
     <select id="service" name="service">
       <option value="">-- Select Service --</option>
-
-      <!-- Existing -->
-      <option value="Bartender">Bartender — £27/hr</option>
-      <option value="Waiter">Waiter — £18/hr</option>
-      <option value="Barback">Barback — £18/hr</option>
-      <option value="Chef">Chef — £30/hr</option>
-
-      <!-- Hospitality -->
-      <option value="Kitchen Assistant">Kitchen Assistant — £19/hr</option>
-      <option value="Event Staff">Event Staff — £20/hr</option>
-
-      <!-- Cleaning -->
-      <option value="House Cleaning">House Cleaning — £19/hr</option>
-      <option value="Office Cleaning">Office Cleaning — £20/hr</option>
-      <option value="Deep Cleaning">Deep Cleaning — £24/hr</option>
-      <option value="End of Tenancy Cleaning">End of Tenancy Cleaning — £26/hr</option>
-      <option value="Window Cleaner">Window Cleaner — £25/hr</option>
-
-      <!-- Security -->
-      <option value="Security">Security — £24/hr</option>
-      <option value="Door Supervisor">Door Supervisor — £26/hr</option>
-      <option value="Event Security">Event Security — £25/hr</option>
-
-      <!-- Construction / Trade -->
-      <option value="Construction Worker">Construction Worker — £28/hr</option>
-      <option value="General Labourer">General Labourer — £25/hr</option>
-      <option value="Handyman">Handyman — £35/hr</option>
-      <option value="Painter">Painter — £30/hr</option>
-      <option value="Electrician">Electrician — £42/hr</option>
-      <option value="Plumber">Plumber — £42/hr</option>
-
-      <!-- Logistics -->
-      <option value="Delivery Driver">Delivery Driver — £20/hr</option>
-      <option value="Warehouse Staff">Warehouse Staff — £19/hr</option>
-      <option value="Picker/Packer">Picker/Packer — £18/hr</option>
-
-      <!-- Care / Support -->
-      <option value="Care Assistant">Care Assistant — £22/hr</option>
-      <option value="Support Worker">Support Worker — £23/hr</option>
-
-      <!-- Office -->
-      <option value="Admin Assistant">Admin Assistant — £21/hr</option>
-      <option value="Receptionist">Receptionist — £20/hr</option>
-      <option value="Customer Service">Customer Service — £20/hr</option>
+      <option value="Bartender">Bartender - GBP 27/hr</option>
+      <option value="Waiter">Waiter - GBP 18/hr</option>
+      <option value="Barback">Barback - GBP 18/hr</option>
+      <option value="Chef">Chef - GBP 30/hr</option>
+      <option value="Kitchen Assistant">Kitchen Assistant - GBP 19/hr</option>
+      <option value="Event Staff">Event Staff - GBP 20/hr</option>
+      <option value="House Cleaning">House Cleaning - GBP 19/hr</option>
+      <option value="Office Cleaning">Office Cleaning - GBP 20/hr</option>
+      <option value="Deep Cleaning">Deep Cleaning - GBP 24/hr</option>
+      <option value="End of Tenancy Cleaning">End of Tenancy Cleaning - GBP 26/hr</option>
+      <option value="Window Cleaner">Window Cleaner - GBP 25/hr</option>
+      <option value="Security">Security - GBP 24/hr</option>
+      <option value="Door Supervisor">Door Supervisor - GBP 26/hr</option>
+      <option value="Event Security">Event Security - GBP 25/hr</option>
+      <option value="Construction Worker">Construction Worker - GBP 28/hr</option>
+      <option value="General Labourer">General Labourer - GBP 25/hr</option>
+      <option value="Handyman">Handyman - GBP 35/hr</option>
+      <option value="Painter">Painter - GBP 30/hr</option>
+      <option value="Electrician">Electrician - GBP 42/hr</option>
+      <option value="Plumber">Plumber - GBP 42/hr</option>
+      <option value="Delivery Driver">Delivery Driver - GBP 20/hr</option>
+      <option value="Warehouse Staff">Warehouse Staff - GBP 19/hr</option>
+      <option value="Picker/Packer">Picker/Packer - GBP 18/hr</option>
+      <option value="Care Assistant">Care Assistant - GBP 22/hr</option>
+      <option value="Support Worker">Support Worker - GBP 23/hr</option>
+      <option value="Admin Assistant">Admin Assistant - GBP 21/hr</option>
+      <option value="Receptionist">Receptionist - GBP 20/hr</option>
+      <option value="Customer Service">Customer Service - GBP 20/hr</option>
     </select>
 
     <label for="quantity">Number of Staff</label>
@@ -282,8 +270,8 @@
             <th>Service</th>
             <th>Qty</th>
             <th>Hours</th>
-            <th>Rate (£/hr)</th>
-            <th>Line Total (£)</th>
+            <th>Rate (GBP/hr)</th>
+            <th>Line Total (GBP)</th>
             <th>Date</th>
             <th>Start</th>
             <th>End</th>
@@ -296,24 +284,24 @@
       <div class="summary-box">
         <div class="summary-row">
           <span>Subtotal</span>
-          <strong id="subtotalAmount">£0.00</strong>
+          <strong id="subtotalAmount">GBP 0.00</strong>
         </div>
         <div class="summary-row">
           <span>VAT (20%)</span>
-          <strong id="vatAmount">£0.00</strong>
+          <strong id="vatAmount">GBP 0.00</strong>
         </div>
         <div class="summary-row total">
           <span>Total (incl. VAT)</span>
-          <strong id="totalWithVat">£0.00</strong>
+          <strong id="totalWithVat">GBP 0.00</strong>
         </div>
         <div class="summary-row">
           <span>Minimum payment required today (33%)</span>
-          <strong id="depositAmount">£0.00</strong>
+          <strong id="depositAmount">GBP 0.00</strong>
         </div>
 
         <div class="summary-note">
-          The subtotal is shown before VAT. VAT is added separately.  
-          The total amount payable includes VAT.  
+          The subtotal is shown before VAT. VAT is added separately.
+          The total amount payable includes VAT.
           The minimum payment required today is 33% of the total including VAT.
         </div>
       </div>
@@ -323,7 +311,7 @@
     <textarea id="notes" name="notes" placeholder="Example: Outdoor event, formal attire required..."></textarea>
 
     <div class="action-row">
-      <button type="button" class="back-btn" id="backBtn">← Back</button>
+      <button type="button" class="back-btn" id="backBtn">Back</button>
       <button type="button" class="cancel-btn" id="cancelBtn">Cancel</button>
     </div>
 
@@ -348,13 +336,13 @@
 
       Swal.fire({
         icon: type,
-        title: title,
+        title,
         text: message,
         background: bgColor,
         color: "#111",
         confirmButtonColor: "#000",
         confirmButtonText: "OK",
-        iconColor: iconColor,
+        iconColor,
         showClass: { popup: "animate__animated animate__fadeInDown" },
         hideClass: { popup: "animate__animated animate__fadeOutUp" }
       });
@@ -362,60 +350,61 @@
   </script>
 
   <script>
-    const addBtn = document.getElementById('addStaffBtn');
-    const tableBody = document.querySelector('#staffTable tbody');
-    const form = document.getElementById('orderForm');
+    const addBtn = document.getElementById("addStaffBtn");
+    const tableBody = document.querySelector("#staffTable tbody");
+    const form = document.getElementById("orderForm");
 
-    const subtotalAmountEl = document.getElementById('subtotalAmount');
-    const vatAmountEl = document.getElementById('vatAmount');
-    const totalWithVatEl = document.getElementById('totalWithVat');
-    const depositAmountEl = document.getElementById('depositAmount');
+    const subtotalAmountEl = document.getElementById("subtotalAmount");
+    const vatAmountEl = document.getElementById("vatAmount");
+    const totalWithVatEl = document.getElementById("totalWithVat");
+    const depositAmountEl = document.getElementById("depositAmount");
 
     const hourlyRates = {
-      "Bartender": 27,
-      "Waiter": 18,
-      "Barback": 18,
-      "Chef": 30,
-
+      Bartender: 27,
+      Waiter: 18,
+      Barback: 18,
+      Chef: 30,
       "Kitchen Assistant": 19,
       "Event Staff": 20,
-
       "House Cleaning": 19,
       "Office Cleaning": 20,
       "Deep Cleaning": 24,
       "End of Tenancy Cleaning": 26,
       "Window Cleaner": 25,
-
-      "Security": 24,
+      Security: 24,
       "Door Supervisor": 26,
       "Event Security": 25,
-
       "Construction Worker": 28,
       "General Labourer": 25,
-      "Handyman": 35,
-      "Painter": 30,
-      "Electrician": 42,
-      "Plumber": 42,
-
+      Handyman: 35,
+      Painter: 30,
+      Electrician: 42,
+      Plumber: 42,
       "Delivery Driver": 20,
       "Warehouse Staff": 19,
       "Picker/Packer": 18,
-
       "Care Assistant": 22,
       "Support Worker": 23,
-
       "Admin Assistant": 21,
-      "Receptionist": 20,
+      Receptionist: 20,
       "Customer Service": 20
     };
 
-    const VAT_RATE = 0.20;
+    const CLEANING_SERVICES = new Set([
+      "House Cleaning",
+      "Office Cleaning",
+      "Deep Cleaning",
+      "End of Tenancy Cleaning",
+      "Window Cleaner"
+    ]);
+
+    const VAT_RATE = 0.2;
     let staffList = [];
 
     const appId = new URLSearchParams(window.location.search).get("appId");
 
     function formatMoney(value) {
-      return `£${Number(value || 0).toFixed(2)}`;
+      return `GBP ${Number(value || 0).toFixed(2)}`;
     }
 
     function calculateEndTime(startTime, hours) {
@@ -426,7 +415,11 @@
       const endHours = Math.floor((totalMinutes / 60) % 24);
       const endMinutes = totalMinutes % 60;
 
-      return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+      return `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`;
+    }
+
+    function getMinimumHoursForService(service) {
+      return CLEANING_SERVICES.has(service) ? 3 : 6;
     }
 
     async function loadCustomer() {
@@ -443,14 +436,15 @@
           throw new Error("Customer not found");
         }
 
-        document.getElementById('applicationId').value = customer.applicationId || "";
-        document.getElementById('customerCode').value = customer.customerCode || "";
-        document.getElementById('customerName').value = `${customer.firstName || ""} ${customer.lastName || ""}`.trim();
-        document.getElementById('companyName').value = customer.companyName || "";
-        document.getElementById('phone').value = customer.mobilePhone || "";
-        document.getElementById('email').value = customer.email || "";
+        document.getElementById("applicationId").value = customer.applicationId || "";
+        document.getElementById("customerCode").value = customer.customerCode || "";
+        document.getElementById("customerName").value =
+          `${customer.firstName || ""} ${customer.lastName || ""}`.trim();
+        document.getElementById("companyName").value = customer.companyName || "";
+        document.getElementById("phone").value = customer.mobilePhone || "";
+        document.getElementById("email").value = customer.email || "";
       } catch (err) {
-        console.error("❌ Error loading customer:", err);
+        console.error("Error loading customer:", err);
         alert("Failed to load customer info: " + err.message);
       }
     }
@@ -473,19 +467,20 @@
       }).then((result) => {
         if (result.isConfirmed) {
           sessionStorage.removeItem("pendingOrderDraft");
-          window.location.href = `/Customer-logins/customer-dashboard.html?appId=${encodeURIComponent(appId || "")}`;
+          window.location.href =
+            `/Customer-logins/customer-dashboard.html?appId=${encodeURIComponent(appId || "")}`;
         }
       });
     });
 
-    addBtn.addEventListener('click', () => {
+    addBtn.addEventListener("click", () => {
       const dateInput = document.getElementById("date").value;
       const selectedDate = new Date(dateInput);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      if (!dateInput || isNaN(selectedDate.getTime())) {
-        showAlert("warning", "Missing Date ⚠️", "Please select a valid event date.");
+      if (!dateInput || Number.isNaN(selectedDate.getTime())) {
+        showAlert("warning", "Missing Date", "Please select a valid event date.");
         return;
       }
 
@@ -498,24 +493,25 @@
       minAllowed.setDate(today.getDate() + 2);
 
       if (selectedDate < minAllowed) {
-        showAlert("warning", "Too Soon ⏳", "Please select a date at least 2 days in advance.");
+        showAlert("warning", "Too Soon", "Please select a date at least 2 days in advance.");
         return;
       }
 
-      const service = document.getElementById('service').value;
-      const quantity = Number(document.getElementById('quantity').value);
-      const hoursInput = Number(document.getElementById('hours').value);
-      const date = document.getElementById('date').value;
-      const startTime = document.getElementById('startTime').value;
+      const service = document.getElementById("service").value;
+      const quantity = Number(document.getElementById("quantity").value);
+      const hoursInput = Number(document.getElementById("hours").value);
+      const date = document.getElementById("date").value;
+      const startTime = document.getElementById("startTime").value;
 
       if (!service || !quantity || !hoursInput || !date || !startTime) {
-        showAlert("warning", "Missing Fields ⚠️", "Please fill all fields before adding to list.");
+        showAlert("warning", "Missing Fields", "Please fill all fields before adding to list.");
         return;
       }
 
       const rate = hourlyRates[service] || 0;
-      const billableHours = Math.max(hoursInput, 6);
-      const lineSubtotal = rate * billableHours * quantity;
+      const minimumHours = getMinimumHoursForService(service);
+      const billableHours = Math.max(hoursInput, minimumHours);
+      const lineSubtotal = Number((rate * billableHours * quantity).toFixed(2));
       const endTime = calculateEndTime(startTime, billableHours);
 
       staffList.push({
@@ -530,45 +526,54 @@
         endTime
       });
 
-      if (hoursInput < 6) {
+      if (hoursInput < minimumHours) {
         showAlert(
           "warning",
-          "Minimum 6-hour Booking Applied ⚖️",
-          "Bookings shorter than 6 hours are billed as 6 hours per staff."
+          `Minimum ${minimumHours}-hour Booking Applied`,
+          minimumHours === 3
+            ? "Cleaning service minimum booking time is 3 hours."
+            : "Bookings shorter than 6 hours are billed as 6 hours per staff."
         );
       }
 
       updateTable();
 
-      document.querySelectorAll('#service, #quantity, #hours, #date, #startTime').forEach(el => el.value = '');
+      document
+        .querySelectorAll("#service, #quantity, #hours, #date, #startTime")
+        .forEach((el) => {
+          el.value = "";
+        });
     });
 
     function updateTable() {
-      tableBody.innerHTML = '';
+      tableBody.innerHTML = "";
 
       let subtotal = 0;
 
       staffList.forEach((item, index) => {
-        subtotal += item.total;
+        subtotal += Number(item.total || 0);
 
-        tableBody.insertAdjacentHTML('beforeend', `
-          <tr>
-            <td>${item.service}</td>
-            <td>${item.quantity}</td>
-            <td>${item.hours}</td>
-            <td>${formatMoney(item.rate)}</td>
-            <td><strong>${formatMoney(item.total)}</strong></td>
-            <td>${item.date}</td>
-            <td>${item.startTime}</td>
-            <td>${item.endTime || "-"}</td>
-            <td><button type="button" class="remove-btn" onclick="removeStaff(${index})">Remove</button></td>
-          </tr>
-        `);
+        tableBody.insertAdjacentHTML(
+          "beforeend",
+          `
+            <tr>
+              <td>${item.service}</td>
+              <td>${item.quantity}</td>
+              <td>${item.hours}</td>
+              <td>${formatMoney(item.rate)}</td>
+              <td><strong>${formatMoney(item.total)}</strong></td>
+              <td>${item.date}</td>
+              <td>${item.startTime}</td>
+              <td>${item.endTime || "-"}</td>
+              <td><button type="button" class="remove-btn" onclick="removeStaff(${index})">Remove</button></td>
+            </tr>
+          `
+        );
       });
 
-      const vatAmount = subtotal * VAT_RATE;
-      const totalWithVat = subtotal + vatAmount;
-      const minimumPaymentAmount = totalWithVat * 0.33;
+      const vatAmount = Number((subtotal * VAT_RATE).toFixed(2));
+      const totalWithVat = Number((subtotal + vatAmount).toFixed(2));
+      const minimumPaymentAmount = Number((totalWithVat * 0.33).toFixed(2));
 
       subtotalAmountEl.textContent = formatMoney(subtotal);
       vatAmountEl.textContent = formatMoney(vatAmount);
@@ -581,22 +586,24 @@
       updateTable();
     };
 
-    form.addEventListener('submit', async (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
       if (staffList.length === 0) {
-        showAlert("warning", "Hold up ⚠️", "Please add at least one staff item before continuing.");
+        showAlert("warning", "Hold up", "Please add at least one staff item before continuing.");
         return;
       }
 
-      const subtotal = staffList.reduce((sum, item) => sum + Number(item.total || 0), 0);
+      const subtotal = Number(
+        staffList.reduce((sum, item) => sum + Number(item.total || 0), 0).toFixed(2)
+      );
       const vatAmount = Number((subtotal * VAT_RATE).toFixed(2));
       const totalAmount = Number((subtotal + vatAmount).toFixed(2));
       const minimumPaymentAmount = Number((totalAmount * 0.33).toFixed(2));
 
       const orderDraft = {
-        customerApplicationId: document.getElementById('applicationId').value,
-        customerCode: document.getElementById('customerCode').value,
+        customerApplicationId: document.getElementById("applicationId").value,
+        customerCode: document.getElementById("customerCode").value,
         customerName: form.customerName.value,
         companyName: form.companyName.value,
         phone: form.phone.value,
@@ -604,12 +611,12 @@
         location: form.location.value,
         staff: staffList,
         notes: form.notes.value,
-        subtotalAmount: Number(subtotal.toFixed(2)),
+        subtotalAmount: subtotal,
         vatRate: VAT_RATE,
-        vatAmount: vatAmount,
-        totalAmount: totalAmount,
+        vatAmount,
+        totalAmount,
         totalWithVat: totalAmount,
-        minimumPaymentAmount: minimumPaymentAmount,
+        minimumPaymentAmount,
         paymentStatus: "Awaiting Deposit",
         orderStatus: "Draft - Awaiting Payment",
         isVisibleToCustomer: false,
@@ -620,7 +627,7 @@
 
       showAlert(
         "success",
-        "Proceeding to Payment ✅",
+        "Proceeding to Payment",
         `Subtotal: ${formatMoney(subtotal)} | VAT: ${formatMoney(vatAmount)} | Total: ${formatMoney(totalAmount)} | Deposit today: ${formatMoney(minimumPaymentAmount)}`
       );
 
