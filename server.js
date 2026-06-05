@@ -268,6 +268,10 @@ function serializeAdminUser(adminUser) {
   };
 }
 
+async function hashAdminPassword(password) {
+  return bcrypt.hash(String(password || "").trim(), 10);
+}
+
 async function ensureInitialSuperAdmin() {
   const email = normalizeEmail(
     process.env.SUPER_ADMIN_EMAIL || "kandemirbulent@outlook.com"
@@ -297,7 +301,7 @@ async function ensureInitialSuperAdmin() {
     }
 
     if (!existingAdmin.passwordHash && password) {
-      existingAdmin.password = password;
+      existingAdmin.passwordHash = await hashAdminPassword(password);
       shouldSave = true;
     }
 
@@ -308,11 +312,13 @@ async function ensureInitialSuperAdmin() {
     return;
   }
 
+  const passwordHash = await hashAdminPassword(password);
+
   await AdminUser.create({
     firstName: "Black Eagle",
     lastName: "Superadmin",
     email,
-    password,
+    passwordHash,
     role: "superadmin",
     status: "active",
     createdBy: null,
@@ -1040,11 +1046,13 @@ app.post("/admin/users", requireAdminAuth, requireSuperAdmin, async (req, res) =
       });
     }
 
+    const passwordHash = await hashAdminPassword(password);
+
     const adminUser = await AdminUser.create({
       firstName,
       lastName,
       email,
-      password,
+      passwordHash,
       role,
       status: "active",
       createdBy: req.adminUser?._id || null,
@@ -1121,7 +1129,7 @@ app.patch("/admin/users/:id", requireAdminAuth, requireSuperAdmin, async (req, r
     }
 
     if (typeof req.body?.password === "string" && req.body.password.trim()) {
-      adminUser.password = req.body.password.trim();
+      adminUser.passwordHash = await hashAdminPassword(req.body.password.trim());
     }
 
     adminUser.role = nextRole;

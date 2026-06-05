@@ -60,18 +60,30 @@ adminUserSchema.virtual("password")
     this._plainPassword = String(password || "");
   });
 
+async function applyDerivedAdminFields(adminUser) {
+  adminUser.firstName = String(adminUser.firstName || "").trim();
+  adminUser.lastName = String(adminUser.lastName || "").trim();
+  adminUser.name = `${adminUser.firstName} ${adminUser.lastName}`.trim();
+  adminUser.email = String(adminUser.email || "").trim().toLowerCase();
+
+  if (typeof adminUser._plainPassword === "string" && adminUser._plainPassword.trim()) {
+    adminUser.passwordHash = await bcrypt.hash(adminUser._plainPassword.trim(), 10);
+    adminUser._plainPassword = "";
+  }
+}
+
+adminUserSchema.pre("validate", async function (next) {
+  try {
+    await applyDerivedAdminFields(this);
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 adminUserSchema.pre("save", async function (next) {
   try {
-    this.firstName = String(this.firstName || "").trim();
-    this.lastName = String(this.lastName || "").trim();
-    this.name = `${this.firstName} ${this.lastName}`.trim();
-    this.email = String(this.email || "").trim().toLowerCase();
-
-    if (typeof this._plainPassword === "string" && this._plainPassword.trim()) {
-      this.passwordHash = await bcrypt.hash(this._plainPassword.trim(), 10);
-      this._plainPassword = "";
-    }
-
+    await applyDerivedAdminFields(this);
     next();
   } catch (error) {
     next(error);
