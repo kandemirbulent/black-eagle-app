@@ -19,6 +19,7 @@ const customerSchema = new mongoose.Schema({
   // 📋 Temel şirket bilgileri
   companyName: { type: String, required: true, unique: true },
   companyAddress: { type: String, required: true },
+  city: { type: String, default: "" },
   postcode: { type: String, required: true },
 
   // 👤 Kişisel bilgiler
@@ -33,7 +34,9 @@ const customerSchema = new mongoose.Schema({
   // 🌍 Ek bilgiler
   website: { type: String, default: "" },
   vatNumber: { type: String, default: "" },
-  companyNumber: { type: String, required: true },
+  companyNumber: { type: String, default: "" },
+  companyHouseNumber: { type: String, default: "" },
+  utrNumber: { type: String, default: "" },
 
   // ⚙️ Hesap durumu
   status: { type: String, default: "pending" }, // "pending", "approved", "rejected", "banned"

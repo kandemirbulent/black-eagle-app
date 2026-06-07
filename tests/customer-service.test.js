@@ -150,7 +150,8 @@ test("registerCustomer blocks duplicates and creates pending customers", async (
     Customer,
     input: {
       companyName: "Black Eagle Ltd",
-      companyAddress: "London",
+      companyAddress: "221 Baker Street",
+      city: "London",
       postcode: "EC1A 1AA",
       firstName: "Jane",
       lastName: "Doe",
@@ -158,7 +159,7 @@ test("registerCustomer blocks duplicates and creates pending customers", async (
       email: "USER@example.com",
       website: "https://example.com",
       vatNumber: "VAT-1",
-      companyNumber: "COMP-1",
+      companyHouseNumber: "COMP-1",
     },
     generateApplicationId: () => "BE-CUST-1000",
     generateCustomerCode: () => "BE-123456",
@@ -169,7 +170,43 @@ test("registerCustomer blocks duplicates and creates pending customers", async (
   assert.equal(result.body.success, true);
   assert.equal(Customer.created.length, 1);
   assert.equal(Customer.created[0].email, "user@example.com");
+  assert.equal(Customer.created[0].city, "London");
+  assert.equal(Customer.created[0].companyHouseNumber, "COMP-1");
+  assert.equal(Customer.created[0].utrNumber, "");
+  assert.equal(Customer.created[0].companyNumber, "COMP-1");
   assert.equal(Customer.created[0].status, "pending");
+});
+
+test("registerCustomer allows empty UTR and Companies House number", async () => {
+  const Customer = createCustomerModel();
+
+  const result = await registerCustomer({
+    Customer,
+    input: {
+      companyName: "Black Eagle Home",
+      companyAddress: "10 Queen Street",
+      city: "Manchester",
+      postcode: "M1 1AA",
+      firstName: "John",
+      lastName: "Smith",
+      mobilePhone: "123",
+      email: "home@example.com",
+      website: "",
+      vatNumber: "",
+      companyHouseNumber: "",
+      utrNumber: "",
+    },
+    generateApplicationId: () => "BE-CUST-2000",
+    generateCustomerCode: () => "BE-654321",
+    now: () => new Date("2026-04-18T12:00:00Z"),
+  });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(result.body.success, true);
+  assert.equal(Customer.created.length, 1);
+  assert.equal(Customer.created[0].companyHouseNumber, "");
+  assert.equal(Customer.created[0].utrNumber, "");
+  assert.equal(Customer.created[0].companyNumber, "");
 });
 
 test("loginCustomer validates approval and password match", async () => {

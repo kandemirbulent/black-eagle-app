@@ -255,8 +255,11 @@
       <label>Company Name *</label>
       <input type="text" name="companyName" required>
 
-      <label>Company Address *</label>
+      <label>Address Line *</label>
       <input type="text" name="companyAddress" required>
+
+      <label>City *</label>
+      <input type="text" name="city" required>
 
       <label>Postcode *</label>
       <input type="text" name="postcode" required>
@@ -279,8 +282,11 @@
       <label>VAT Number (optional)</label>
       <input type="text" name="vatNumber" pattern="^GB[0-9]{9,12}$" title="Format: GB followed by 9–12 digits" placeholder="e.g. GB123456789">
 
-      <label>Company House Number / UTR Number *</label>
-      <input type="text" name="companyNumber" required pattern="[A-Za-z0-9]+" title="Enter your Company House or UTR Number">
+      <label>Companies House Number (Optional)</label>
+      <input type="text" name="companyHouseNumber" pattern="[A-Za-z0-9]*" title="Enter your Companies House Number" placeholder="Companies House Number (Optional)">
+
+      <label>UTR Number (Optional)</label>
+      <input type="text" name="utrNumber" pattern="[A-Za-z0-9]*" title="Enter your UTR Number" placeholder="UTR Number (Optional)">
 
       <button type="submit" class="btn">Submit</button>
       <button type="button" class="btn btn-secondary" onclick="window.history.back()">Back</button>

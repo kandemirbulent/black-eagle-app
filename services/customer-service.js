@@ -178,6 +178,36 @@ async function registerCustomer({
 }) {
   const normalizedEmail = normalizeEmail(input.email);
   const normalizedCompanyName = String(input.companyName || "").trim();
+  const normalizedCompanyAddress = String(input.companyAddress || "").trim();
+  const normalizedCity = String(input.city || "").trim();
+  const normalizedPostcode = String(input.postcode || "").trim();
+  const normalizedFirstName = String(input.firstName || "").trim();
+  const normalizedLastName = String(input.lastName || "").trim();
+  const normalizedMobilePhone = String(input.mobilePhone || "").trim();
+  const normalizedCompanyHouseNumber = String(
+    input.companyHouseNumber || ""
+  ).trim();
+  const normalizedUtrNumber = String(input.utrNumber || "").trim();
+  const legacyCompanyNumber = String(input.companyNumber || "").trim();
+
+  if (
+    !normalizedCompanyName ||
+    !normalizedCompanyAddress ||
+    !normalizedCity ||
+    !normalizedPostcode ||
+    !normalizedFirstName ||
+    !normalizedLastName ||
+    !normalizedMobilePhone ||
+    !normalizedEmail
+  ) {
+    return {
+      statusCode: 400,
+      body: {
+        success: false,
+        message: "Please fill all required customer fields.",
+      },
+    };
+  }
 
   const blocked = await Customer.findOne({
     $or: [{ email: normalizedEmail }, { companyName: normalizedCompanyName }],
@@ -217,15 +247,19 @@ async function registerCustomer({
     applicationId,
     customerCode,
     companyName: normalizedCompanyName,
-    companyAddress: String(input.companyAddress || "").trim(),
-    postcode: String(input.postcode || "").trim(),
-    firstName: String(input.firstName || "").trim(),
-    lastName: String(input.lastName || "").trim(),
-    mobilePhone: String(input.mobilePhone || "").trim(),
+    companyAddress: normalizedCompanyAddress,
+    city: normalizedCity,
+    postcode: normalizedPostcode,
+    firstName: normalizedFirstName,
+    lastName: normalizedLastName,
+    mobilePhone: normalizedMobilePhone,
     email: normalizedEmail,
     website: String(input.website || "").trim(),
     vatNumber: String(input.vatNumber || "").trim(),
-    companyNumber: String(input.companyNumber || "").trim(),
+    companyNumber:
+      normalizedCompanyHouseNumber || normalizedUtrNumber || legacyCompanyNumber,
+    companyHouseNumber: normalizedCompanyHouseNumber,
+    utrNumber: normalizedUtrNumber,
     status: "pending",
     createdAt: now(),
   });
