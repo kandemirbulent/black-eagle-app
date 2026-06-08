@@ -605,8 +605,10 @@
     }
 
     function authHeaders(extra = {}) {
+      const adminToken = localStorage.getItem("adminToken") || "";
       return {
-        Authorization: `Bearer ${localStorage.getItem("adminToken") || ""}`,
+        Authorization: `Bearer ${adminToken}`,
+        "X-Admin-Token": adminToken,
         ...extra
       };
     }

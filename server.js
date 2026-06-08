@@ -391,7 +391,11 @@ async function ensureInitialSuperAdmin() {
 async function requireAdminAuth(req, res, next) {
   try {
     const authHeader = String(req.headers.authorization || "");
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    const headerFallbackToken = String(req.headers["x-admin-token"] || "").trim();
+    const queryFallbackToken = String(req.query?.adminToken || "").trim();
+    const bodyFallbackToken = String(req.body?.adminToken || "").trim();
+    const token = bearerToken || headerFallbackToken || queryFallbackToken || bodyFallbackToken;
 
     if (!token) {
       return res.status(401).json({
