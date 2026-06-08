@@ -101,6 +101,19 @@
     return null;
   }
 
+  const SUPPORT_ASSISTANT_NAMES = [
+    "Daniel",
+    "James",
+    "Oliver",
+    "George",
+    "William",
+    "Emily",
+    "Sophie",
+    "Olivia",
+    "Amelia",
+    "Charlotte",
+  ];
+
   const style = document.createElement("style");
   style.textContent = `
     .be-support-widget{position:fixed;right:18px;bottom:max(18px,env(safe-area-inset-bottom));z-index:10001;font-family:Arial,sans-serif}
@@ -150,11 +163,11 @@
           <div class="be-support-agent">
             <div class="be-support-agent-badge">D</div>
             <div>
-              <div class="be-support-agent-name">Daniel</div>
+              <div class="be-support-agent-name"></div>
               <div class="be-support-agent-role">Black Eagle Support Assistant</div>
             </div>
           </div>
-          <p class="be-support-welcome-message">Hello, my name is Daniel from Black Eagle Support. How can I help you today?</p>
+          <p class="be-support-welcome-message"></p>
         </div>
         <div class="be-support-session"></div>
         <form class="be-support-form">
@@ -203,6 +216,25 @@
   const sessionBox = container.querySelector(".be-support-session");
   const statusBox = container.querySelector(".be-support-status");
   const guestFields = Array.from(container.querySelectorAll(".be-guest-field"));
+  const assistantNameBox = container.querySelector(".be-support-agent-name");
+  const welcomeMessageBox = container.querySelector(".be-support-welcome-message");
+  const assistantBadgeBox = container.querySelector(".be-support-agent-badge");
+  let currentAssistantName = "";
+
+  function pickRandomAssistantName() {
+    const index = Math.floor(Math.random() * SUPPORT_ASSISTANT_NAMES.length);
+    return SUPPORT_ASSISTANT_NAMES[index];
+  }
+
+  function renderAssistantIdentity() {
+    if (!currentAssistantName) {
+      currentAssistantName = pickRandomAssistantName();
+    }
+
+    assistantNameBox.textContent = currentAssistantName;
+    assistantBadgeBox.textContent = currentAssistantName.slice(0, 1).toUpperCase();
+    welcomeMessageBox.textContent = `Hello, my name is ${currentAssistantName} from Black Eagle Support. How can I help you today?`;
+  }
 
   function showStatus(message, type) {
     statusBox.textContent = message;
@@ -236,8 +268,13 @@
     panel.classList.toggle("open", isOpen);
     panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
     if (isOpen) {
+      if (!currentAssistantName) {
+        renderAssistantIdentity();
+      }
       renderSession();
       clearStatus();
+    } else {
+      currentAssistantName = "";
     }
   }
 
@@ -297,5 +334,6 @@
     }
   });
 
+  renderAssistantIdentity();
   renderSession();
 })();
