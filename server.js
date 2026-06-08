@@ -15,6 +15,7 @@ const crypto = require("crypto");
 const Order = require("./models/order");
 const Customer = require("./models/customer");
 const Staff = require("./models/staff");
+const SupportMessage = require("./models/supportMessage");
 const AdminUser = require("./models/adminUser");
 const Event = require("./models/event");
 const EventApplication = require("./models/eventApplication");
@@ -34,6 +35,15 @@ const {
 const {
   calculateOrderFinancials,
 } = require("./utils/order-utils");
+const {
+  buildStaffAddress,
+  getStaffLocationSummary,
+} = require("./utils/staff-utils");
+const {
+  SUPPORT_MESSAGE_PRIORITIES,
+  SUPPORT_MESSAGE_STATUSES,
+  validateSupportMessageInput,
+} = require("./utils/support-utils");
 const {
   approveCustomer,
   rejectCustomer,
@@ -56,6 +66,8 @@ const {
 } = require("./services/staff-service");
 
 const app = express();
+const publicDir = path.join(__dirname, "public");
+const supportWidgetScriptTag = '<script src="/js/support-widget.js" defer></script>';
 
 // 📨 Nodemailer
 const emailPort = Number.parseInt(process.env.EMAIL_PORT || "587", 10);
@@ -429,6 +441,110 @@ function parseAddressSummary(address = "") {
   };
 }
 
+function resolvePublicHtmlPath(requestPath = "/") {
+  const normalizedPath = requestPath === "/" ? "/index.html" : String(requestPath || "");
+
+  if (!normalizedPath.toLowerCase().endsWith(".html")) {
+    return null;
+  }
+
+  const resolvedPath = path.resolve(publicDir, `.${normalizedPath}`);
+  if (!resolvedPath.startsWith(publicDir)) {
+    return null;
+  }
+
+  return resolvedPath;
+}
+
+async function serveHtmlWithSupportWidget(req, res, next) {
+  if (!["GET", "HEAD"].includes(req.method)) {
+    return next();
+  }
+
+  const filePath = resolvePublicHtmlPath(req.path);
+  if (!filePath) {
+    return next();
+  }
+
+  try {
+    const fileStat = await fs.promises.stat(filePath);
+    if (!fileStat.isFile()) {
+      return next();
+    }
+
+    let html = await fs.promises.readFile(filePath, "utf8");
+    if (!html.includes('/js/support-widget.js')) {
+      if (html.includes("</body>")) {
+        html = html.replace("</body>", `${supportWidgetScriptTag}\n</body>`);
+      } else {
+        html += `\n${supportWidgetScriptTag}\n`;
+      }
+    }
+
+    return res.type("html").send(html);
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      return next();
+    }
+
+    console.error("❌ Error injecting support widget:", error);
+    return next();
+  }
+}
+
+function serializeSupportMessage(message) {
+  if (!message) return null;
+
+  const source = typeof message.toObject === "function" ? message.toObject() : message;
+  return {
+    id: String(source._id || ""),
+    userId: source.userId || "",
+    name: source.name || "",
+    email: source.email || "",
+    phone: source.phone || "",
+    role: source.role || "",
+    userType: source.userType || "",
+    message: source.message || "",
+    sourcePage: source.sourcePage || "",
+    status: source.status || "New",
+    priority: source.priority || "Normal",
+    createdAt: source.createdAt || null,
+    updatedAt: source.updatedAt || null,
+  };
+}
+
+async function sendSupportMessageNotification(supportMessage) {
+  const superAdminEmail = normalizeEmail(
+    process.env.SUPER_ADMIN_EMAIL || process.env.EMAIL_USER || ""
+  );
+
+  if (!superAdminEmail) {
+    return;
+  }
+
+  const details = serializeSupportMessage(supportMessage);
+
+  await mailer.sendMail({
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    to: superAdminEmail,
+    subject: `📩 New Support Message${details.priority === "Urgent" ? " (Urgent)" : ""}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;padding:20px;line-height:1.6;">
+        <h2>New Support Message</h2>
+        <p><strong>Name:</strong> ${details.name || "-"}</p>
+        <p><strong>Email:</strong> ${details.email || "-"}</p>
+        <p><strong>Phone:</strong> ${details.phone || "-"}</p>
+        <p><strong>Role:</strong> ${details.role || "-"}</p>
+        <p><strong>User Type:</strong> ${details.userType || "-"}</p>
+        <p><strong>Priority:</strong> ${details.priority || "Normal"}</p>
+        <p><strong>Status:</strong> ${details.status || "New"}</p>
+        <p><strong>Source Page:</strong> ${details.sourcePage || "-"}</p>
+        <p><strong>Message:</strong><br>${String(details.message || "-").replace(/\n/g, "<br>")}</p>
+      </div>
+    `,
+  });
+}
+
 function toCsvValue(value) {
   const text = String(value ?? "");
   if (/[",\n]/.test(text)) {
@@ -613,7 +729,8 @@ app.post("/stripe-webhook", express.raw({ type: "application/json" }), async (re
 // ✅ Bunlar webhook'tan SONRA gelmeli
 app.use(express.json({ limit: "15mb" }));
 app.use(express.urlencoded({ extended: true, limit: "15mb" }));
-app.use(express.static(path.join(__dirname, "public")));
+app.use(serveHtmlWithSupportWidget);
+app.use(express.static(publicDir));
 app.use(cors());
 app.use("/api/staff-events", staffEvents);
 
@@ -898,6 +1015,36 @@ app.get("/get-pending-customers", requireAdminAuth, async (req, res) => {
   } catch (err) {
     console.error("❌ Error fetching pending customers:", err);
     res.status(500).json({ message: "Server error" });
+  }
+});
+
+app.post("/api/support-message", async (req, res) => {
+  try {
+    const validation = validateSupportMessageInput(req.body);
+
+    if (!validation.ok) {
+      return res.status(validation.statusCode).json(validation.body);
+    }
+
+    const supportMessage = await SupportMessage.create(validation.data);
+
+    try {
+      await sendSupportMessageNotification(supportMessage);
+    } catch (mailError) {
+      console.error("❌ Support message notification failed:", mailError);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Support message sent successfully.",
+      supportMessage: serializeSupportMessage(supportMessage),
+    });
+  } catch (error) {
+    console.error("❌ Error saving support message:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while saving support message.",
+    });
   }
 });
 
@@ -1226,6 +1373,96 @@ app.delete("/admin/users/:id", requireAdminAuth, requireSuperAdmin, async (req, 
   }
 });
 
+app.get("/api/super-admin/support-messages", requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const messages = await SupportMessage.find().sort({ createdAt: -1 });
+    return res.json({
+      success: true,
+      messages: messages.map(serializeSupportMessage),
+    });
+  } catch (error) {
+    console.error("❌ Error loading support messages:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while loading support messages.",
+    });
+  }
+});
+
+app.patch("/api/super-admin/support-messages/:id/status", requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const nextStatus = String(req.body?.status || "").trim();
+
+    if (!SUPPORT_MESSAGE_STATUSES.includes(nextStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid support status.",
+      });
+    }
+
+    const updatedMessage = await SupportMessage.findByIdAndUpdate(
+      req.params.id,
+      { $set: { status: nextStatus } },
+      { new: true }
+    );
+
+    if (!updatedMessage) {
+      return res.status(404).json({
+        success: false,
+        message: "Support message not found.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      supportMessage: serializeSupportMessage(updatedMessage),
+    });
+  } catch (error) {
+    console.error("❌ Error updating support status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating support status.",
+    });
+  }
+});
+
+app.patch("/api/super-admin/support-messages/:id/priority", requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const nextPriority = String(req.body?.priority || "").trim();
+
+    if (!SUPPORT_MESSAGE_PRIORITIES.includes(nextPriority)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid support priority.",
+      });
+    }
+
+    const updatedMessage = await SupportMessage.findByIdAndUpdate(
+      req.params.id,
+      { $set: { priority: nextPriority } },
+      { new: true }
+    );
+
+    if (!updatedMessage) {
+      return res.status(404).json({
+        success: false,
+        message: "Support message not found.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      supportMessage: serializeSupportMessage(updatedMessage),
+    });
+  } catch (error) {
+    console.error("❌ Error updating support priority:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating support priority.",
+    });
+  }
+});
+
 app.get("/admin/customers", requireAdminAuth, async (req, res) => {
   try {
     const customers = await Customer.find().sort({ createdAt: -1 });
@@ -1243,7 +1480,9 @@ app.get("/admin/staff", requireAdminAuth, async (req, res) => {
   try {
     const staffMembers = await Staff.find().sort({ createdAt: -1 }).lean();
     return res.json(
-      staffMembers.map((staffMember) => ({
+      staffMembers.map((staffMember) => {
+        const location = getStaffLocationSummary(staffMember);
+        return ({
         id: String(staffMember._id),
         fullName:
           staffMember.name ||
@@ -1252,12 +1491,14 @@ app.get("/admin/staff", requireAdminAuth, async (req, res) => {
         lastName: staffMember.lastName || "",
         email: staffMember.email || "",
         mobile: staffMember.mobile || "",
+        city: location.city,
         postcode: staffMember.postcode || "",
         address: staffMember.address || "",
         positions: Array.isArray(staffMember.positions) ? staffMember.positions : [],
         status: staffMember.status || "",
         createdAt: staffMember.createdAt || null,
-      }))
+      });
+      })
     );
   } catch (error) {
     console.error("❌ Error loading staff list:", error);
@@ -1304,8 +1545,8 @@ app.get("/admin/dashboard-summary", requireAdminAuth, async (req, res) => {
     const cityCounts = {};
 
     for (const staffMember of staffMembers) {
-      const addressSummary = parseAddressSummary(staffMember.address);
-      const cityKey = addressSummary.city || "Unknown";
+      const location = getStaffLocationSummary(staffMember);
+      const cityKey = location.city || "Unknown";
       cityCounts[cityKey] = Number(cityCounts[cityKey] || 0) + 1;
 
       for (const position of Array.isArray(staffMember.positions) ? staffMember.positions : []) {
@@ -1423,7 +1664,7 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
     const rows = staffMembers.map((staffMember) => {
       const applicationRow = applicationMap.get(String(staffMember._id)) || {};
       const assignmentRow = assignmentMap.get(String(staffMember._id)) || {};
-      const addressSummary = parseAddressSummary(staffMember.address);
+      const location = getStaffLocationSummary(staffMember);
 
       return {
         staffId: String(staffMember._id),
@@ -1437,9 +1678,9 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
           ? staffMember.positions.join(", ")
           : "",
         postcode: staffMember.postcode || "",
-        city: addressSummary.city,
-        region: addressSummary.region,
-        address: staffMember.address || "",
+        city: location.city,
+        region: location.region,
+        address: location.address || staffMember.address || "",
         experience: Number(staffMember.experience || 0),
         averageRating: Number(staffMember.averageRating || 0),
         feedbackCount: Number(staffMember.feedbackCount || 0),
@@ -2046,6 +2287,9 @@ app.post("/api/staff/create", async (req, res) => {
       dob,
       mobile,
       email,
+      addressLine1,
+      addressLine2,
+      city,
       postcode,
       address,
       niNumber,
@@ -2062,8 +2306,9 @@ app.post("/api/staff/create", async (req, res) => {
       !dob ||
       !mobile ||
       !email ||
+      !String(city || "").trim() ||
       !postcode ||
-      !address ||
+      !(String(addressLine1 || "").trim() || String(address || "").trim()) ||
       !niNumber ||
       !availability ||
       !selfieData
@@ -2093,6 +2338,22 @@ app.post("/api/staff/create", async (req, res) => {
       });
     }
 
+    const normalizedAddressLine1 = String(addressLine1 || "").trim();
+    const normalizedAddressLine2 = String(addressLine2 || "").trim();
+    const requestedCity = String(city || "").trim();
+    const normalizedAddress = buildStaffAddress({
+      addressLine1: normalizedAddressLine1,
+      addressLine2: normalizedAddressLine2,
+      city: requestedCity,
+      address,
+    });
+    const derivedLocation = getStaffLocationSummary({
+      address: normalizedAddress,
+      addressLine1: normalizedAddressLine1,
+      addressLine2: normalizedAddressLine2,
+      city: requestedCity,
+    });
+
     const verifyCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     const newStaff = new Staff({
@@ -2101,8 +2362,11 @@ app.post("/api/staff/create", async (req, res) => {
       dob,
       mobile: normalizedMobile,
       email: normalizedEmail,
+      addressLine1: derivedLocation.addressLine1,
+      addressLine2: derivedLocation.addressLine2,
+      city: derivedLocation.city,
       postcode,
-      address,
+      address: normalizedAddress,
       niNumber,
       experience: Number(experience || 0),
       availability: availability || "",
@@ -2396,6 +2660,9 @@ app.get("/api/staff/me", async (req, res) => {
         dob: staff.dob || null,
         mobile: staff.mobile || "",
         email: staff.email || "",
+        city: staff.city || getStaffLocationSummary(staff).city || "",
+        addressLine1: staff.addressLine1 || getStaffLocationSummary(staff).addressLine1 || "",
+        addressLine2: staff.addressLine2 || getStaffLocationSummary(staff).addressLine2 || "",
         postcode: staff.postcode || "",
         address: staff.address || "",
         niNumber: staff.niNumber || "",
@@ -2441,6 +2708,9 @@ app.put("/api/staff/profile", async (req, res) => {
       firstName,
       lastName,
       mobile,
+      city,
+      addressLine1,
+      addressLine2,
       postcode,
       address,
       experience,
@@ -2483,8 +2753,44 @@ app.put("/api/staff/profile", async (req, res) => {
       staff.postcode = postcode.trim();
     }
 
+    if (typeof city === "string") {
+      staff.city = city.trim();
+    }
+
+    if (typeof addressLine1 === "string") {
+      staff.addressLine1 = addressLine1.trim();
+    }
+
+    if (typeof addressLine2 === "string") {
+      staff.addressLine2 = addressLine2.trim();
+    }
+
     if (typeof address === "string") {
       staff.address = address.trim();
+
+      if (
+        typeof city !== "string" &&
+        typeof addressLine1 !== "string" &&
+        typeof addressLine2 !== "string"
+      ) {
+        const derivedLocation = getStaffLocationSummary({ address: staff.address });
+        staff.addressLine1 = derivedLocation.addressLine1;
+        staff.addressLine2 = derivedLocation.addressLine2;
+        staff.city = derivedLocation.city;
+      }
+    }
+
+    if (
+      typeof city === "string" ||
+      typeof addressLine1 === "string" ||
+      typeof addressLine2 === "string"
+    ) {
+      staff.address = buildStaffAddress({
+        addressLine1: staff.addressLine1,
+        addressLine2: staff.addressLine2,
+        city: staff.city,
+        address: staff.address,
+      });
     }
 
     if (typeof experience !== "undefined") {
@@ -2520,6 +2826,9 @@ app.put("/api/staff/profile", async (req, res) => {
         lastName: staff.lastName || "",
         mobile: staff.mobile || "",
         email: staff.email || "",
+        city: staff.city || getStaffLocationSummary(staff).city || "",
+        addressLine1: staff.addressLine1 || getStaffLocationSummary(staff).addressLine1 || "",
+        addressLine2: staff.addressLine2 || getStaffLocationSummary(staff).addressLine2 || "",
         postcode: staff.postcode || "",
         address: staff.address || "",
         experience: Number(staff.experience || 0),

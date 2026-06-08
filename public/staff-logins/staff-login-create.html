@@ -362,18 +362,28 @@
   <div class="step" id="step2">
     <div class="form-grid">
       <div>
+        <label for="addressLine1">Address Line 1</label>
+        <input id="addressLine1" type="text" required>
+      </div>
+
+      <div>
+        <label for="addressLine2">Address Line 2 (Optional)</label>
+        <input id="addressLine2" type="text">
+      </div>
+
+      <div>
+        <label for="city">City</label>
+        <input id="city" type="text" required>
+      </div>
+
+      <div>
         <label for="postcode">Postcode</label>
         <input id="postcode" type="text" required>
       </div>
 
-      <div>
+      <div class="full">
         <label for="niNumber">National Insurance No</label>
         <input id="niNumber" type="text" required>
-      </div>
-
-      <div class="full">
-        <label for="address">Address</label>
-        <input id="address" type="text" required>
       </div>
     </div>
 
@@ -678,8 +688,10 @@
       dob: document.getElementById("dob").value,
       mobile: document.getElementById("mobile").value.trim(),
       email: document.getElementById("email").value.trim().toLowerCase(),
+      addressLine1: document.getElementById("addressLine1").value.trim(),
+      addressLine2: document.getElementById("addressLine2").value.trim(),
+      city: document.getElementById("city").value.trim(),
       postcode: document.getElementById("postcode").value.trim(),
-      address: document.getElementById("address").value.trim(),
       niNumber: document.getElementById("niNumber").value.trim(),
       experience: Number(document.getElementById("experience").value || 0),
       availability: document.getElementById("availability").value,

@@ -46,6 +46,24 @@ const staffSchema = new mongoose.Schema(
       trim: true,
     },
 
+    city: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    addressLine1: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    addressLine2: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     address: {
       type: String,
       required: true,

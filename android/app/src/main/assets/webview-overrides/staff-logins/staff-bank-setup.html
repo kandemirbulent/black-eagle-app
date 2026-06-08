@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Bank Details</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px 14px;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #eef0f3;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 430px;
+      background: white;
+      padding: 24px 18px;
+      border-radius: 14px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.5rem;
+      margin-bottom: 12px;
+      color: #333;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 0.95rem;
+      color: #666;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .form-label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 12px;
+    }
+
+    input {
+      margin-top: 6px;
+      padding: 13px 12px;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      font-size: 1rem;
+      background: #fafafa;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    input:focus {
+      border-color: #007bff;
+      outline: none;
+      box-shadow: 0 0 4px rgba(0,123,255,0.4);
+      background: #fff;
+    }
+
+    .button {
+      width: 100%;
+      padding: 14px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.05rem;
+      cursor: pointer;
+      margin-top: 15px;
+      font-weight: 700;
+    }
+
+    .button:hover { background: #005fcc; }
+    .button:disabled { opacity: 0.7; cursor: not-allowed; }
+
+    .skip-link {
+      display: block;
+      margin-top: 14px;
+      text-align: center;
+      color: #4b5563;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .status {
+      margin-top: 14px;
+      font-size: 14px;
+      text-align: center;
+      color: #666;
+      line-height: 1.45;
+    }
+
+    .status.error { color: #b91c1c; }
+    .status.ok { color: #166534; }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 14px 10px 20px;
+        align-items: flex-start;
+      }
+
+      .container {
+        padding: 20px 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Bank Details</h1>
+    <div class="subtitle">
+      Add your bank account as a separate step after password setup.
+    </div>
+
+    <label class="form-label">Email:
+      <input type="email" id="email" readonly>
+    </label>
+
+    <label class="form-label">Account Holder Name:
+      <input type="text" id="accountHolder">
+    </label>
+
+    <label class="form-label">Bank Name:
+      <input type="text" id="bankName">
+    </label>
+
+    <label class="form-label">Sort Code:
+      <input type="text" id="sortCode">
+    </label>
+
+    <label class="form-label">Account Number:
+      <input type="text" id="accountNumber">
+    </label>
+
+    <label class="form-label">IBAN (optional):
+      <input type="text" id="iban">
+    </label>
+
+    <button class="button" id="saveBtn">Save Bank Details</button>
+    <a class="skip-link" href="/mobile-app.html">Skip for now and go to login</a>
+    <div id="status" class="status"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const emailInput = document.getElementById("email");
+    const saveBtn = document.getElementById("saveBtn");
+    const statusBox = document.getElementById("status");
+    const emailFromQuery = params.get("email");
+    const emailFromStorage = localStorage.getItem("staffPendingBankEmail");
+    const resolvedEmail = (emailFromQuery || emailFromStorage || "").trim().toLowerCase();
+
+    emailInput.value = resolvedEmail;
+
+    function setStatus(message, type = "") {
+      statusBox.textContent = message;
+      statusBox.className = `status ${type}`.trim();
+    }
+
+    function setLoading(isLoading) {
+      saveBtn.disabled = isLoading;
+      saveBtn.textContent = isLoading ? "Saving..." : "Save Bank Details";
+    }
+
+    function keepFieldVisible(field) {
+      setTimeout(() => {
+        field.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+      }, 180);
+    }
+
+    document.querySelectorAll("input").forEach((field) => {
+      field.addEventListener("focus", () => keepFieldVisible(field));
+      field.addEventListener("click", () => keepFieldVisible(field));
+    });
+
+    window.addEventListener("resize", () => {
+      const active = document.activeElement;
+      if (active && ["INPUT", "TEXTAREA", "SELECT"].includes(active.tagName)) {
+        keepFieldVisible(active);
+      }
+    });
+
+    saveBtn.addEventListener("click", async function () {
+      const email = emailInput.value.trim().toLowerCase();
+
+      if (!email) {
+        setStatus("Missing account email. Please complete phone verification again.", "error");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setStatus("");
+
+        const res = await fetch("/api/staff/bank-details", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            email,
+            accountHolder: document.getElementById("accountHolder").value.trim(),
+            bankName: document.getElementById("bankName").value.trim(),
+            sortCode: document.getElementById("sortCode").value.trim(),
+            accountNumber: document.getElementById("accountNumber").value.trim(),
+            iban: document.getElementById("iban").value.trim()
+          })
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setStatus(data.message || "Failed to save bank details.", "error");
+          setLoading(false);
+          return;
+        }
+
+        localStorage.removeItem("staffPendingBankEmail");
+        setStatus(data.message || "Bank details saved successfully. Redirecting to login...", "ok");
+
+        setTimeout(() => {
+          window.location.href = "/mobile-app.html";
+        }, 900);
+      } catch (error) {
+        console.error("Bank setup error:", error);
+        setStatus("Server connection failed.", "error");
+        setLoading(false);
+      }
+    });
+  </script>
+  <script src="/js/support-widget.js" defer></script>
+</body>
+</html>

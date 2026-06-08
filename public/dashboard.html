@@ -296,6 +296,7 @@
       <button type="button" data-target="customersSection">Customers</button>
       <button type="button" data-target="ordersSection">Orders</button>
       <button type="button" data-target="staffReportsSection">Staff Reports</button>
+      <button type="button" id="supportMessagesNavButton" class="hidden" data-target="supportMessagesSection">Support Messages</button>
       <button type="button" id="adminNavButton" class="hidden" data-target="adminManagementSection">Admin Management</button>
       <button type="button" id="logoutButton">Logout</button>
     </aside>
@@ -495,6 +496,31 @@
         </div>
       </section>
 
+      <section id="supportMessagesSection" class="section hidden">
+        <h2>Support Messages</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Role</th>
+                <th>User Type</th>
+                <th>Message</th>
+                <th>Source Page</th>
+                <th>Date/Time</th>
+                <th>Status</th>
+                <th>Priority</th>
+              </tr>
+            </thead>
+            <tbody id="supportMessagesTable">
+              <tr><td colspan="10">Superadmin access required.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section id="adminManagementSection" class="section hidden">
         <h2>Admin Management</h2>
         <div class="form-grid">
@@ -554,12 +580,15 @@
     const welcomeText = document.getElementById("welcomeText");
     const adminManagementSection = document.getElementById("adminManagementSection");
     const adminNavButton = document.getElementById("adminNavButton");
+    const supportMessagesSection = document.getElementById("supportMessagesSection");
+    const supportMessagesNavButton = document.getElementById("supportMessagesNavButton");
 
     let currentAdmin = null;
     let dashboardSummary = null;
     let customersCache = [];
     let ordersCache = [];
     let staffRows = [];
+    let supportMessagesCache = [];
 
     if (!token) {
       window.location.href = "/login.html";
@@ -653,6 +682,8 @@
       if ((data.role || "").toLowerCase() === "superadmin") {
         adminManagementSection.classList.remove("hidden");
         adminNavButton.classList.remove("hidden");
+        supportMessagesSection.classList.remove("hidden");
+        supportMessagesNavButton.classList.remove("hidden");
       }
     }
 
@@ -887,6 +918,50 @@
       `).join("") || "<tr><td colspan='7'>No admin users found.</td></tr>";
     }
 
+    async function loadSupportMessages() {
+      if ((currentAdmin?.role || "").toLowerCase() !== "superadmin") {
+        return;
+      }
+
+      const response = await authFetch("/api/super-admin/support-messages");
+      const data = await response.json();
+      supportMessagesCache = Array.isArray(data.messages) ? data.messages : [];
+      const tbody = document.getElementById("supportMessagesTable");
+
+      if (!supportMessagesCache.length) {
+        tbody.innerHTML = "<tr><td colspan='10'>No support messages found.</td></tr>";
+        return;
+      }
+
+      tbody.innerHTML = supportMessagesCache.map((item) => `
+        <tr>
+          <td>${item.name || "-"}</td>
+          <td>${item.email || "-"}</td>
+          <td>${item.phone || "-"}</td>
+          <td>${item.role || "-"}</td>
+          <td>${item.userType || "-"}</td>
+          <td>${item.message || "-"}</td>
+          <td>${item.sourcePage || "-"}</td>
+          <td>${formatDateTime(item.createdAt)}</td>
+          <td>
+            <select data-support-id="${item.id}" data-field="status">
+              <option value="New" ${item.status === "New" ? "selected" : ""}>New</option>
+              <option value="In Progress" ${item.status === "In Progress" ? "selected" : ""}>In Progress</option>
+              <option value="Resolved" ${item.status === "Resolved" ? "selected" : ""}>Resolved</option>
+            </select>
+            <button type="button" class="btn btn-primary" style="margin-top:8px;" onclick="saveSupportStatus('${item.id}')">Save</button>
+          </td>
+          <td>
+            <select data-support-id="${item.id}" data-field="priority">
+              <option value="Normal" ${item.priority === "Normal" ? "selected" : ""}>Normal</option>
+              <option value="Urgent" ${item.priority === "Urgent" ? "selected" : ""}>Urgent</option>
+            </select>
+            <button type="button" class="btn btn-secondary" style="margin-top:8px;" onclick="saveSupportPriority('${item.id}')">Save</button>
+          </td>
+        </tr>
+      `).join("");
+    }
+
     async function createAdminUser() {
       const firstName = document.getElementById("adminFirstName").value.trim();
       const lastName = document.getElementById("adminLastName").value.trim();
@@ -943,6 +1018,40 @@
 
       showMessage("Admin user deleted successfully.", "success");
       await loadAdminUsers();
+    }
+
+    async function saveSupportStatusRecord(messageId) {
+      const status = document.querySelector(`[data-support-id="${messageId}"][data-field="status"]`)?.value;
+      const response = await authFetch(`/api/super-admin/support-messages/${messageId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || "Could not update support status.");
+      }
+
+      showMessage("Support status updated successfully.", "success");
+      await loadSupportMessages();
+    }
+
+    async function saveSupportPriorityRecord(messageId) {
+      const priority = document.querySelector(`[data-support-id="${messageId}"][data-field="priority"]`)?.value;
+      const response = await authFetch(`/api/super-admin/support-messages/${messageId}/priority`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priority })
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || "Could not update support priority.");
+      }
+
+      showMessage("Support priority updated successfully.", "success");
+      await loadSupportMessages();
     }
 
     async function approveCustomerRecord(id) {
@@ -1003,6 +1112,7 @@
       await loadCustomers();
       await runStaffReport();
       if ((currentAdmin?.role || "").toLowerCase() === "superadmin") {
+        await loadSupportMessages();
         await loadAdminUsers();
       }
     }
@@ -1092,6 +1202,22 @@
         await deleteAdminUserRecord(id);
       } catch (error) {
         showMessage(error.message || "Could not delete admin user.", "error");
+      }
+    };
+
+    window.saveSupportStatus = async (id) => {
+      try {
+        await saveSupportStatusRecord(id);
+      } catch (error) {
+        showMessage(error.message || "Could not update support status.", "error");
+      }
+    };
+
+    window.saveSupportPriority = async (id) => {
+      try {
+        await saveSupportPriorityRecord(id);
+      } catch (error) {
+        showMessage(error.message || "Could not update support priority.", "error");
       }
     };
 
