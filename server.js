@@ -264,6 +264,16 @@ function buildAdminAuthToken(adminUser) {
   });
 }
 
+function hashAdminSessionToken(token) {
+  return crypto.createHash("sha256").update(String(token || "")).digest("hex");
+}
+
+async function storeAdminSessionToken(adminUser, token) {
+  adminUser.adminAuthTokenHash = hashAdminSessionToken(token);
+  adminUser.adminAuthTokenExpiresAt = new Date(Date.now() + ADMIN_TOKEN_TTL_MS);
+  await adminUser.save();
+}
+
 function serializeAdminUser(adminUser) {
   return {
     id: adminUser._id,
@@ -382,16 +392,27 @@ async function requireAdminAuth(req, res, next) {
   try {
     const authHeader = String(req.headers.authorization || "");
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-    const payload = verifyAdminToken(token);
 
-    if (!payload?.sub) {
+    if (!token) {
       return res.status(401).json({
         success: false,
         message: "Admin authentication required.",
       });
     }
 
-    const adminUser = await AdminUser.findById(payload.sub);
+    const payload = verifyAdminToken(token);
+    let adminUser = null;
+
+    if (payload?.sub) {
+      adminUser = await AdminUser.findById(payload.sub);
+    }
+
+    if (!adminUser) {
+      adminUser = await AdminUser.findOne({
+        adminAuthTokenHash: hashAdminSessionToken(token),
+        adminAuthTokenExpiresAt: { $gt: new Date() },
+      });
+    }
 
     if (!adminUser || adminUser.status !== "active") {
       return res.status(401).json({
@@ -1166,11 +1187,12 @@ async function handleAdminLogin(req, res) {
     }
 
     adminUser.lastLoginAt = new Date();
-    await adminUser.save();
+    const token = buildAdminAuthToken(adminUser);
+    await storeAdminSessionToken(adminUser, token);
 
     return res.json({
       success: true,
-      token: buildAdminAuthToken(adminUser),
+      token,
       redirect: "/dashboard.html",
       user: serializeAdminUser(adminUser),
     });

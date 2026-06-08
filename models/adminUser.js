@@ -51,6 +51,16 @@ const adminUserSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    adminAuthTokenHash: {
+      type: String,
+      default: "",
+      index: true,
+    },
+    adminAuthTokenExpiresAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
   },
   { timestamps: true }
 );
