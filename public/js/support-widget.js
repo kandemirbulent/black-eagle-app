@@ -66,7 +66,7 @@
 
   const style = document.createElement("style");
   style.textContent = `
-    .be-support-widget{position:fixed;right:18px;bottom:18px;z-index:9999;font-family:Arial,sans-serif}
+    .be-support-widget{position:fixed;right:18px;bottom:max(18px,env(safe-area-inset-bottom));z-index:10001;font-family:Arial,sans-serif}
     .be-support-toggle{border:none;border-radius:999px;background:linear-gradient(135deg,#111827,#f4c542);color:#fff;padding:13px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 14px 36px rgba(17,24,39,.28)}
     .be-support-panel{width:min(360px,calc(100vw - 24px));max-height:min(78vh,680px);overflow:auto;margin-top:12px;border-radius:18px;border:1px solid rgba(17,24,39,.08);background:#fff;color:#111827;box-shadow:0 22px 55px rgba(15,23,42,.22);display:none}
     .be-support-panel.open{display:block}
@@ -75,6 +75,12 @@
     .be-support-close{border:none;background:transparent;color:#374151;cursor:pointer;font-size:20px;line-height:1}
     .be-support-body{padding:16px 18px 18px}
     .be-support-copy{font-size:13px;color:#4b5563;line-height:1.5;margin-bottom:14px}
+    .be-support-welcome{margin-bottom:14px;padding:14px;border-radius:14px;background:#f9fafb;border:1px solid #e5e7eb}
+    .be-support-agent{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+    .be-support-agent-badge{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:999px;background:#111827;color:#fff;font-size:14px;font-weight:700}
+    .be-support-agent-name{font-size:14px;font-weight:700;color:#111827}
+    .be-support-agent-role{font-size:12px;color:#6b7280}
+    .be-support-welcome-message{font-size:14px;line-height:1.6;color:#111827;margin:0 0 10px}
     .be-support-session{margin-bottom:14px;padding:12px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;line-height:1.5}
     .be-support-grid{display:grid;gap:10px}
     .be-support-field label{display:block;margin-bottom:6px;font-size:12px;font-weight:700;color:#374151}
@@ -88,7 +94,7 @@
     .be-support-status.show{display:block}
     .be-support-status.success{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
     .be-support-status.error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
-    @media (max-width:640px){.be-support-widget{right:12px;bottom:12px;left:12px}.be-support-toggle{width:100%}.be-support-panel{width:100%}}
+    @media (max-width:640px){.be-support-widget{right:12px;bottom:max(12px,env(safe-area-inset-bottom));left:12px}.be-support-toggle{width:100%}.be-support-panel{width:100%}}
   `;
   document.head.appendChild(style);
 
@@ -103,6 +109,16 @@
       </div>
       <div class="be-support-body">
         <p class="be-support-copy">Need help? Send a support message and the Black Eagle team will review it.</p>
+        <div class="be-support-welcome">
+          <div class="be-support-agent">
+            <div class="be-support-agent-badge">D</div>
+            <div>
+              <div class="be-support-agent-name">Daniel</div>
+              <div class="be-support-agent-role">Black Eagle Support Assistant</div>
+            </div>
+          </div>
+          <p class="be-support-welcome-message">Hello, my name is Daniel from Black Eagle Support. How can I help you today?</p>
+        </div>
         <div class="be-support-session"></div>
         <form class="be-support-form">
           <div class="be-support-grid">
