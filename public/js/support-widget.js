@@ -16,7 +16,34 @@
     }
   }
 
+  function getCurrentPath() {
+    return String(window.location.pathname || "/").trim().toLowerCase();
+  }
+
+  function isCustomerContext() {
+    const path = getCurrentPath();
+    return [
+      "/customer-logins/customer-dashboard.html",
+      "/customer-logins/create-order.html",
+      "/event-detail.html",
+      "/invoice.html",
+      "/order-detail.html",
+      "/payment.html",
+      "/success.html",
+      "/cancel.html",
+    ].includes(path);
+  }
+
+  function isStaffContext() {
+    const path = getCurrentPath();
+    return [
+      "/staff-logins/staff-dashboard.html",
+    ].includes(path);
+  }
+
   function getCustomerSession() {
+    if (!isCustomerContext()) return null;
+
     const customer = safeParse(localStorage.getItem("customer"));
     if (!customer && !localStorage.getItem("customerEmail")) return null;
 
@@ -39,6 +66,8 @@
   }
 
   function getStaffSession() {
+    if (!isStaffContext()) return null;
+
     const staffProfile = safeParse(localStorage.getItem("staffProfile"));
     if (!staffProfile && !localStorage.getItem("staffEmail")) return null;
 
@@ -61,7 +90,15 @@
   }
 
   function getSession() {
-    return getCustomerSession() || getStaffSession();
+    if (isCustomerContext()) {
+      return getCustomerSession();
+    }
+
+    if (isStaffContext()) {
+      return getStaffSession();
+    }
+
+    return null;
   }
 
   const style = document.createElement("style");
