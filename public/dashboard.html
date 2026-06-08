@@ -271,6 +271,93 @@
       display: none !important;
     }
 
+    .support-message-preview {
+      max-width: 240px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 1000;
+    }
+
+    .modal-panel {
+      width: min(100%, 760px);
+      max-height: min(90vh, 860px);
+      overflow: auto;
+      background: #fff;
+      color: #111827;
+      border-radius: 20px;
+      box-shadow: 0 28px 80px rgba(15, 23, 42, 0.3);
+      padding: 20px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .modal-title {
+      font-size: 22px;
+      margin-bottom: 6px;
+    }
+
+    .icon-button {
+      width: auto;
+      min-width: 44px;
+      border: none;
+      background: #e5e7eb;
+      color: #111827;
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .support-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .support-detail-card {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .support-detail-card strong,
+    .support-message-full strong {
+      display: block;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #6b7280;
+      margin-bottom: 6px;
+    }
+
+    .support-message-full {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.6;
+    }
+
     @media (max-width: 920px) {
       .layout {
         grid-template-columns: 1fr;
@@ -283,6 +370,18 @@
 
       .content {
         padding: 16px;
+      }
+
+      .support-detail-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .modal-panel {
+        padding: 16px;
+      }
+
+      .modal-header {
+        align-items: center;
       }
     }
   </style>
@@ -510,16 +609,45 @@
                 <th>Message</th>
                 <th>Source Page</th>
                 <th>Date/Time</th>
+                <th>Details</th>
                 <th>Status</th>
                 <th>Priority</th>
               </tr>
             </thead>
             <tbody id="supportMessagesTable">
-              <tr><td colspan="10">Superadmin access required.</td></tr>
+              <tr><td colspan="11">Superadmin access required.</td></tr>
             </tbody>
           </table>
         </div>
       </section>
+
+      <div id="supportMessageModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="supportMessageModalTitle">
+        <div class="modal-panel">
+          <div class="modal-header">
+            <div>
+              <h3 id="supportMessageModalTitle" class="modal-title">Support Message Details</h3>
+              <p class="subtle">Full message content and sender details</p>
+            </div>
+            <button type="button" class="icon-button" id="closeSupportMessageModal" aria-label="Close support message details">&times;</button>
+          </div>
+
+          <div class="support-detail-grid">
+            <div class="support-detail-card"><strong>Name</strong><div id="supportDetailName">-</div></div>
+            <div class="support-detail-card"><strong>Email</strong><div id="supportDetailEmail">-</div></div>
+            <div class="support-detail-card"><strong>Phone</strong><div id="supportDetailPhone">-</div></div>
+            <div class="support-detail-card"><strong>Role / User Type</strong><div id="supportDetailRoleType">-</div></div>
+            <div class="support-detail-card"><strong>Source Page</strong><div id="supportDetailSourcePage">-</div></div>
+            <div class="support-detail-card"><strong>Date / Time</strong><div id="supportDetailDateTime">-</div></div>
+            <div class="support-detail-card"><strong>Status</strong><div id="supportDetailStatus">-</div></div>
+            <div class="support-detail-card"><strong>Priority</strong><div id="supportDetailPriority">-</div></div>
+          </div>
+
+          <div class="support-message-full">
+            <strong>Full Message</strong>
+            <div id="supportDetailMessage">-</div>
+          </div>
+        </div>
+      </div>
 
       <section id="adminManagementSection" class="section hidden">
         <h2>Admin Management</h2>
@@ -582,6 +710,8 @@
     const adminNavButton = document.getElementById("adminNavButton");
     const supportMessagesSection = document.getElementById("supportMessagesSection");
     const supportMessagesNavButton = document.getElementById("supportMessagesNavButton");
+    const supportMessageModal = document.getElementById("supportMessageModal");
+    const closeSupportMessageModalButton = document.getElementById("closeSupportMessageModal");
 
     let currentAdmin = null;
     let dashboardSummary = null;
@@ -655,6 +785,42 @@
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return "Never";
       return date.toLocaleString();
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function getSupportMessageById(messageId) {
+      return supportMessagesCache.find((item) => item.id === messageId) || null;
+    }
+
+    function closeSupportMessageModal() {
+      supportMessageModal.classList.add("hidden");
+    }
+
+    function openSupportMessageModal(messageId) {
+      const item = getSupportMessageById(messageId);
+      if (!item) {
+        showMessage("Support message details could not be loaded.", "error");
+        return;
+      }
+
+      document.getElementById("supportDetailName").textContent = item.name || "-";
+      document.getElementById("supportDetailEmail").textContent = item.email || "-";
+      document.getElementById("supportDetailPhone").textContent = item.phone || "-";
+      document.getElementById("supportDetailRoleType").textContent = [item.role || "-", item.userType || "-"].join(" / ");
+      document.getElementById("supportDetailSourcePage").textContent = item.sourcePage || "-";
+      document.getElementById("supportDetailDateTime").textContent = formatDateTime(item.createdAt);
+      document.getElementById("supportDetailStatus").textContent = item.status || "-";
+      document.getElementById("supportDetailPriority").textContent = item.priority || "-";
+      document.getElementById("supportDetailMessage").textContent = item.message || "-";
+      supportMessageModal.classList.remove("hidden");
     }
 
     function renderCountMap(targetId, mapObject) {
@@ -931,20 +1097,23 @@
       const tbody = document.getElementById("supportMessagesTable");
 
       if (!supportMessagesCache.length) {
-        tbody.innerHTML = "<tr><td colspan='10'>No support messages found.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='11'>No support messages found.</td></tr>";
         return;
       }
 
       tbody.innerHTML = supportMessagesCache.map((item) => `
         <tr>
-          <td>${item.name || "-"}</td>
-          <td>${item.email || "-"}</td>
-          <td>${item.phone || "-"}</td>
-          <td>${item.role || "-"}</td>
-          <td>${item.userType || "-"}</td>
-          <td>${item.message || "-"}</td>
-          <td>${item.sourcePage || "-"}</td>
+          <td>${escapeHtml(item.name || "-")}</td>
+          <td>${escapeHtml(item.email || "-")}</td>
+          <td>${escapeHtml(item.phone || "-")}</td>
+          <td>${escapeHtml(item.role || "-")}</td>
+          <td>${escapeHtml(item.userType || "-")}</td>
+          <td><div class="support-message-preview">${escapeHtml(item.message || "-")}</div></td>
+          <td>${escapeHtml(item.sourcePage || "-")}</td>
           <td>${formatDateTime(item.createdAt)}</td>
+          <td>
+            <button type="button" class="btn btn-muted" onclick="viewSupportMessageDetails('${item.id}')">Details</button>
+          </td>
           <td>
             <select data-support-id="${item.id}" data-field="status">
               <option value="New" ${item.status === "New" ? "selected" : ""}>New</option>
@@ -1129,6 +1298,17 @@
     });
 
     document.getElementById("logoutButton").addEventListener("click", logout);
+    closeSupportMessageModalButton.addEventListener("click", closeSupportMessageModal);
+    supportMessageModal.addEventListener("click", (event) => {
+      if (event.target === supportMessageModal) {
+        closeSupportMessageModal();
+      }
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !supportMessageModal.classList.contains("hidden")) {
+        closeSupportMessageModal();
+      }
+    });
     document.getElementById("runReportButton").addEventListener("click", async () => {
       try {
         await runStaffReport();
@@ -1221,6 +1401,10 @@
       } catch (error) {
         showMessage(error.message || "Could not update support priority.", "error");
       }
+    };
+
+    window.viewSupportMessageDetails = (id) => {
+      openSupportMessageModal(id);
     };
 
     (async function init() {
