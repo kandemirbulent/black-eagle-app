@@ -30,7 +30,11 @@ workflows:
       - name: Export IPA
         script: |
           xcode-project build-ipa \
-            --archive "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive"
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME" \
+            --config Release \
+            --archive-directory "$CM_BUILD_DIR/build" \
+            --ipa-directory "$CM_BUILD_DIR/build/ios/ipa"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
