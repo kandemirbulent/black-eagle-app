@@ -26,6 +26,7 @@ workflows:
             -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            -allowProvisioningUpdates \
             clean archive
       - name: Export IPA
         script: |
