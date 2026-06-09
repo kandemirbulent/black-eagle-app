@@ -63,4 +63,3 @@ artifacts:
   - build/ios/ipa/*.ipa
   - /tmp/xcodebuild_logs/*.log
   - build/BlackEagleStaffing.xcarchive
-```
