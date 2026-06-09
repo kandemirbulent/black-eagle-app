@@ -29,9 +29,8 @@ workflows:
             clean archive
       - name: Export IPA
         script: |
-          xcode-project ipa \
-            --archive "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
-            --export-options-plist "$CM_BUILD_DIR/exportOptions.plist"
+          xcode-project build-ipa \
+            --archive "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
