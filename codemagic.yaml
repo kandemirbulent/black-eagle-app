@@ -55,7 +55,7 @@ workflows:
             -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
             -exportPath "$CM_BUILD_DIR/build/ios/ipa" \
             -exportOptionsPlist "$CM_BUILD_DIR/exportOptions.plist"
-     artifacts:
-       - build/ios/ipa/*.ipa
-       - /tmp/xcodebuild_logs/*.log
-       - build/BlackEagleStaffing.xcarchive
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - build/BlackEagleStaffing.xcarchive
