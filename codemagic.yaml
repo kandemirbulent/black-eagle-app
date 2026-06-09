@@ -37,14 +37,9 @@ workflows:
             <key>method</key>
             <string>app-store-connect</string>
             <key>signingStyle</key>
-            <string>manual</string>
+            <string>automatic</string>
             <key>teamID</key>
             <string>42FRQR444G</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.blackeagle.staffing</key>
-              <string>BlackEagleProfile</string>
-            </dict>
           </dict>
           </plist>
           EOF
