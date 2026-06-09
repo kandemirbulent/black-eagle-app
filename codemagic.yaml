@@ -24,9 +24,10 @@ workflows:
             -configuration Release \
             -sdk iphoneos \
             -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
-            CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            -allowProvisioningUpdates \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             clean archive
       - name: Export IPA
         script: |
