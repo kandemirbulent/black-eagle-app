@@ -16,19 +16,10 @@ workflows:
     scripts:
       - name: Show Xcode version
         script: xcodebuild -version
-      - name: Build iOS archive
+      - name: Build and export IPA
         script: |
           xcode-project use-profiles
 
-          xcodebuild \
-            -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME" \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
-            clean archive
-      - name: Export IPA
-        script: |
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
@@ -38,4 +29,4 @@ workflows:
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-      - build/BlackEagleStaffing.xcarchive
+      - build/*.xcarchive
