@@ -20,12 +20,27 @@ workflows:
         script: |
           xcode-project use-profiles
 
-          xcode-project build-ipa \
-            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME" \
-            --config Release \
-            --archive-directory "$CM_BUILD_DIR/build" \
-            --ipa-directory "$CM_BUILD_DIR/build/ios/ipa"
+          xcodebuild \
+            -project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive" \
+            clean archive
+
+          rm -rf "$CM_BUILD_DIR/build/ios/ipa"
+          mkdir -p "$CM_BUILD_DIR/build/ios/ipa/Payload"
+
+          cp -R \
+            "$CM_BUILD_DIR/build/BlackEagleStaffing.xcarchive/Products/Applications/BlackEagleStaffing.app" \
+            "$CM_BUILD_DIR/build/ios/ipa/Payload/"
+
+          cd "$CM_BUILD_DIR/build/ios/ipa"
+          zip -r "BlackEagleStaffing.ipa" Payload
+          rm -rf Payload
+
+          file "$CM_BUILD_DIR/build/ios/ipa/BlackEagleStaffing.ipa"
+          ls -lh "$CM_BUILD_DIR/build/ios/ipa/BlackEagleStaffing.ipa"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
