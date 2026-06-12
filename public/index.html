@@ -35,8 +35,8 @@
 
         <div class="nav-actions">
           <div class="language-switcher" aria-label="Language switcher">
-            <button type="button" data-language-option="en" aria-pressed="true">English</button>
-            <button type="button" data-language-option="tr" aria-pressed="false">Türkçe</button>
+            <button type="button" data-language-option="en" data-i18n="common.lang.english" data-i18n-default="English" aria-pressed="true">English</button>
+            <button type="button" data-language-option="tr" data-i18n="common.lang.turkish" data-i18n-default="Türkçe" aria-pressed="false">Türkçe</button>
           </div>
           <a class="button button-ghost" href="/terms.html" data-i18n="index.nav.terms" data-i18n-default="Terms">Terms</a>
           <a class="button button-primary" href="/login.html" data-i18n="index.nav.login" data-i18n-default="Client & Staff Login">Client & Staff Login</a>
@@ -81,15 +81,15 @@
                 </div>
 
                 <div class="badge-row">
-                  <span class="badge">Bartenders</span>
-                  <span class="badge">Waiters</span>
-                  <span class="badge">Chefs</span>
-                  <span class="badge">Security</span>
+                  <span class="badge" data-i18n="index.hero.badge.bartenders" data-i18n-default="Bartenders">Bartenders</span>
+                  <span class="badge" data-i18n="index.hero.badge.waiters" data-i18n-default="Waiters">Waiters</span>
+                  <span class="badge" data-i18n="index.hero.badge.chefs" data-i18n-default="Chefs">Chefs</span>
+                  <span class="badge" data-i18n="index.hero.badge.security" data-i18n-default="Security">Security</span>
                 </div>
               </div>
 
               <aside class="panel hero-panel hero-panel-floating">
-                <span class="panel-kicker">Visual Slider</span>
+                <span class="panel-kicker" data-i18n="index.hero.panelKicker" data-i18n-default="Visual Slider">Visual Slider</span>
                 <h2 class="panel-title" data-i18n="index.hero.panelTitle" data-i18n-default="Slim rectangle, not full-width.">Slim rectangle, not full-width.</h2>
                 <p class="panel-copy" data-i18n="index.hero.panelCopy" data-i18n-default="This slider now sits inside the page container so it feels cleaner and more controlled instead of stretching edge to edge across the full screen.">
                   This slider now sits inside the page container so it feels cleaner and more controlled instead of stretching
@@ -106,10 +106,10 @@
                 </div>
 
                 <div class="hero-slider-dots" role="tablist" data-i18n-aria-label="index.slider.aria" data-i18n-default-aria-label="Homepage header slides" aria-label="Homepage header slides">
-                  <button class="hero-slider-dot is-active" type="button" role="tab" data-hero-dot="0" aria-selected="true">Bartenders</button>
-                  <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="1" aria-selected="false">Waiters</button>
-                  <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="2" aria-selected="false">Chefs</button>
-                  <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="3" aria-selected="false">Security</button>
+                  <button class="hero-slider-dot is-active" type="button" role="tab" data-hero-dot="0" aria-selected="true" data-i18n="index.hero.badge.bartenders" data-i18n-default="Bartenders">Bartenders</button>
+                  <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="1" aria-selected="false" data-i18n="index.hero.badge.waiters" data-i18n-default="Waiters">Waiters</button>
+                  <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="2" aria-selected="false" data-i18n="index.hero.badge.chefs" data-i18n-default="Chefs">Chefs</button>
+                  <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="3" aria-selected="false" data-i18n="index.hero.badge.security" data-i18n-default="Security">Security</button>
                 </div>
               </div>
             </div>
@@ -164,17 +164,17 @@
           <div class="work-gallery" data-work-gallery>
             <section class="work-banner" aria-label="Black Eagle team showcase header">
               <div class="work-banner-copy">
-                <span class="story-tag">Team Showcase</span>
-                <h3>Different job groups, one strong visual front</h3>
-                <p>
+                <span class="story-tag" data-i18n="index.showcase.bannerTag" data-i18n-default="Team Showcase">Team Showcase</span>
+                <h3 data-i18n="index.showcase.bannerTitle" data-i18n-default="Different job groups, one strong visual front">Different job groups, one strong visual front</h3>
+                <p data-i18n="index.showcase.bannerCopy" data-i18n-default="The top of this section now works like a visual header. Later, if you send a dedicated crowd or mixed-team header image, we can replace this collage with one large banner without changing the layout.">
                   The top of this section now works like a visual header. Later, if you send a dedicated crowd or mixed-team
                   header image, we can replace this collage with one large banner without changing the layout.
                 </p>
                 <div class="story-notes">
-                  <span>Bar teams</span>
-                  <span>Front-of-house staff</span>
-                  <span>Kitchen support</span>
-                  <span>More roles listed below</span>
+                  <span data-i18n="index.showcase.bannerNote1" data-i18n-default="Bar teams">Bar teams</span>
+                  <span data-i18n="index.showcase.bannerNote2" data-i18n-default="Front-of-house staff">Front-of-house staff</span>
+                  <span data-i18n="index.showcase.bannerNote3" data-i18n-default="Kitchen support">Kitchen support</span>
+                  <span data-i18n="index.showcase.bannerNote4" data-i18n-default="More roles listed below">More roles listed below</span>
                 </div>
               </div>
 
@@ -205,8 +205,8 @@
                   <img src="/img/service-bartenders-photo.png" alt="Bartenders preparing drinks behind the bar during live event service." />
                 </span>
                 <span class="work-card-body">
-                  <span class="work-card-label">Bar Service</span>
-                  <span class="work-card-title">Bartenders</span>
+                  <span class="work-card-label" data-i18n="index.showcase.card1.label" data-i18n-default="Bar Service">Bar Service</span>
+                  <span class="work-card-title" data-i18n="index.showcase.card1.title" data-i18n-default="Bartenders">Bartenders</span>
                 </span>
               </button>
 
@@ -223,8 +223,8 @@
                   <img src="/img/service-waiters-photo.png" alt="Waiting staff serving guests and supporting front-of-house event delivery." />
                 </span>
                 <span class="work-card-body">
-                  <span class="work-card-label">Front of House</span>
-                  <span class="work-card-title">Waiters</span>
+                  <span class="work-card-label" data-i18n="index.showcase.card2.label" data-i18n-default="Front of House">Front of House</span>
+                  <span class="work-card-title" data-i18n="index.showcase.card2.title" data-i18n-default="Waiters">Waiters</span>
                 </span>
               </button>
 
@@ -241,8 +241,8 @@
                   <img src="/img/service-chefs-photo.png" alt="Chef-led kitchen service supporting event delivery behind the scenes." />
                 </span>
                 <span class="work-card-body">
-                  <span class="work-card-label">Kitchen Team</span>
-                  <span class="work-card-title">Chefs</span>
+                  <span class="work-card-label" data-i18n="index.showcase.card3.label" data-i18n-default="Kitchen Team">Kitchen Team</span>
+                  <span class="work-card-title" data-i18n="index.showcase.card3.title" data-i18n-default="Chefs">Chefs</span>
                 </span>
               </button>
             </div>
@@ -259,16 +259,16 @@
                   <img src="/img/service-bartenders-photo.png" alt="Bartenders preparing drinks behind the bar during live event service." />
                 </div>
                 <div class="work-detail-body">
-                  <span class="story-tag">Bartender Service</span>
-                  <h3>Fast drinks service with a polished guest-facing feel</h3>
-                  <p>
+                  <span class="story-tag" data-i18n="index.showcase.detail1.tag" data-i18n-default="Bartender Service">Bartender Service</span>
+                  <h3 data-i18n="index.showcase.detail1.title" data-i18n-default="Fast drinks service with a polished guest-facing feel">Fast drinks service with a polished guest-facing feel</h3>
+                  <p data-i18n="index.showcase.detail1.copy" data-i18n-default="This gallery item shows the type of bar team Black Eagle can place for weddings, private functions, and premium hospitality moments where both speed and presentation matter.">
                     This gallery item shows the type of bar team Black Eagle can place for weddings, private functions,
                     and premium hospitality moments where both speed and presentation matter.
                   </p>
                   <div class="story-notes">
-                    <span>Welcome drinks and cocktail support</span>
-                    <span>Busy bar coverage during peak service</span>
-                    <span>Professional presentation behind the counter</span>
+                    <span data-i18n="index.showcase.detail1.note1" data-i18n-default="Welcome drinks and cocktail support">Welcome drinks and cocktail support</span>
+                    <span data-i18n="index.showcase.detail1.note2" data-i18n-default="Busy bar coverage during peak service">Busy bar coverage during peak service</span>
+                    <span data-i18n="index.showcase.detail1.note3" data-i18n-default="Professional presentation behind the counter">Professional presentation behind the counter</span>
                   </div>
                 </div>
               </article>
@@ -285,16 +285,16 @@
                   <img src="/img/service-waiters-photo.png" alt="Waiting staff serving guests and supporting front-of-house event delivery." />
                 </div>
                 <div class="work-detail-body">
-                  <span class="story-tag">Waiting Staff</span>
-                  <h3>Floor teams that help the room feel calm, ready, and organised</h3>
-                  <p>
+                  <span class="story-tag" data-i18n="index.showcase.detail2.tag" data-i18n-default="Waiting Staff">Waiting Staff</span>
+                  <h3 data-i18n="index.showcase.detail2.title" data-i18n-default="Floor teams that help the room feel calm, ready, and organised">Floor teams that help the room feel calm, ready, and organised</h3>
+                  <p data-i18n="index.showcase.detail2.copy" data-i18n-default="This card is for front-of-house service work. It is the right place to show images of event staff serving guests, handling tables, and maintaining a polished standard across the floor.">
                     This card is for front-of-house service work. It is the right place to show images of event staff
                     serving guests, handling tables, and maintaining a polished standard across the floor.
                   </p>
                   <div class="story-notes">
-                    <span>Guest welcome and table support</span>
-                    <span>Reliable pacing throughout live service</span>
-                    <span>Professional presence at private events</span>
+                    <span data-i18n="index.showcase.detail2.note1" data-i18n-default="Guest welcome and table support">Guest welcome and table support</span>
+                    <span data-i18n="index.showcase.detail2.note2" data-i18n-default="Reliable pacing throughout live service">Reliable pacing throughout live service</span>
+                    <span data-i18n="index.showcase.detail2.note3" data-i18n-default="Professional presence at private events">Professional presence at private events</span>
                   </div>
                 </div>
               </article>
@@ -311,16 +311,16 @@
                   <img src="/img/service-chefs-photo.png" alt="Chef-led kitchen service supporting event delivery behind the scenes." />
                 </div>
                 <div class="work-detail-body">
-                  <span class="story-tag">Chef Support</span>
-                  <h3>Kitchen specialists who keep back-of-house delivery moving</h3>
-                  <p>
+                  <span class="story-tag" data-i18n="index.showcase.detail3.tag" data-i18n-default="Chef Support">Chef Support</span>
+                  <h3 data-i18n="index.showcase.detail3.title" data-i18n-default="Kitchen specialists who keep back-of-house delivery moving">Kitchen specialists who keep back-of-house delivery moving</h3>
+                  <p data-i18n="index.showcase.detail3.copy" data-i18n-default="This space highlights chef and kitchen roles that support the event from behind the scenes. It works well for showing food preparation, service coordination, and the pressure-handling side of operations.">
                     This space highlights chef and kitchen roles that support the event from behind the scenes. It works
                     well for showing food preparation, service coordination, and the pressure-handling side of operations.
                   </p>
                   <div class="story-notes">
-                    <span>Prep and pass support during service</span>
-                    <span>Stronger back-of-house coordination</span>
-                    <span>Experienced kitchen coverage for event days</span>
+                    <span data-i18n="index.showcase.detail3.note1" data-i18n-default="Prep and pass support during service">Prep and pass support during service</span>
+                    <span data-i18n="index.showcase.detail3.note2" data-i18n-default="Stronger back-of-house coordination">Stronger back-of-house coordination</span>
+                    <span data-i18n="index.showcase.detail3.note3" data-i18n-default="Experienced kitchen coverage for event days">Experienced kitchen coverage for event days</span>
                   </div>
                 </div>
               </article>
@@ -344,68 +344,68 @@
                 <div class="role-carousel-viewport">
                   <div class="role-pill-track" aria-label="Additional Black Eagle roles">
                     <article class="role-pill">
-                      <span class="role-pill-group">Hospitality</span>
-                      <strong>Kitchen Porter</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.hospitality" data-i18n-default="Hospitality">Hospitality</span>
+                      <strong data-i18n="index.roles.kitchenPorter" data-i18n-default="Kitchen Porter">Kitchen Porter</strong>
                     </article>
                     <article class="role-pill role-pill-featured">
-                      <span class="role-pill-group">Featured Next</span>
-                      <strong>Security</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.featuredNext" data-i18n-default="Featured Next">Featured Next</span>
+                      <strong data-i18n="index.hero.badge.security" data-i18n-default="Security">Security</strong>
                     </article>
                     <article class="role-pill role-pill-featured">
-                      <span class="role-pill-group">Featured Next</span>
-                      <strong>Barback</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.featuredNext" data-i18n-default="Featured Next">Featured Next</span>
+                      <strong data-i18n="index.roles.barback" data-i18n-default="Barback">Barback</strong>
                     </article>
                     <article class="role-pill">
-                      <span class="role-pill-group">Event Crew</span>
-                      <strong>Event Staff</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.eventCrew" data-i18n-default="Event Crew">Event Crew</span>
+                      <strong data-i18n="index.roles.eventStaff" data-i18n-default="Event Staff">Event Staff</strong>
                     </article>
                     <article class="role-pill role-pill-featured">
-                      <span class="role-pill-group">Cleaning</span>
-                      <strong>House Cleaning</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.cleaning" data-i18n-default="Cleaning">Cleaning</span>
+                      <strong data-i18n="index.roles.houseCleaning" data-i18n-default="House Cleaning">House Cleaning</strong>
                     </article>
                     <article class="role-pill role-pill-featured">
-                      <span class="role-pill-group">Cleaning</span>
-                      <strong>Office Cleaning</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.cleaning" data-i18n-default="Cleaning">Cleaning</span>
+                      <strong data-i18n="index.roles.officeCleaning" data-i18n-default="Office Cleaning">Office Cleaning</strong>
                     </article>
                     <article class="role-pill role-pill-featured">
-                      <span class="role-pill-group">Cleaning</span>
-                      <strong>Deep Cleaning</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.cleaning" data-i18n-default="Cleaning">Cleaning</span>
+                      <strong data-i18n="index.roles.deepCleaning" data-i18n-default="Deep Cleaning">Deep Cleaning</strong>
                     </article>
                     <article class="role-pill role-pill-featured">
-                      <span class="role-pill-group">Cleaning</span>
-                      <strong>Window Cleaner</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.cleaning" data-i18n-default="Cleaning">Cleaning</span>
+                      <strong data-i18n="index.roles.windowCleaner" data-i18n-default="Window Cleaner">Window Cleaner</strong>
                     </article>
                     <article class="role-pill">
-                      <span class="role-pill-group">Trade</span>
-                      <strong>Construction Worker</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.trade" data-i18n-default="Trade">Trade</span>
+                      <strong data-i18n="index.roles.constructionWorker" data-i18n-default="Construction Worker">Construction Worker</strong>
                     </article>
                     <article class="role-pill">
-                      <span class="role-pill-group">Trade</span>
-                      <strong>Electrician</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.trade" data-i18n-default="Trade">Trade</span>
+                      <strong data-i18n="index.roles.electrician" data-i18n-default="Electrician">Electrician</strong>
                     </article>
                     <article class="role-pill">
-                      <span class="role-pill-group">Trade</span>
-                      <strong>Plumber</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.trade" data-i18n-default="Trade">Trade</span>
+                      <strong data-i18n="index.roles.plumber" data-i18n-default="Plumber">Plumber</strong>
                     </article>
                     <article class="role-pill">
-                      <span class="role-pill-group">Trade</span>
-                      <strong>Painter</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.trade" data-i18n-default="Trade">Trade</span>
+                      <strong data-i18n="index.roles.painter" data-i18n-default="Painter">Painter</strong>
                     </article>
                     <article class="role-pill">
-                      <span class="role-pill-group">Trade</span>
-                      <strong>Handyman</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.trade" data-i18n-default="Trade">Trade</span>
+                      <strong data-i18n="index.roles.handyman" data-i18n-default="Handyman">Handyman</strong>
                     </article>
                     <article class="role-pill">
-                      <span class="role-pill-group">Security</span>
-                      <strong>Door Supervisor</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.security" data-i18n-default="Security">Security</span>
+                      <strong data-i18n="index.roles.doorSupervisor" data-i18n-default="Door Supervisor">Door Supervisor</strong>
                     </article>
                     <article class="role-pill">
-                      <span class="role-pill-group">Support</span>
-                      <strong>Delivery Driver</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.support" data-i18n-default="Support">Support</span>
+                      <strong data-i18n="index.roles.deliveryDriver" data-i18n-default="Delivery Driver">Delivery Driver</strong>
                     </article>
                     <article class="role-pill">
-                      <span class="role-pill-group">Support</span>
-                      <strong>Warehouse Staff</strong>
+                      <span class="role-pill-group" data-i18n="index.roles.group.support" data-i18n-default="Support">Support</span>
+                      <strong data-i18n="index.roles.warehouseStaff" data-i18n-default="Warehouse Staff">Warehouse Staff</strong>
                     </article>
                   </div>
                 </div>
@@ -431,16 +431,16 @@
                   <img src="/img/service-security-photo.png" alt="Security staff checking guest identification at an event entrance." />
                 </div>
                 <div class="featured-role-body">
-                  <span class="story-tag">Security</span>
-                  <h3>Professional guest control and calm entry-point coverage</h3>
-                  <p>
+                  <span class="story-tag" data-i18n="index.hero.badge.security" data-i18n-default="Security">Security</span>
+                  <h3 data-i18n="index.showcase.featuredCard.title" data-i18n-default="Professional guest control and calm entry-point coverage">Professional guest control and calm entry-point coverage</h3>
+                  <p data-i18n="index.showcase.featuredCard.copy" data-i18n-default="This layout is now ready for the larger visual roles. Security is shown as a premium feature block so the page stays clean while still giving key services stronger visibility.">
                     This layout is now ready for the larger visual roles. Security is shown as a premium feature block
                     so the page stays clean while still giving key services stronger visibility.
                   </p>
                   <div class="story-notes">
-                    <span>Guest check and access control</span>
-                    <span>Professional event entrance presence</span>
-                    <span>Suitable format for larger featured images</span>
+                    <span data-i18n="index.showcase.featuredCard.note1" data-i18n-default="Guest check and access control">Guest check and access control</span>
+                    <span data-i18n="index.showcase.featuredCard.note2" data-i18n-default="Professional event entrance presence">Professional event entrance presence</span>
+                    <span data-i18n="index.showcase.featuredCard.note3" data-i18n-default="Suitable format for larger featured images">Suitable format for larger featured images</span>
                   </div>
                 </div>
               </article>
@@ -499,9 +499,9 @@
                 The client experience is designed to reduce uncertainty before the event day.
               </p>
               <div class="check-list">
-                <div class="check-item"><span>+</span><span>Approved-only access after review</span></div>
-                <div class="check-item"><span>+</span><span>Deposit and final payment visibility</span></div>
-                <div class="check-item"><span>+</span><span>Confirmed staff shown inside the event record</span></div>
+                <div class="check-item"><span>+</span><span data-i18n="index.platform.clients.item1" data-i18n-default="Approved-only access after review">Approved-only access after review</span></div>
+                <div class="check-item"><span>+</span><span data-i18n="index.platform.clients.item2" data-i18n-default="Deposit and final payment visibility">Deposit and final payment visibility</span></div>
+                <div class="check-item"><span>+</span><span data-i18n="index.platform.clients.item3" data-i18n-default="Confirmed staff shown inside the event record">Confirmed staff shown inside the event record</span></div>
               </div>
             </article>
 
@@ -512,9 +512,9 @@
                 without being flooded by irrelevant listings.
               </p>
               <div class="check-list">
-                <div class="check-item"><span>+</span><span>Email verification and admin approval workflow</span></div>
-                <div class="check-item"><span>+</span><span>Role and location-aware event visibility</span></div>
-                <div class="check-item"><span>+</span><span>Assignment and earnings visibility after selection</span></div>
+                <div class="check-item"><span>+</span><span data-i18n="index.platform.staff.item1" data-i18n-default="Email verification and admin approval workflow">Email verification and admin approval workflow</span></div>
+                <div class="check-item"><span>+</span><span data-i18n="index.platform.staff.item2" data-i18n-default="Role and location-aware event visibility">Role and location-aware event visibility</span></div>
+                <div class="check-item"><span>+</span><span data-i18n="index.platform.staff.item3" data-i18n-default="Assignment and earnings visibility after selection">Assignment and earnings visibility after selection</span></div>
               </div>
             </article>
           </div>
