@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Black Eagle Agency | Event Staffing Across London & the UK</title>
+  <title data-i18n-title="index.title" data-i18n-default-title="Black Eagle Agency | Event Staffing Across London & the UK">Black Eagle Agency | Event Staffing Across London & the UK</title>
   <meta
     name="description"
+    data-i18n-content="index.description"
+    data-i18n-default-content="Black Eagle Agency connects event clients with vetted hospitality staff for weddings, private events, and corporate service across London and the UK."
     content="Black Eagle Agency connects event clients with vetted hospitality staff for weddings, private events, and corporate service across London and the UK."
   />
   <meta name="theme-color" content="#0a0d12" />
@@ -19,21 +21,25 @@
           <img class="brand-logo" src="/img/blackeaglelogo.png" alt="Black Eagle Agency logo" />
           <span>
             <span class="brand-title">Black Eagle</span>
-            <span class="brand-subtitle">Hospitality Staffing Agency</span>
+            <span class="brand-subtitle" data-i18n="index.brandSubtitle" data-i18n-default="Hospitality Staffing Agency">Hospitality Staffing Agency</span>
           </span>
         </a>
 
         <nav class="nav-links">
-          <a href="#services">Services</a>
-          <a href="#showcase">Visual Showcase</a>
-          <a href="#how-it-works">How It Works</a>
-          <a href="#platform">Platform</a>
-          <a href="#standards">Standards</a>
+          <a href="#services" data-i18n="index.nav.services" data-i18n-default="Services">Services</a>
+          <a href="#showcase" data-i18n="index.nav.showcase" data-i18n-default="Visual Showcase">Visual Showcase</a>
+          <a href="#how-it-works" data-i18n="index.nav.howItWorks" data-i18n-default="How It Works">How It Works</a>
+          <a href="#platform" data-i18n="index.nav.platform" data-i18n-default="Platform">Platform</a>
+          <a href="#standards" data-i18n="index.nav.standards" data-i18n-default="Standards">Standards</a>
         </nav>
 
         <div class="nav-actions">
-          <a class="button button-ghost" href="/terms.html">Terms</a>
-          <a class="button button-primary" href="/login.html">Client & Staff Login</a>
+          <div class="language-switcher" aria-label="Language switcher">
+            <button type="button" data-language-option="en" aria-pressed="true">English</button>
+            <button type="button" data-language-option="tr" aria-pressed="false">Türkçe</button>
+          </div>
+          <a class="button button-ghost" href="/terms.html" data-i18n="index.nav.terms" data-i18n-default="Terms">Terms</a>
+          <a class="button button-primary" href="/login.html" data-i18n="index.nav.login" data-i18n-default="Client & Staff Login">Client & Staff Login</a>
         </div>
       </div>
     </header>
@@ -59,19 +65,19 @@
 
             <div class="hero-slider-overlay">
               <div class="hero-copy hero-copy-card">
-                <span class="eyebrow">Homepage Slider</span>
-                <h1>
+                <span class="eyebrow" data-i18n="index.hero.eyebrow" data-i18n-default="Homepage Slider">Homepage Slider</span>
+                <h1 data-i18n="index.hero.title" data-i18n-default="Event teams shown in a clean rotating banner.">
                   Event teams shown in a
                   <span>clean rotating banner.</span>
                 </h1>
-                <p>
+                <p data-i18n="index.hero.copy" data-i18n-default="The top of the homepage now uses the uploaded visuals as a slimmer slider. It stays more rectangular, less overwhelming, and still gives the page a stronger first impression.">
                   The top of the homepage now uses the uploaded visuals as a slimmer slider. It stays more rectangular,
                   less overwhelming, and still gives the page a stronger first impression.
                 </p>
 
                 <div class="hero-actions">
-                  <a class="button button-primary" href="/Customer-logins/customer-login-create.html">Hire Staff</a>
-                  <a class="button button-secondary" href="/staff-logins/staff-login-create.html">Join Our Team</a>
+                  <a class="button button-primary" href="/Customer-logins/customer-login-create.html" data-i18n="index.hero.hireStaff" data-i18n-default="Hire Staff">Hire Staff</a>
+                  <a class="button button-secondary" href="/staff-logins/staff-login-create.html" data-i18n="index.hero.joinTeam" data-i18n-default="Join Our Team">Join Our Team</a>
                 </div>
 
                 <div class="badge-row">
@@ -84,8 +90,8 @@
 
               <aside class="panel hero-panel hero-panel-floating">
                 <span class="panel-kicker">Visual Slider</span>
-                <h2 class="panel-title">Slim rectangle, not full-width.</h2>
-                <p class="panel-copy">
+                <h2 class="panel-title" data-i18n="index.hero.panelTitle" data-i18n-default="Slim rectangle, not full-width.">Slim rectangle, not full-width.</h2>
+                <p class="panel-copy" data-i18n="index.hero.panelCopy" data-i18n-default="This slider now sits inside the page container so it feels cleaner and more controlled instead of stretching edge to edge across the full screen.">
                   This slider now sits inside the page container so it feels cleaner and more controlled instead of stretching
                   edge to edge across the full screen.
                 </p>
@@ -95,11 +101,11 @@
             <div class="hero-slider-controls">
               <div class="hero-slider-controls-inner">
                 <div class="hero-slider-arrows">
-                  <button class="hero-slider-arrow" type="button" data-hero-prev aria-label="Previous header slide">&#8249;</button>
-                  <button class="hero-slider-arrow" type="button" data-hero-next aria-label="Next header slide">&#8250;</button>
+                  <button class="hero-slider-arrow" type="button" data-hero-prev data-i18n-aria-label="index.slider.prev" data-i18n-default-aria-label="Previous header slide" aria-label="Previous header slide">&#8249;</button>
+                  <button class="hero-slider-arrow" type="button" data-hero-next data-i18n-aria-label="index.slider.next" data-i18n-default-aria-label="Next header slide" aria-label="Next header slide">&#8250;</button>
                 </div>
 
-                <div class="hero-slider-dots" role="tablist" aria-label="Homepage header slides">
+                <div class="hero-slider-dots" role="tablist" data-i18n-aria-label="index.slider.aria" data-i18n-default-aria-label="Homepage header slides" aria-label="Homepage header slides">
                   <button class="hero-slider-dot is-active" type="button" role="tab" data-hero-dot="0" aria-selected="true">Bartenders</button>
                   <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="1" aria-selected="false">Waiters</button>
                   <button class="hero-slider-dot" type="button" role="tab" data-hero-dot="2" aria-selected="false">Chefs</button>
@@ -114,9 +120,9 @@
       <section class="section" id="services">
         <div class="container">
           <div class="section-header">
-            <span class="section-tag">Services</span>
-            <h2 class="section-title">Hospitality support for <span>high-pressure event days</span></h2>
-            <p class="section-copy">
+            <span class="section-tag" data-i18n="index.services.tag" data-i18n-default="Services">Services</span>
+            <h2 class="section-title" data-i18n="index.services.title" data-i18n-default="Hospitality support for high-pressure event days">Hospitality support for <span>high-pressure event days</span></h2>
+            <p class="section-copy" data-i18n="index.services.copy" data-i18n-default="The platform is designed around real staffing operations, not a generic booking form. That matters when timing, presentation, and accountability all affect the event.">
               The platform is designed around real staffing operations, not a generic booking form. That matters
               when timing, presentation, and accountability all affect the event.
             </p>
@@ -125,20 +131,20 @@
           <div class="card-grid">
             <article class="card">
               <div class="card-icon">A</div>
-              <h3>Client booking experience</h3>
-              <p>Clients create event requests, pay deposits, review assigned staff, and confirm service with confidence.</p>
+              <h3 data-i18n="index.services.card1.title" data-i18n-default="Client booking experience">Client booking experience</h3>
+              <p data-i18n="index.services.card1.copy" data-i18n-default="Clients create event requests, pay deposits, review assigned staff, and confirm service with confidence.">Clients create event requests, pay deposits, review assigned staff, and confirm service with confidence.</p>
             </article>
 
             <article class="card">
               <div class="card-icon">B</div>
-              <h3>Role-based staff access</h3>
-              <p>Applicants do not see every job. They see the right roles for their profile, location, and working fit.</p>
+              <h3 data-i18n="index.services.card2.title" data-i18n-default="Role-based staff access">Role-based staff access</h3>
+              <p data-i18n="index.services.card2.copy" data-i18n-default="Applicants do not see every job. They see the right roles for their profile, location, and working fit.">Applicants do not see every job. They see the right roles for their profile, location, and working fit.</p>
             </article>
 
             <article class="card">
               <div class="card-icon">C</div>
-              <h3>Admin-controlled approvals</h3>
-              <p>Real people review applications, approve valid users, reject risky ones, and maintain quality across the roster.</p>
+              <h3 data-i18n="index.services.card3.title" data-i18n-default="Admin-controlled approvals">Admin-controlled approvals</h3>
+              <p data-i18n="index.services.card3.copy" data-i18n-default="Real people review applications, approve valid users, reject risky ones, and maintain quality across the roster.">Real people review applications, approve valid users, reject risky ones, and maintain quality across the roster.</p>
             </article>
           </div>
         </div>
@@ -147,9 +153,9 @@
       <section class="section" id="showcase">
         <div class="container">
           <div class="section-header">
-            <span class="section-tag">Our Work</span>
-            <h2 class="section-title">See the kind of teams <span>we place on live event days</span></h2>
-            <p class="section-copy">
+            <span class="section-tag" data-i18n="index.showcase.tag" data-i18n-default="Our Work">Our Work</span>
+            <h2 class="section-title" data-i18n="index.showcase.title" data-i18n-default="See the kind of teams we place on live event days">See the kind of teams <span>we place on live event days</span></h2>
+            <p class="section-copy" data-i18n="index.showcase.copy" data-i18n-default="This area is built around the jobs you want to show. The hero banner keeps the section visual, the main cards spotlight the strongest roles, and the remaining jobs stay in a cleaner horizontal layout below.">
               This area is built around the jobs you want to show. The hero banner keeps the section visual, the main
               cards spotlight the strongest roles, and the remaining jobs stay in a cleaner horizontal layout below.
             </p>
@@ -323,10 +329,10 @@
             <section class="role-strip" aria-labelledby="more-roles-title">
               <div class="role-strip-header">
                 <div>
-                  <span class="section-tag">More Roles</span>
-                  <h3 id="more-roles-title">Keep the rest of the jobs compact and horizontal</h3>
+                <span class="section-tag" data-i18n="index.showcase.rolesTag" data-i18n-default="More Roles">More Roles</span>
+                  <h3 id="more-roles-title" data-i18n="index.showcase.rolesTitle" data-i18n-default="Keep the rest of the jobs compact and horizontal">Keep the rest of the jobs compact and horizontal</h3>
                 </div>
-                <p>
+                <p data-i18n="index.showcase.rolesCopy" data-i18n-default="These roles stay in a slimmer format so the page does not become too crowded. Security, Cleaning, and Barback can be promoted into larger image blocks next.">
                   These roles stay in a slimmer format so the page does not become too crowded. Security, Cleaning,
                   and Barback can be promoted into larger image blocks next.
                 </p>
@@ -411,10 +417,10 @@
             <section class="featured-stack" aria-labelledby="featured-stack-title">
               <div class="role-strip-header">
                 <div>
-                  <span class="section-tag">Featured Vertical Roles</span>
-                  <h3 id="featured-stack-title">Security can now sit in the larger image format</h3>
+                  <span class="section-tag" data-i18n="index.showcase.featuredTag" data-i18n-default="Featured Vertical Roles">Featured Vertical Roles</span>
+                  <h3 id="featured-stack-title" data-i18n="index.showcase.featuredTitle" data-i18n-default="Security can now sit in the larger image format">Security can now sit in the larger image format</h3>
                 </div>
-                <p>
+                <p data-i18n="index.showcase.featuredCopy" data-i18n-default="This stacked format is reserved for the roles you said should stay more visual. We can add Cleaning and Barback underneath this same block style next.">
                   This stacked format is reserved for the roles you said should stay more visual. We can add
                   Cleaning and Barback underneath this same block style next.
                 </p>
@@ -446,33 +452,33 @@
       <section class="section" id="how-it-works">
         <div class="container">
           <div class="section-header">
-            <span class="section-tag">How It Works</span>
-            <h2 class="section-title">A cleaner path from <span>event request to confirmed team</span></h2>
+            <span class="section-tag" data-i18n="index.how.tag" data-i18n-default="How It Works">How It Works</span>
+            <h2 class="section-title" data-i18n="index.how.title" data-i18n-default="A cleaner path from event request to confirmed team">A cleaner path from <span>event request to confirmed team</span></h2>
           </div>
 
           <div class="steps">
             <article class="step">
               <div class="step-number">1</div>
-              <h3>Apply and verify</h3>
-              <p>Clients and staff submit registration details. Admin review keeps the system credible before access is granted.</p>
+              <h3 data-i18n="index.how.step1.title" data-i18n-default="Apply and verify">Apply and verify</h3>
+              <p data-i18n="index.how.step1.copy" data-i18n-default="Clients and staff submit registration details. Admin review keeps the system credible before access is granted.">Clients and staff submit registration details. Admin review keeps the system credible before access is granted.</p>
             </article>
 
             <article class="step">
               <div class="step-number">2</div>
-              <h3>Create the event</h3>
-              <p>Clients submit staffing needs and complete the deposit so the request becomes a real live booking.</p>
+              <h3 data-i18n="index.how.step2.title" data-i18n-default="Create the event">Create the event</h3>
+              <p data-i18n="index.how.step2.copy" data-i18n-default="Clients submit staffing needs and complete the deposit so the request becomes a real live booking.">Clients submit staffing needs and complete the deposit so the request becomes a real live booking.</p>
             </article>
 
             <article class="step">
               <div class="step-number">3</div>
-              <h3>Collect the right applications</h3>
-              <p>Suitable staff apply, the application window closes, and the strongest available team can be selected.</p>
+              <h3 data-i18n="index.how.step3.title" data-i18n-default="Collect the right applications">Collect the right applications</h3>
+              <p data-i18n="index.how.step3.copy" data-i18n-default="Suitable staff apply, the application window closes, and the strongest available team can be selected.">Suitable staff apply, the application window closes, and the strongest available team can be selected.</p>
             </article>
 
             <article class="step">
               <div class="step-number">4</div>
-              <h3>Confirm, deliver, and review</h3>
-              <p>Clients see confirmed staff on the event, service is delivered, and feedback closes the quality loop.</p>
+              <h3 data-i18n="index.how.step4.title" data-i18n-default="Confirm, deliver, and review">Confirm, deliver, and review</h3>
+              <p data-i18n="index.how.step4.copy" data-i18n-default="Clients see confirmed staff on the event, service is delivered, and feedback closes the quality loop.">Clients see confirmed staff on the event, service is delivered, and feedback closes the quality loop.</p>
             </article>
           </div>
         </div>
@@ -481,14 +487,14 @@
       <section class="section" id="platform">
         <div class="container">
           <div class="section-header">
-            <span class="section-tag">Platform Access</span>
-            <h2 class="section-title">One brand, two user journeys, <span>one controlled operation</span></h2>
+            <span class="section-tag" data-i18n="index.platform.tag" data-i18n-default="Platform Access">Platform Access</span>
+            <h2 class="section-title" data-i18n="index.platform.title" data-i18n-default="One brand, two user journeys, one controlled operation">One brand, two user journeys, <span>one controlled operation</span></h2>
           </div>
 
           <div class="split-grid">
             <article class="audience-card">
-              <h3>For clients</h3>
-              <p>
+              <h3 data-i18n="index.platform.clients.title" data-i18n-default="For clients">For clients</h3>
+              <p data-i18n="index.platform.clients.copy" data-i18n-default="Create events, track payments, review confirmed staff, and leave feedback after the work is complete. The client experience is designed to reduce uncertainty before the event day.">
                 Create events, track payments, review confirmed staff, and leave feedback after the work is complete.
                 The client experience is designed to reduce uncertainty before the event day.
               </p>
@@ -500,8 +506,8 @@
             </article>
 
             <article class="audience-card">
-              <h3>For staff</h3>
-              <p>
+              <h3 data-i18n="index.platform.staff.title" data-i18n-default="For staff">For staff</h3>
+              <p data-i18n="index.platform.staff.copy" data-i18n-default="Staff build verified accounts, complete payment details, apply to suitable jobs, and track assignments without being flooded by irrelevant listings.">
                 Staff build verified accounts, complete payment details, apply to suitable jobs, and track assignments
                 without being flooded by irrelevant listings.
               </p>
@@ -518,9 +524,9 @@
       <section class="section" id="standards">
         <div class="container">
           <div class="section-header">
-            <span class="section-tag">Standards</span>
-            <h2 class="section-title">Built to feel <span>reassuring, not chaotic</span></h2>
-            <p class="section-copy">
+            <span class="section-tag" data-i18n="index.standards.tag" data-i18n-default="Standards">Standards</span>
+            <h2 class="section-title" data-i18n="index.standards.title" data-i18n-default="Built to feel reassuring, not chaotic">Built to feel <span>reassuring, not chaotic</span></h2>
+            <p class="section-copy" data-i18n="index.standards.copy" data-i18n-default="The public site should communicate the same thing the service delivers: control, credibility, and a premium operational standard from first enquiry to final payment.">
               The public site should communicate the same thing the service delivers: control, credibility,
               and a premium operational standard from first enquiry to final payment.
             </p>
@@ -529,20 +535,20 @@
           <div class="card-grid">
             <article class="card">
               <div class="card-icon">Q</div>
-              <h3>Verified access</h3>
-              <p>Pending approvals and manual review help protect clients, staff, and the business from low-quality signups.</p>
+              <h3 data-i18n="index.standards.card1.title" data-i18n-default="Verified access">Verified access</h3>
+              <p data-i18n="index.standards.card1.copy" data-i18n-default="Pending approvals and manual review help protect clients, staff, and the business from low-quality signups.">Pending approvals and manual review help protect clients, staff, and the business from low-quality signups.</p>
             </article>
 
             <article class="card">
               <div class="card-icon">R</div>
-              <h3>Roster visibility</h3>
-              <p>Clients can match the confirmed staff list to the event itself, reducing uncertainty on the day of service.</p>
+              <h3 data-i18n="index.standards.card2.title" data-i18n-default="Roster visibility">Roster visibility</h3>
+              <p data-i18n="index.standards.card2.copy" data-i18n-default="Clients can match the confirmed staff list to the event itself, reducing uncertainty on the day of service.">Clients can match the confirmed staff list to the event itself, reducing uncertainty on the day of service.</p>
             </article>
 
             <article class="card">
               <div class="card-icon">S</div>
-              <h3>Operational follow-through</h3>
-              <p>Feedback, payment stages, and role tracking turn one-off bookings into a manageable operating system.</p>
+              <h3 data-i18n="index.standards.card3.title" data-i18n-default="Operational follow-through">Operational follow-through</h3>
+              <p data-i18n="index.standards.card3.copy" data-i18n-default="Feedback, payment stages, and role tracking turn one-off bookings into a manageable operating system.">Feedback, payment stages, and role tracking turn one-off bookings into a manageable operating system.</p>
             </article>
           </div>
         </div>
@@ -551,14 +557,14 @@
       <div class="container">
         <section class="cta-strip">
           <div>
-            <h3>Ready to book staff or join the roster?</h3>
-            <p>Use the live platform to create an account, submit your application, or continue into your dashboard.</p>
+            <h3 data-i18n="index.cta.title" data-i18n-default="Ready to book staff or join the roster?">Ready to book staff or join the roster?</h3>
+            <p data-i18n="index.cta.copy" data-i18n-default="Use the live platform to create an account, submit your application, or continue into your dashboard.">Use the live platform to create an account, submit your application, or continue into your dashboard.</p>
           </div>
 
           <div class="nav-actions">
-            <a class="button button-secondary" href="/Customer-logins/customer-login-create.html">Create Client Account</a>
-            <a class="button button-secondary" href="/staff-logins/staff-login-create.html">Create Staff Account</a>
-            <a class="button button-primary" href="/login.html">Login</a>
+            <a class="button button-secondary" href="/Customer-logins/customer-login-create.html" data-i18n="index.cta.client" data-i18n-default="Create Client Account">Create Client Account</a>
+            <a class="button button-secondary" href="/staff-logins/staff-login-create.html" data-i18n="index.cta.staff" data-i18n-default="Create Staff Account">Create Staff Account</a>
+            <a class="button button-primary" href="/login.html" data-i18n="index.cta.login" data-i18n-default="Login">Login</a>
           </div>
         </section>
       </div>
@@ -566,18 +572,19 @@
 
     <footer class="footer">
       <div class="footer-inner">
-        <span>Black Eagle Agency. Hospitality staffing for events across London and the UK.</span>
+        <span data-i18n="index.footer.copy" data-i18n-default="Black Eagle Agency. Hospitality staffing for events across London and the UK.">Black Eagle Agency. Hospitality staffing for events across London and the UK.</span>
         <div class="footer-links">
-          <a href="/about.html">About</a>
-          <a href="/contact.html">Contact</a>
-          <a href="/privacy.html">Privacy</a>
-          <a href="/terms.html">Terms</a>
-          <a href="/login.html">Login</a>
+          <a href="/about.html" data-i18n="index.footer.about" data-i18n-default="About">About</a>
+          <a href="/contact.html" data-i18n="index.footer.contact" data-i18n-default="Contact">Contact</a>
+          <a href="/privacy.html" data-i18n="index.footer.privacy" data-i18n-default="Privacy">Privacy</a>
+          <a href="/terms.html" data-i18n="index.footer.terms" data-i18n-default="Terms">Terms</a>
+          <a href="/login.html" data-i18n="about.nav.login" data-i18n-default="Login">Login</a>
         </div>
       </div>
     </footer>
   </div>
 
+  <script src="/js/i18n.js"></script>
   <script>
     (() => {
       const slider = document.querySelector("[data-hero-slider]");

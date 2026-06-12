@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Contact Black Eagle | Event Staffing Enquiries</title>
+  <title data-i18n-title="contact.title" data-i18n-default-title="Contact Black Eagle | Event Staffing Enquiries">Contact Black Eagle | Event Staffing Enquiries</title>
   <meta
     name="description"
+    data-i18n-content="contact.description"
+    data-i18n-default-content="Contact Black Eagle for event staffing enquiries, account support, and general agency questions."
     content="Contact Black Eagle for event staffing enquiries, account support, and general agency questions."
   />
   <meta name="theme-color" content="#0a0d12" />
@@ -19,16 +21,20 @@
           <img class="brand-logo" src="/img/blackeaglelogo.png" alt="Black Eagle Agency logo" />
           <span>
             <span class="brand-title">Black Eagle</span>
-            <span class="brand-subtitle">Contact</span>
+            <span class="brand-subtitle" data-i18n="contact.brandSubtitle" data-i18n-default="Contact">Contact</span>
           </span>
         </a>
 
         <nav class="nav-links">
-          <a href="/">Home</a>
-          <a href="/about.html">About</a>
-          <a href="/privacy.html">Privacy</a>
-          <a href="/login.html">Login</a>
+          <a href="/" data-i18n="about.nav.home" data-i18n-default="Home">Home</a>
+          <a href="/about.html" data-i18n="index.footer.about" data-i18n-default="About">About</a>
+          <a href="/privacy.html" data-i18n="about.nav.privacy" data-i18n-default="Privacy">Privacy</a>
+          <a href="/login.html" data-i18n="about.nav.login" data-i18n-default="Login">Login</a>
         </nav>
+        <div class="language-switcher" aria-label="Language switcher">
+          <button type="button" data-language-option="en" aria-pressed="true">English</button>
+          <button type="button" data-language-option="tr" aria-pressed="false">Türkçe</button>
+        </div>
       </div>
     </header>
 
@@ -36,17 +42,17 @@
       <section class="page-hero">
         <div class="container page-hero-grid">
           <div>
-            <span class="eyebrow">Get in touch</span>
-            <h1>Speak to Black Eagle about staffing, support, or your account.</h1>
-            <p>
+            <span class="eyebrow" data-i18n="contact.hero.eyebrow" data-i18n-default="Get in touch">Get in touch</span>
+            <h1 data-i18n="contact.hero.title" data-i18n-default="Speak to Black Eagle about staffing, support, or your account.">Speak to Black Eagle about staffing, support, or your account.</h1>
+            <p data-i18n="contact.hero.copy" data-i18n-default="Use the relevant route below so your enquiry reaches the right part of the business quickly. This helps us respond faster and keeps service enquiries separate from platform support.">
               Use the relevant route below so your enquiry reaches the right part of the business quickly.
               This helps us respond faster and keeps service enquiries separate from platform support.
             </p>
           </div>
 
           <aside class="hero-side-note">
-            <strong>Best route for active users</strong>
-            <span>If you already have an approved account, your dashboard remains the best place to continue the process tied to your booking or application.</span>
+            <strong data-i18n="contact.note.title" data-i18n-default="Best route for active users">Best route for active users</strong>
+            <span data-i18n="contact.note.copy" data-i18n-default="If you already have an approved account, your dashboard remains the best place to continue the process tied to your booking or application.">If you already have an approved account, your dashboard remains the best place to continue the process tied to your booking or application.</span>
           </aside>
         </div>
       </section>
@@ -55,64 +61,64 @@
         <div class="container content-grid">
           <div class="content-main">
             <section class="content-section">
-              <h2>Contact options</h2>
+              <h2 data-i18n="contact.options.title" data-i18n-default="Contact options">Contact options</h2>
               <div class="contact-grid">
                 <div class="info-card">
-                  <strong>General enquiries</strong>
+                  <strong data-i18n="contact.options.general" data-i18n-default="General enquiries">General enquiries</strong>
                   <span>Email: info@blackeagleservices.co.uk</span>
                 </div>
                 <div class="info-card">
-                  <strong>Business location</strong>
-                  <span>London, United Kingdom</span>
+                  <strong data-i18n="contact.options.location" data-i18n-default="Business location">Business location</strong>
+                  <span data-i18n="contact.options.locationCopy" data-i18n-default="London, United Kingdom">London, United Kingdom</span>
                 </div>
                 <div class="info-card">
-                  <strong>New client bookings</strong>
-                  <span>Use the client signup route if you want to request event staffing through the platform.</span>
+                  <strong data-i18n="contact.options.client" data-i18n-default="New client bookings">New client bookings</strong>
+                  <span data-i18n="contact.options.clientCopy" data-i18n-default="Use the client signup route if you want to request event staffing through the platform.">Use the client signup route if you want to request event staffing through the platform.</span>
                 </div>
                 <div class="info-card">
-                  <strong>Staff applications</strong>
-                  <span>Use the staff signup route if you want to register interest in live opportunities.</span>
+                  <strong data-i18n="contact.options.staff" data-i18n-default="Staff applications">Staff applications</strong>
+                  <span data-i18n="contact.options.staffCopy" data-i18n-default="Use the staff signup route if you want to register interest in live opportunities.">Use the staff signup route if you want to register interest in live opportunities.</span>
                 </div>
               </div>
             </section>
 
             <section class="content-section">
-              <h2>Before you contact us</h2>
+              <h2 data-i18n="contact.before.title" data-i18n-default="Before you contact us">Before you contact us</h2>
               <ul>
-                <li>If you are waiting for approval, check the email address used on your application.</li>
-                <li>If you are an existing client, keep your booking or order details ready.</li>
-                <li>If you are an approved staff member, have your account email ready so the team can find your record quickly.</li>
+                <li data-i18n="contact.before.li1" data-i18n-default="If you are waiting for approval, check the email address used on your application.">If you are waiting for approval, check the email address used on your application.</li>
+                <li data-i18n="contact.before.li2" data-i18n-default="If you are an existing client, keep your booking or order details ready.">If you are an existing client, keep your booking or order details ready.</li>
+                <li data-i18n="contact.before.li3" data-i18n-default="If you are an approved staff member, have your account email ready so the team can find your record quickly.">If you are an approved staff member, have your account email ready so the team can find your record quickly.</li>
               </ul>
             </section>
 
             <section class="content-section">
-              <h2>Useful routes</h2>
-              <p>
+              <h2 data-i18n="contact.routes.title" data-i18n-default="Useful routes">Useful routes</h2>
+              <p data-i18n="contact.routes.copy" data-i18n-default="Most platform actions are meant to happen inside the approved account flow rather than through a generic enquiry. Use the correct route below if you are ready to proceed.">
                 Most platform actions are meant to happen inside the approved account flow rather than through a generic enquiry.
                 Use the correct route below if you are ready to proceed.
               </p>
               <div class="hero-actions">
-                <a class="button button-primary" href="/Customer-logins/customer-login-create.html">Client account</a>
-                <a class="button button-secondary" href="/staff-logins/staff-login-create.html">Staff account</a>
-                <a class="button button-ghost" href="/login.html">Existing login</a>
+                <a class="button button-primary" href="/Customer-logins/customer-login-create.html" data-i18n="contact.routes.client" data-i18n-default="Client account">Client account</a>
+                <a class="button button-secondary" href="/staff-logins/staff-login-create.html" data-i18n="contact.routes.staff" data-i18n-default="Staff account">Staff account</a>
+                <a class="button button-ghost" href="/login.html" data-i18n="contact.routes.login" data-i18n-default="Existing login">Existing login</a>
               </div>
             </section>
           </div>
 
           <aside class="content-aside">
-            <h3>Support notes</h3>
+            <h3 data-i18n="contact.support.title" data-i18n-default="Support notes">Support notes</h3>
             <div class="stack">
               <div class="info-card">
-                <strong>Client support</strong>
-                <span>Booking questions, event changes, payment follow-up, and roster visibility.</span>
+                <strong data-i18n="contact.support.clientTitle" data-i18n-default="Client support">Client support</strong>
+                <span data-i18n="contact.support.clientCopy" data-i18n-default="Booking questions, event changes, payment follow-up, and roster visibility.">Booking questions, event changes, payment follow-up, and roster visibility.</span>
               </div>
               <div class="info-card">
-                <strong>Staff support</strong>
-                <span>Application status, onboarding, profile completion, and assignment questions.</span>
+                <strong data-i18n="contact.support.staffTitle" data-i18n-default="Staff support">Staff support</strong>
+                <span data-i18n="contact.support.staffCopy" data-i18n-default="Application status, onboarding, profile completion, and assignment questions.">Application status, onboarding, profile completion, and assignment questions.</span>
               </div>
               <div class="info-card">
-                <strong>Policy documents</strong>
-                <span><a href="/privacy.html">Privacy Policy</a>, <a href="/account-deletion.html">Account Deletion</a>, and <a href="/terms.html">Terms & Conditions</a>.</span>
+                <strong data-i18n="contact.support.policyTitle" data-i18n-default="Policy documents">Policy documents</strong>
+                <span data-i18n-html="contact.support.policyCopy" data-i18n-default-html="<a href=&quot;/privacy.html&quot;>Privacy Policy</a>, <a href=&quot;/account-deletion.html&quot;>Account Deletion</a>, and <a href=&quot;/terms.html&quot;>Terms &amp; Conditions</a>."><a href="/privacy.html">Privacy Policy</a>, <a href="/account-deletion.html">Account Deletion</a>, and <a href="/terms.html">Terms & Conditions</a>.</span>
               </div>
             </div>
           </aside>
@@ -122,17 +128,18 @@
 
     <footer class="footer">
       <div class="footer-inner">
-        <span>Black Eagle Agency. Hospitality staffing for events across London and the UK.</span>
+        <span data-i18n="contact.footer.copy" data-i18n-default="Black Eagle Agency. Hospitality staffing for events across London and the UK.">Black Eagle Agency. Hospitality staffing for events across London and the UK.</span>
         <div class="footer-links">
-          <a href="/">Home</a>
-          <a href="/about.html">About</a>
-          <a href="/contact.html">Contact</a>
-          <a href="/privacy.html">Privacy</a>
-          <a href="/account-deletion.html">Account deletion</a>
-          <a href="/terms.html">Terms</a>
+          <a href="/" data-i18n="about.nav.home" data-i18n-default="Home">Home</a>
+          <a href="/about.html" data-i18n="index.footer.about" data-i18n-default="About">About</a>
+          <a href="/contact.html" data-i18n="index.footer.contact" data-i18n-default="Contact">Contact</a>
+          <a href="/privacy.html" data-i18n="index.footer.privacy" data-i18n-default="Privacy">Privacy</a>
+          <a href="/account-deletion.html" data-i18n="contact.footer.accountDeletion" data-i18n-default="Account deletion">Account deletion</a>
+          <a href="/terms.html" data-i18n="index.footer.terms" data-i18n-default="Terms">Terms</a>
         </div>
       </div>
     </footer>
   </div>
+  <script src="/js/i18n.js"></script>
 </body>
 </html>

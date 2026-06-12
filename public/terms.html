@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Terms & Conditions | Black Eagle Agency</title>
+  <title data-i18n-title="terms.title" data-i18n-default-title="Terms & Conditions | Black Eagle Agency">Terms & Conditions | Black Eagle Agency</title>
   <meta
     name="description"
+    data-i18n-content="terms.description"
+    data-i18n-default-content="Terms and conditions for Black Eagle Agency covering bookings, deposits, cancellations, staffing changes, and operational expectations."
     content="Terms and conditions for Black Eagle Agency covering bookings, deposits, cancellations, staffing changes, and operational expectations."
   />
   <meta name="theme-color" content="#0a0d12" />
@@ -19,16 +21,20 @@
           <img class="brand-logo" src="/img/blackeaglelogo.png" alt="Black Eagle Agency logo" />
           <span>
             <span class="brand-title">Black Eagle</span>
-            <span class="brand-subtitle">Terms & Conditions</span>
+            <span class="brand-subtitle" data-i18n="terms.brandSubtitle" data-i18n-default="Terms & Conditions">Terms & Conditions</span>
           </span>
         </a>
 
         <nav class="nav-links">
-          <a href="/">Home</a>
-          <a href="/about.html">About</a>
-          <a href="/contact.html">Contact</a>
-          <a href="/privacy.html">Privacy</a>
+          <a href="/" data-i18n="about.nav.home" data-i18n-default="Home">Home</a>
+          <a href="/about.html" data-i18n="index.footer.about" data-i18n-default="About">About</a>
+          <a href="/contact.html" data-i18n="index.footer.contact" data-i18n-default="Contact">Contact</a>
+          <a href="/privacy.html" data-i18n="index.footer.privacy" data-i18n-default="Privacy">Privacy</a>
         </nav>
+        <div class="language-switcher" aria-label="Language switcher">
+          <button type="button" data-language-option="en" aria-pressed="true">English</button>
+          <button type="button" data-language-option="tr" aria-pressed="false">Türkçe</button>
+        </div>
       </div>
     </header>
 
@@ -36,17 +42,17 @@
       <section class="page-hero">
         <div class="container page-hero-grid">
           <div>
-            <span class="eyebrow">Booking terms</span>
-            <h1>Clear booking rules for clients, staff, and agency operations.</h1>
-            <p>
+            <span class="eyebrow" data-i18n="terms.hero.eyebrow" data-i18n-default="Booking terms">Booking terms</span>
+            <h1 data-i18n="terms.hero.title" data-i18n-default="Clear booking rules for clients, staff, and agency operations.">Clear booking rules for clients, staff, and agency operations.</h1>
+            <p data-i18n="terms.hero.copy" data-i18n-default="These terms explain how Black Eagle manages bookings, deposits, cancellations, payment stages, service delivery expectations, and operational protections across the platform.">
               These terms explain how Black Eagle manages bookings, deposits, cancellations, payment stages,
               service delivery expectations, and operational protections across the platform.
             </p>
           </div>
 
           <aside class="hero-side-note">
-            <strong>Before launch</strong>
-            <span>This document should be reviewed with your final live business details, cancellation policy, and legal wording before public release.</span>
+            <strong data-i18n="terms.note.title" data-i18n-default="Before launch">Before launch</strong>
+            <span data-i18n="terms.note.copy" data-i18n-default="This document should be reviewed with your final live business details, cancellation policy, and legal wording before public release.">This document should be reviewed with your final live business details, cancellation policy, and legal wording before public release.</span>
           </aside>
         </div>
       </section>
@@ -145,19 +151,19 @@
           </div>
 
           <aside class="content-aside">
-            <h3>Related pages</h3>
+            <h3 data-i18n="terms.related.title" data-i18n-default="Related pages">Related pages</h3>
             <div class="stack">
               <div class="info-card">
-                <strong>Privacy policy</strong>
-                <span><a href="/privacy.html">Read how data is handled</a> across client and staff workflows.</span>
+                <strong data-i18n="terms.related.privacyTitle" data-i18n-default="Privacy policy">Privacy policy</strong>
+                <span data-i18n-html="terms.related.privacyCopy" data-i18n-default-html="<a href=&quot;/privacy.html&quot;>Read how data is handled</a> across client and staff workflows."><a href="/privacy.html">Read how data is handled</a> across client and staff workflows.</span>
               </div>
               <div class="info-card">
-                <strong>Client signup</strong>
-                <span><a href="/Customer-logins/customer-login-create.html">Start a client application</a>.</span>
+                <strong data-i18n="terms.related.clientTitle" data-i18n-default="Client signup">Client signup</strong>
+                <span data-i18n-html="terms.related.clientCopy" data-i18n-default-html="<a href=&quot;/Customer-logins/customer-login-create.html&quot;>Start a client application</a>."><a href="/Customer-logins/customer-login-create.html">Start a client application</a>.</span>
               </div>
               <div class="info-card">
-                <strong>Staff signup</strong>
-                <span><a href="/staff-logins/staff-login-create.html">Start a staff application</a>.</span>
+                <strong data-i18n="terms.related.staffTitle" data-i18n-default="Staff signup">Staff signup</strong>
+                <span data-i18n-html="terms.related.staffCopy" data-i18n-default-html="<a href=&quot;/staff-logins/staff-login-create.html&quot;>Start a staff application</a>."><a href="/staff-logins/staff-login-create.html">Start a staff application</a>.</span>
               </div>
             </div>
           </aside>
@@ -167,16 +173,17 @@
 
     <footer class="footer">
       <div class="footer-inner">
-        <span>Black Eagle Agency. Hospitality staffing for events across London and the UK.</span>
+        <span data-i18n="terms.footer.copy" data-i18n-default="Black Eagle Agency. Hospitality staffing for events across London and the UK.">Black Eagle Agency. Hospitality staffing for events across London and the UK.</span>
         <div class="footer-links">
-          <a href="/">Home</a>
-          <a href="/about.html">About</a>
-          <a href="/contact.html">Contact</a>
-          <a href="/privacy.html">Privacy</a>
-          <a href="/terms.html">Terms</a>
+          <a href="/" data-i18n="about.nav.home" data-i18n-default="Home">Home</a>
+          <a href="/about.html" data-i18n="index.footer.about" data-i18n-default="About">About</a>
+          <a href="/contact.html" data-i18n="index.footer.contact" data-i18n-default="Contact">Contact</a>
+          <a href="/privacy.html" data-i18n="index.footer.privacy" data-i18n-default="Privacy">Privacy</a>
+          <a href="/terms.html" data-i18n="index.footer.terms" data-i18n-default="Terms">Terms</a>
         </div>
       </div>
     </footer>
   </div>
+  <script src="/js/i18n.js"></script>
 </body>
 </html>

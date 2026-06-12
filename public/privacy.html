@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Privacy Policy | Black Eagle Services</title>
+  <title data-i18n-title="privacy.title" data-i18n-default-title="Privacy Policy | Black Eagle Services">Privacy Policy | Black Eagle Services</title>
   <meta
     name="description"
+    data-i18n-content="privacy.description"
+    data-i18n-default-content="Read the Black Eagle Services privacy policy covering customer accounts, staff onboarding data, payments, communications, and account deletion requests."
     content="Read the Black Eagle Services privacy policy covering customer accounts, staff onboarding data, payments, communications, and account deletion requests."
   />
   <meta name="theme-color" content="#0a0d12" />
@@ -19,16 +21,20 @@
           <img class="brand-logo" src="/img/blackeaglelogo.png" alt="Black Eagle Services logo" />
           <span>
             <span class="brand-title">Black Eagle</span>
-            <span class="brand-subtitle">Privacy Policy</span>
+            <span class="brand-subtitle" data-i18n="privacy.brandSubtitle" data-i18n-default="Privacy Policy">Privacy Policy</span>
           </span>
         </a>
 
         <nav class="nav-links">
-          <a href="/">Home</a>
-          <a href="/about.html">About</a>
-          <a href="/contact.html">Contact</a>
-          <a href="/login.html">Login</a>
+          <a href="/" data-i18n="about.nav.home" data-i18n-default="Home">Home</a>
+          <a href="/about.html" data-i18n="index.footer.about" data-i18n-default="About">About</a>
+          <a href="/contact.html" data-i18n="index.footer.contact" data-i18n-default="Contact">Contact</a>
+          <a href="/login.html" data-i18n="about.nav.login" data-i18n-default="Login">Login</a>
         </nav>
+        <div class="language-switcher" aria-label="Language switcher">
+          <button type="button" data-language-option="en" aria-pressed="true">English</button>
+          <button type="button" data-language-option="tr" aria-pressed="false">Türkçe</button>
+        </div>
       </div>
     </header>
 
@@ -36,17 +42,17 @@
       <section class="page-hero">
         <div class="container page-hero-grid">
           <div>
-            <span class="eyebrow">Privacy & data use</span>
-            <h1>How Black Eagle Services collects, uses, and protects personal data.</h1>
-            <p>
+            <span class="eyebrow" data-i18n="privacy.hero.eyebrow" data-i18n-default="Privacy & data use">Privacy & data use</span>
+            <h1 data-i18n="privacy.hero.title" data-i18n-default="How Black Eagle Services collects, uses, and protects personal data.">How Black Eagle Services collects, uses, and protects personal data.</h1>
+            <p data-i18n="privacy.hero.copy" data-i18n-default="This Privacy Policy applies to the Black Eagle website, platform dashboards, account onboarding flows, and any mobile application or webview that connects to the same services.">
               This Privacy Policy applies to the Black Eagle website, platform dashboards, account onboarding
               flows, and any mobile application or webview that connects to the same services.
             </p>
           </div>
 
           <aside class="hero-side-note">
-            <strong>Last updated</strong>
-            <span>23 April 2026</span>
+            <strong data-i18n="privacy.note.title" data-i18n-default="Last updated">Last updated</strong>
+            <span data-i18n="privacy.note.copy" data-i18n-default="23 April 2026">23 April 2026</span>
           </aside>
         </div>
       </section>
@@ -185,26 +191,26 @@
           </div>
 
           <aside class="content-aside">
-            <h3>Quick summary</h3>
+            <h3 data-i18n="privacy.summary.title" data-i18n-default="Quick summary">Quick summary</h3>
             <div class="stack">
               <div class="info-card">
-                <strong>Main uses</strong>
-                <span>Account management, event staffing, booking delivery, payments, support, and security.</span>
+                <strong data-i18n="privacy.summary.mainUses" data-i18n-default="Main uses">Main uses</strong>
+                <span data-i18n="privacy.summary.mainUsesCopy" data-i18n-default="Account management, event staffing, booking delivery, payments, support, and security.">Account management, event staffing, booking delivery, payments, support, and security.</span>
               </div>
               <div class="info-card">
-                <strong>Sensitive categories</strong>
-                <span>Staff selfie images, National Insurance details, and bank details are used only where needed for onboarding and operations.</span>
+                <strong data-i18n="privacy.summary.sensitive" data-i18n-default="Sensitive categories">Sensitive categories</strong>
+                <span data-i18n="privacy.summary.sensitiveCopy" data-i18n-default="Staff selfie images, National Insurance details, and bank details are used only where needed for onboarding and operations.">Staff selfie images, National Insurance details, and bank details are used only where needed for onboarding and operations.</span>
               </div>
               <div class="info-card">
-                <strong>Third parties</strong>
-                <span>Payments may be processed by Stripe. Service emails may be sent through our configured email providers.</span>
+                <strong data-i18n="privacy.summary.thirdParties" data-i18n-default="Third parties">Third parties</strong>
+                <span data-i18n="privacy.summary.thirdPartiesCopy" data-i18n-default="Payments may be processed by Stripe. Service emails may be sent through our configured email providers.">Payments may be processed by Stripe. Service emails may be sent through our configured email providers.</span>
               </div>
               <div class="info-card">
-                <strong>Deletion requests</strong>
-                <span><a href="/account-deletion.html">Open the account deletion page</a> to request account removal or data deletion review.</span>
+                <strong data-i18n="privacy.summary.deletion" data-i18n-default="Deletion requests">Deletion requests</strong>
+                <span data-i18n-html="privacy.summary.deletionCopy" data-i18n-default-html="<a href=&quot;/account-deletion.html&quot;>Open the account deletion page</a> to request account removal or data deletion review."><a href="/account-deletion.html">Open the account deletion page</a> to request account removal or data deletion review.</span>
               </div>
               <div class="info-card">
-                <strong>Contact</strong>
+                <strong data-i18n="privacy.summary.contact" data-i18n-default="Contact">Contact</strong>
                 <span><a href="mailto:info@blackeagleservices.co.uk">info@blackeagleservices.co.uk</a></span>
               </div>
             </div>
@@ -215,17 +221,18 @@
 
     <footer class="footer">
       <div class="footer-inner">
-        <span>Black Eagle Services. Hospitality staffing for events across London and the UK.</span>
+        <span data-i18n="privacy.footer.copy" data-i18n-default="Black Eagle Services. Hospitality staffing for events across London and the UK.">Black Eagle Services. Hospitality staffing for events across London and the UK.</span>
         <div class="footer-links">
-          <a href="/">Home</a>
-          <a href="/about.html">About</a>
-          <a href="/contact.html">Contact</a>
-          <a href="/privacy.html">Privacy</a>
-          <a href="/account-deletion.html">Account deletion</a>
-          <a href="/terms.html">Terms</a>
+          <a href="/" data-i18n="about.nav.home" data-i18n-default="Home">Home</a>
+          <a href="/about.html" data-i18n="index.footer.about" data-i18n-default="About">About</a>
+          <a href="/contact.html" data-i18n="index.footer.contact" data-i18n-default="Contact">Contact</a>
+          <a href="/privacy.html" data-i18n="index.footer.privacy" data-i18n-default="Privacy">Privacy</a>
+          <a href="/account-deletion.html" data-i18n="privacy.footer.accountDeletion" data-i18n-default="Account deletion">Account deletion</a>
+          <a href="/terms.html" data-i18n="index.footer.terms" data-i18n-default="Terms">Terms</a>
         </div>
       </div>
     </footer>
   </div>
+  <script src="/js/i18n.js"></script>
 </body>
 </html>
