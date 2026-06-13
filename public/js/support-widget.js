@@ -6,12 +6,6 @@
   const DEFAULT_LANGUAGE = "en";
   const SUPPORTED_LANGUAGES = new Set(["en", "tr"]);
 
-  try {
-    if (localStorage.getItem("adminToken")) return;
-  } catch (error) {
-    console.error("Support widget storage check failed:", error);
-  }
-
   function safeParse(value) {
     try {
       return value ? JSON.parse(value) : null;
@@ -43,6 +37,17 @@
     return [
       "/staff-logins/staff-dashboard.html",
     ].includes(path);
+  }
+
+  function isAdminContext() {
+    const path = getCurrentPath();
+    return path.includes("/admin") || path.includes("/dashboard");
+  }
+
+  try {
+    if (isAdminContext() && localStorage.getItem("adminToken")) return;
+  } catch (error) {
+    console.error("Support widget storage check failed:", error);
   }
 
   function getCustomerSession() {
