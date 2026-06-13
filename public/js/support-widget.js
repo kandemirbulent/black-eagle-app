@@ -2,6 +2,10 @@
   if (window.__blackEagleSupportWidgetLoaded) return;
   window.__blackEagleSupportWidgetLoaded = true;
 
+  const LANGUAGE_STORAGE_KEY = "preferredLanguage";
+  const DEFAULT_LANGUAGE = "en";
+  const SUPPORTED_LANGUAGES = new Set(["en", "tr"]);
+
   try {
     if (localStorage.getItem("adminToken")) return;
   } catch (error) {
@@ -114,6 +118,92 @@
     "Charlotte",
   ];
 
+  const TURKISH_SUPPORT_ASSISTANT_NAMES = [
+    "Ayse",
+    "Fatma",
+    "Elif",
+    "Zeynep",
+    "Merve",
+    "Mehmet",
+    "Ahmet",
+    "Mustafa",
+    "Emre",
+    "Burak",
+  ];
+
+  const WIDGET_TEXT = {
+    en: {
+      toggle: "Support",
+      title: "Support Chat",
+      closeAria: "Close support widget",
+      copy: "Need help? Send a support message and the Black Eagle team will review it.",
+      agentRole: "Black Eagle Support Assistant",
+      name: "Name",
+      email: "Email",
+      phone: "Phone (Optional)",
+      userType: "User Type",
+      userTypePlaceholder: "Select user type",
+      userTypeCustomer: "Customer Candidate",
+      userTypeStaff: "Staff Candidate",
+      message: "Message",
+      messagePlaceholder: "Write your support request",
+      send: "Send",
+      sending: "Sending...",
+      close: "Close",
+      welcome: (name) => `Hello, my name is ${name} from Black Eagle Support. How can I help you today?`,
+      signedInAs: "Signed in as:",
+      role: "Role",
+      notSignedIn: "Not signed in",
+      notSignedInCopy: "Please enter your details before sending a support message.",
+      requiredFields: "Please complete the required support fields.",
+      sendFailed: "Support message could not be sent.",
+      sentSuccess: "Your support message has been sent.",
+      serverFailed: "Server connection failed.",
+    },
+    tr: {
+      toggle: "Destek",
+      title: "Destek Sohbeti",
+      closeAria: "Destek penceresini kapat",
+      copy: "Yardima mi ihtiyaciniz var? Bir destek mesaji gonderin, Black Eagle ekibi inceleyip size donsun.",
+      agentRole: "Black Eagle Destek Temsilcisi",
+      name: "Ad Soyad",
+      email: "E-posta",
+      phone: "Telefon (Istege Bagli)",
+      userType: "Kullanici Tipi",
+      userTypePlaceholder: "Kullanici tipi secin",
+      userTypeCustomer: "Musteri Adayi",
+      userTypeStaff: "Personel Adayi",
+      message: "Mesaj",
+      messagePlaceholder: "Destek talebinizi yazin",
+      send: "Gonder",
+      sending: "Gonderiliyor...",
+      close: "Kapat",
+      welcome: (name) => `Merhaba, ben Black Eagle destek ekibinden ${name}. Size nasil yardimci olabilirim?`,
+      signedInAs: "Giris yapan kullanici:",
+      role: "Rol",
+      notSignedIn: "Giris yapilmamis",
+      notSignedInCopy: "Destek mesaji gondermeden once bilgilerinizi girin.",
+      requiredFields: "Lutfen gerekli destek alanlarini doldurun.",
+      sendFailed: "Destek mesaji gonderilemedi.",
+      sentSuccess: "Destek mesajiniz gonderildi.",
+      serverFailed: "Sunucu baglantisi kurulamadi.",
+    },
+  };
+
+  function getLanguage() {
+    try {
+      const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      return SUPPORTED_LANGUAGES.has(stored) ? stored : DEFAULT_LANGUAGE;
+    } catch (error) {
+      return DEFAULT_LANGUAGE;
+    }
+  }
+
+  function getText(key) {
+    const language = getLanguage();
+    return WIDGET_TEXT[language]?.[key] ?? WIDGET_TEXT.en[key];
+  }
+
   const style = document.createElement("style");
   style.textContent = `
     .be-support-widget{position:fixed;right:18px;bottom:max(18px,env(safe-area-inset-bottom));z-index:10001;font-family:Arial,sans-serif}
@@ -219,11 +309,24 @@
   const assistantNameBox = container.querySelector(".be-support-agent-name");
   const welcomeMessageBox = container.querySelector(".be-support-welcome-message");
   const assistantBadgeBox = container.querySelector(".be-support-agent-badge");
+  const titleBox = container.querySelector(".be-support-title");
+  const copyBox = container.querySelector(".be-support-copy");
+  const agentRoleBox = container.querySelector(".be-support-agent-role");
+  const nameLabel = container.querySelector('label[for="beSupportName"]');
+  const emailLabel = container.querySelector('label[for="beSupportEmail"]');
+  const phoneLabel = container.querySelector('label[for="beSupportPhone"]');
+  const userTypeLabel = container.querySelector('label[for="beSupportUserType"]');
+  const messageLabel = container.querySelector('label[for="beSupportMessage"]');
+  const userTypeSelect = container.querySelector("#beSupportUserType");
+  const userTypeOptions = userTypeSelect ? Array.from(userTypeSelect.options) : [];
+  const messageInput = container.querySelector("#beSupportMessage");
+  const submitButton = container.querySelector(".be-support-submit");
   let currentAssistantName = "";
 
   function pickRandomAssistantName() {
-    const index = Math.floor(Math.random() * SUPPORT_ASSISTANT_NAMES.length);
-    return SUPPORT_ASSISTANT_NAMES[index];
+    const names = getLanguage() === "tr" ? TURKISH_SUPPORT_ASSISTANT_NAMES : SUPPORT_ASSISTANT_NAMES;
+    const index = Math.floor(Math.random() * names.length);
+    return names[index];
   }
 
   function renderAssistantIdentity() {
@@ -233,7 +336,27 @@
 
     assistantNameBox.textContent = currentAssistantName;
     assistantBadgeBox.textContent = currentAssistantName.slice(0, 1).toUpperCase();
-    welcomeMessageBox.textContent = `Hello, my name is ${currentAssistantName} from Black Eagle Support. How can I help you today?`;
+    welcomeMessageBox.textContent = getText("welcome")(currentAssistantName);
+  }
+
+  function renderWidgetText() {
+    toggleButton.textContent = getText("toggle");
+    titleBox.textContent = getText("title");
+    closeButton.setAttribute("aria-label", getText("closeAria"));
+    copyBox.textContent = getText("copy");
+    agentRoleBox.textContent = getText("agentRole");
+    nameLabel.textContent = getText("name");
+    emailLabel.textContent = getText("email");
+    phoneLabel.textContent = getText("phone");
+    userTypeLabel.textContent = getText("userType");
+    if (userTypeOptions[0]) userTypeOptions[0].textContent = getText("userTypePlaceholder");
+    if (userTypeOptions[1]) userTypeOptions[1].textContent = getText("userTypeCustomer");
+    if (userTypeOptions[2]) userTypeOptions[2].textContent = getText("userTypeStaff");
+    messageLabel.textContent = getText("message");
+    messageInput.setAttribute("placeholder", getText("messagePlaceholder"));
+    submitButton.textContent = submitButton.disabled ? getText("sending") : getText("send");
+    cancelButton.textContent = getText("close");
+    renderAssistantIdentity();
   }
 
   function showStatus(message, type) {
@@ -246,18 +369,25 @@
     statusBox.className = "be-support-status";
   }
 
+  function formatRole(role) {
+    if (getLanguage() !== "tr") return role;
+    if (role === "customer") return "musteri";
+    if (role === "staff") return "personel";
+    return role;
+  }
+
   function renderSession() {
     const session = getSession();
 
     if (session && session.email) {
-      sessionBox.innerHTML = `<strong>Signed in as:</strong><br>${session.name || session.email}<br>${session.email}<br>Role: ${session.role}`;
+      sessionBox.innerHTML = `<strong>${getText("signedInAs")}</strong><br>${session.name || session.email}<br>${session.email}<br>${getText("role")}: ${formatRole(session.role)}`;
       guestFields.forEach((field) => {
         field.style.display = "none";
       });
       return session;
     }
 
-    sessionBox.innerHTML = "<strong>Not signed in</strong><br>Please enter your details before sending a support message.";
+    sessionBox.innerHTML = `<strong>${getText("notSignedIn")}</strong><br>${getText("notSignedInCopy")}`;
     guestFields.forEach((field) => {
       field.style.display = "block";
     });
@@ -271,6 +401,7 @@
       if (!currentAssistantName) {
         renderAssistantIdentity();
       }
+      renderWidgetText();
       renderSession();
       clearStatus();
     } else {
@@ -301,13 +432,11 @@
     };
 
     if (!payload.name || !payload.email || !payload.message || (!payload.role && !payload.userType)) {
-      showStatus("Please complete the required support fields.", "error");
+      showStatus(getText("requiredFields"), "error");
       return;
     }
-
-    const submitButton = container.querySelector(".be-support-submit");
     submitButton.disabled = true;
-    submitButton.textContent = "Sending...";
+    submitButton.textContent = getText("sending");
 
     try {
       const response = await fetch("/api/support-message", {
@@ -318,22 +447,42 @@
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok || data.success === false) {
-        showStatus(data.message || "Support message could not be sent.", "error");
+        const errorMessage = getLanguage() === "tr" ? getText("sendFailed") : (data.message || getText("sendFailed"));
+        showStatus(errorMessage, "error");
         return;
       }
 
       form.reset();
       renderSession();
-      showStatus("Your support message has been sent.", "success");
+      showStatus(getText("sentSuccess"), "success");
     } catch (error) {
       console.error("Support widget submit error:", error);
-      showStatus("Server connection failed.", "error");
+      showStatus(getText("serverFailed"), "error");
     } finally {
       submitButton.disabled = false;
-      submitButton.textContent = "Send";
+      submitButton.textContent = getText("send");
     }
   });
 
+  document.querySelectorAll("[data-language-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      window.setTimeout(() => {
+        currentAssistantName = "";
+        renderWidgetText();
+        renderSession();
+      }, 0);
+    });
+  });
+
+  window.addEventListener("storage", (event) => {
+    if (event.key === LANGUAGE_STORAGE_KEY) {
+      currentAssistantName = "";
+      renderWidgetText();
+      renderSession();
+    }
+  });
+
+  renderWidgetText();
   renderAssistantIdentity();
   renderSession();
 })();
