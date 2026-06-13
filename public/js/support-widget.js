@@ -10,6 +10,7 @@
     "/index.html",
     "/about.html",
     "/contact.html",
+    "/references.html",
     "/privacy.html",
     "/terms.html",
     "/account-deletion.html",
