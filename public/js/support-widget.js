@@ -5,110 +5,26 @@
   const LANGUAGE_STORAGE_KEY = "preferredLanguage";
   const DEFAULT_LANGUAGE = "en";
   const SUPPORTED_LANGUAGES = new Set(["en", "tr"]);
-
-  function safeParse(value) {
-    try {
-      return value ? JSON.parse(value) : null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  function getCurrentPath() {
-    return String(window.location.pathname || "/").trim().toLowerCase();
-  }
-
-  function isCustomerContext() {
-    const path = getCurrentPath();
-    return [
-      "/customer-logins/customer-dashboard.html",
-      "/customer-logins/create-order.html",
-      "/event-detail.html",
-      "/invoice.html",
-      "/order-detail.html",
-      "/payment.html",
-      "/success.html",
-      "/cancel.html",
-    ].includes(path);
-  }
-
-  function isStaffContext() {
-    const path = getCurrentPath();
-    return [
-      "/staff-logins/staff-dashboard.html",
-    ].includes(path);
-  }
-
-  function isAdminContext() {
-    const path = getCurrentPath();
-    return path.includes("/admin") || path.includes("/dashboard");
-  }
-
-  try {
-    if (isAdminContext() && localStorage.getItem("adminToken")) return;
-  } catch (error) {
-    console.error("Support widget storage check failed:", error);
-  }
-
-  function getCustomerSession() {
-    if (!isCustomerContext()) return null;
-
-    const customer = safeParse(localStorage.getItem("customer"));
-    if (!customer && !localStorage.getItem("customerEmail")) return null;
-
-    const derivedName = `${String(customer?.firstName || "").trim()} ${String(
-      customer?.lastName || ""
-    ).trim()}`.trim();
-
-    return {
-      userId: String(customer?.id || "").trim(),
-      name:
-        String(customer?.name || "").trim() ||
-        derivedName ||
-        String(localStorage.getItem("customerName") || "").trim(),
-      email:
-        String(customer?.email || "").trim() ||
-        String(localStorage.getItem("customerEmail") || "").trim(),
-      role: "customer",
-      userType: "",
-    };
-  }
-
-  function getStaffSession() {
-    if (!isStaffContext()) return null;
-
-    const staffProfile = safeParse(localStorage.getItem("staffProfile"));
-    if (!staffProfile && !localStorage.getItem("staffEmail")) return null;
-
-    const derivedName = `${String(staffProfile?.firstName || "").trim()} ${String(
-      staffProfile?.lastName || ""
-    ).trim()}`.trim();
-
-    return {
-      userId: String(staffProfile?.id || "").trim(),
-      name:
-        String(staffProfile?.name || "").trim() ||
-        derivedName ||
-        String(localStorage.getItem("staffName") || "").trim(),
-      email:
-        String(staffProfile?.email || "").trim() ||
-        String(localStorage.getItem("staffEmail") || "").trim(),
-      role: "staff",
-      userType: "",
-    };
-  }
-
-  function getSession() {
-    if (isCustomerContext()) {
-      return getCustomerSession();
-    }
-
-    if (isStaffContext()) {
-      return getStaffSession();
-    }
-
-    return null;
-  }
+  const PUBLIC_WIDGET_PATHS = new Set([
+    "/",
+    "/index.html",
+    "/about.html",
+    "/contact.html",
+    "/privacy.html",
+    "/terms.html",
+    "/account-deletion.html",
+  ]);
+  const CUSTOMER_PATHS = new Set([
+    "/customer-logins/customer-dashboard.html",
+    "/customer-logins/create-order.html",
+    "/event-detail.html",
+    "/invoice.html",
+    "/order-detail.html",
+    "/payment.html",
+    "/success.html",
+    "/cancel.html",
+  ]);
+  const STAFF_PATHS = new Set(["/staff-logins/staff-dashboard.html"]);
 
   const SUPPORT_ASSISTANT_NAMES = [
     "Daniel",
@@ -124,7 +40,7 @@
   ];
 
   const TURKISH_SUPPORT_ASSISTANT_NAMES = [
-    "Ayse",
+    "Ay\u015fe",
     "Fatma",
     "Elif",
     "Zeynep",
@@ -195,6 +111,48 @@
     },
   };
 
+  function safeParse(value) {
+    try {
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function getCurrentPath() {
+    return String(window.location.pathname || "/").trim().toLowerCase();
+  }
+
+  function isCustomerContext() {
+    return CUSTOMER_PATHS.has(getCurrentPath());
+  }
+
+  function isStaffContext() {
+    return STAFF_PATHS.has(getCurrentPath());
+  }
+
+  function isBlockedContext() {
+    const path = getCurrentPath();
+    return (
+      path.includes("/admin") ||
+      path.includes("/dashboard") ||
+      path === "/login.html" ||
+      path.includes("/customer-logins/") ||
+      path.includes("/staff-logins/") ||
+      path === "/payment.html" ||
+      path === "/invoice.html" ||
+      path === "/order-detail.html" ||
+      path === "/event-detail.html"
+    );
+  }
+
+  function shouldRenderWidget() {
+    const path = getCurrentPath();
+    if (isBlockedContext()) return false;
+    if (PUBLIC_WIDGET_PATHS.has(path)) return true;
+    return false;
+  }
+
   function getLanguage() {
     try {
       const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -209,285 +167,378 @@
     return WIDGET_TEXT[language]?.[key] ?? WIDGET_TEXT.en[key];
   }
 
-  const style = document.createElement("style");
-  style.textContent = `
-    .be-support-widget{position:fixed;right:18px;bottom:max(18px,env(safe-area-inset-bottom));z-index:10001;font-family:Arial,sans-serif}
-    .be-support-toggle{border:none;border-radius:999px;background:linear-gradient(135deg,#111827,#f4c542);color:#fff;padding:13px 18px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 14px 36px rgba(17,24,39,.28)}
-    .be-support-panel{width:min(360px,calc(100vw - 24px));max-height:min(78vh,680px);overflow:auto;margin-top:12px;border-radius:18px;border:1px solid rgba(17,24,39,.08);background:#fff;color:#111827;box-shadow:0 22px 55px rgba(15,23,42,.22);display:none}
-    .be-support-panel.open{display:block}
-    .be-support-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 12px;border-bottom:1px solid #e5e7eb}
-    .be-support-title{font-size:16px;font-weight:700}
-    .be-support-close{border:none;background:transparent;color:#374151;cursor:pointer;font-size:20px;line-height:1}
-    .be-support-body{padding:16px 18px 18px}
-    .be-support-copy{font-size:13px;color:#4b5563;line-height:1.5;margin-bottom:14px}
-    .be-support-welcome{margin-bottom:14px;padding:14px;border-radius:14px;background:#f9fafb;border:1px solid #e5e7eb}
-    .be-support-agent{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-    .be-support-agent-badge{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:999px;background:#111827;color:#fff;font-size:14px;font-weight:700}
-    .be-support-agent-name{font-size:14px;font-weight:700;color:#111827}
-    .be-support-agent-role{font-size:12px;color:#6b7280}
-    .be-support-welcome-message{font-size:14px;line-height:1.6;color:#111827;margin:0 0 10px}
-    .be-support-session{margin-bottom:14px;padding:12px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;line-height:1.5}
-    .be-support-grid{display:grid;gap:10px}
-    .be-support-field label{display:block;margin-bottom:6px;font-size:12px;font-weight:700;color:#374151}
-    .be-support-field input,.be-support-field select,.be-support-field textarea{width:100%;border:1px solid #d1d5db;border-radius:12px;padding:11px 12px;font-size:14px;color:#111827;background:#fff}
-    .be-support-field textarea{min-height:110px;resize:vertical}
-    .be-support-actions{display:flex;gap:10px;margin-top:14px}
-    .be-support-submit,.be-support-cancel{flex:1;border:none;border-radius:999px;padding:12px 14px;font-size:14px;font-weight:700;cursor:pointer}
-    .be-support-submit{background:#111827;color:#fff}
-    .be-support-cancel{background:#f3f4f6;color:#111827}
-    .be-support-status{display:none;margin-top:12px;padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.5}
-    .be-support-status.show{display:block}
-    .be-support-status.success{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
-    .be-support-status.error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
-    @media (max-width:640px){.be-support-widget{right:12px;bottom:max(12px,env(safe-area-inset-bottom));left:12px}.be-support-toggle{width:100%}.be-support-panel{width:100%}}
-  `;
-  document.head.appendChild(style);
+  function getCustomerSession() {
+    if (!isCustomerContext()) return null;
 
-  const container = document.createElement("div");
-  container.className = "be-support-widget";
-  container.innerHTML = `
-    <button type="button" class="be-support-toggle">Support</button>
-    <div class="be-support-panel" aria-hidden="true">
-      <div class="be-support-header">
-        <div class="be-support-title">Support Chatbox V1</div>
-        <button type="button" class="be-support-close" aria-label="Close support widget">×</button>
-      </div>
-      <div class="be-support-body">
-        <p class="be-support-copy">Need help? Send a support message and the Black Eagle team will review it.</p>
-        <div class="be-support-welcome">
-          <div class="be-support-agent">
-            <div class="be-support-agent-badge">D</div>
-            <div>
-              <div class="be-support-agent-name"></div>
-              <div class="be-support-agent-role">Black Eagle Support Assistant</div>
-            </div>
-          </div>
-          <p class="be-support-welcome-message"></p>
-        </div>
-        <div class="be-support-session"></div>
-        <form class="be-support-form">
-          <div class="be-support-grid">
-            <div class="be-support-field be-guest-field">
-              <label for="beSupportName">Name</label>
-              <input id="beSupportName" name="name" type="text" />
-            </div>
-            <div class="be-support-field be-guest-field">
-              <label for="beSupportEmail">Email</label>
-              <input id="beSupportEmail" name="email" type="email" />
-            </div>
-            <div class="be-support-field be-guest-field">
-              <label for="beSupportPhone">Phone (Optional)</label>
-              <input id="beSupportPhone" name="phone" type="text" />
-            </div>
-            <div class="be-support-field be-guest-field">
-              <label for="beSupportUserType">User Type</label>
-              <select id="beSupportUserType" name="userType">
-                <option value="">Select user type</option>
-                <option value="customer-candidate">Customer Candidate</option>
-                <option value="staff-candidate">Staff Candidate</option>
-              </select>
-            </div>
-            <div class="be-support-field">
-              <label for="beSupportMessage">Message</label>
-              <textarea id="beSupportMessage" name="message" placeholder="Write your support request"></textarea>
-            </div>
-          </div>
-          <div class="be-support-actions">
-            <button type="submit" class="be-support-submit">Send</button>
-            <button type="button" class="be-support-cancel">Close</button>
-          </div>
-          <div class="be-support-status"></div>
-        </form>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(container);
+    const customer = safeParse(localStorage.getItem("customer"));
+    if (!customer && !localStorage.getItem("customerEmail")) return null;
 
-  const toggleButton = container.querySelector(".be-support-toggle");
-  const panel = container.querySelector(".be-support-panel");
-  const closeButton = container.querySelector(".be-support-close");
-  const cancelButton = container.querySelector(".be-support-cancel");
-  const form = container.querySelector(".be-support-form");
-  const sessionBox = container.querySelector(".be-support-session");
-  const statusBox = container.querySelector(".be-support-status");
-  const guestFields = Array.from(container.querySelectorAll(".be-guest-field"));
-  const assistantNameBox = container.querySelector(".be-support-agent-name");
-  const welcomeMessageBox = container.querySelector(".be-support-welcome-message");
-  const assistantBadgeBox = container.querySelector(".be-support-agent-badge");
-  const titleBox = container.querySelector(".be-support-title");
-  const copyBox = container.querySelector(".be-support-copy");
-  const agentRoleBox = container.querySelector(".be-support-agent-role");
-  const nameLabel = container.querySelector('label[for="beSupportName"]');
-  const emailLabel = container.querySelector('label[for="beSupportEmail"]');
-  const phoneLabel = container.querySelector('label[for="beSupportPhone"]');
-  const userTypeLabel = container.querySelector('label[for="beSupportUserType"]');
-  const messageLabel = container.querySelector('label[for="beSupportMessage"]');
-  const userTypeSelect = container.querySelector("#beSupportUserType");
-  const userTypeOptions = userTypeSelect ? Array.from(userTypeSelect.options) : [];
-  const messageInput = container.querySelector("#beSupportMessage");
-  const submitButton = container.querySelector(".be-support-submit");
-  let currentAssistantName = "";
+    const derivedName = `${String(customer?.firstName || "").trim()} ${String(
+      customer?.lastName || ""
+    ).trim()}`.trim();
 
-  function pickRandomAssistantName() {
-    const names = getLanguage() === "tr" ? TURKISH_SUPPORT_ASSISTANT_NAMES : SUPPORT_ASSISTANT_NAMES;
-    const index = Math.floor(Math.random() * names.length);
-    return names[index];
+    return {
+      userId: String(customer?.id || "").trim(),
+      name:
+        String(customer?.name || "").trim() ||
+        derivedName ||
+        String(localStorage.getItem("customerName") || "").trim(),
+      email:
+        String(customer?.email || "").trim() ||
+        String(localStorage.getItem("customerEmail") || "").trim(),
+      role: "customer",
+      userType: "",
+    };
   }
 
-  function renderAssistantIdentity() {
-    if (!currentAssistantName) {
-      currentAssistantName = pickRandomAssistantName();
-    }
+  function getStaffSession() {
+    if (!isStaffContext()) return null;
 
-    assistantNameBox.textContent = currentAssistantName;
-    assistantBadgeBox.textContent = currentAssistantName.slice(0, 1).toUpperCase();
-    welcomeMessageBox.textContent = getText("welcome")(currentAssistantName);
+    const staffProfile = safeParse(localStorage.getItem("staffProfile"));
+    if (!staffProfile && !localStorage.getItem("staffEmail")) return null;
+
+    const derivedName = `${String(staffProfile?.firstName || "").trim()} ${String(
+      staffProfile?.lastName || ""
+    ).trim()}`.trim();
+
+    return {
+      userId: String(staffProfile?.id || "").trim(),
+      name:
+        String(staffProfile?.name || "").trim() ||
+        derivedName ||
+        String(localStorage.getItem("staffName") || "").trim(),
+      email:
+        String(staffProfile?.email || "").trim() ||
+        String(localStorage.getItem("staffEmail") || "").trim(),
+      role: "staff",
+      userType: "",
+    };
   }
 
-  function renderWidgetText() {
-    toggleButton.textContent = getText("toggle");
-    titleBox.textContent = getText("title");
-    closeButton.setAttribute("aria-label", getText("closeAria"));
-    copyBox.textContent = getText("copy");
-    agentRoleBox.textContent = getText("agentRole");
-    nameLabel.textContent = getText("name");
-    emailLabel.textContent = getText("email");
-    phoneLabel.textContent = getText("phone");
-    userTypeLabel.textContent = getText("userType");
-    if (userTypeOptions[0]) userTypeOptions[0].textContent = getText("userTypePlaceholder");
-    if (userTypeOptions[1]) userTypeOptions[1].textContent = getText("userTypeCustomer");
-    if (userTypeOptions[2]) userTypeOptions[2].textContent = getText("userTypeStaff");
-    messageLabel.textContent = getText("message");
-    messageInput.setAttribute("placeholder", getText("messagePlaceholder"));
-    submitButton.textContent = submitButton.disabled ? getText("sending") : getText("send");
-    cancelButton.textContent = getText("close");
-    renderAssistantIdentity();
-  }
-
-  function showStatus(message, type) {
-    statusBox.textContent = message;
-    statusBox.className = `be-support-status show ${type}`;
-  }
-
-  function clearStatus() {
-    statusBox.textContent = "";
-    statusBox.className = "be-support-status";
-  }
-
-  function formatRole(role) {
-    if (getLanguage() !== "tr") return role;
-    if (role === "customer") return "musteri";
-    if (role === "staff") return "personel";
-    return role;
-  }
-
-  function renderSession() {
-    const session = getSession();
-
-    if (session && session.email) {
-      sessionBox.innerHTML = `<strong>${getText("signedInAs")}</strong><br>${session.name || session.email}<br>${session.email}<br>${getText("role")}: ${formatRole(session.role)}`;
-      guestFields.forEach((field) => {
-        field.style.display = "none";
-      });
-      return session;
-    }
-
-    sessionBox.innerHTML = `<strong>${getText("notSignedIn")}</strong><br>${getText("notSignedInCopy")}`;
-    guestFields.forEach((field) => {
-      field.style.display = "block";
-    });
+  function getSession() {
+    if (isCustomerContext()) return getCustomerSession();
+    if (isStaffContext()) return getStaffSession();
     return null;
   }
 
-  function setOpen(isOpen) {
-    panel.classList.toggle("open", isOpen);
-    panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
-    if (isOpen) {
-      if (!currentAssistantName) {
-        renderAssistantIdentity();
+  function injectStyle() {
+    if (document.getElementById("be-support-widget-style")) return;
+
+    const style = document.createElement("style");
+    style.id = "be-support-widget-style";
+    style.textContent = `
+      .be-support-widget{position:fixed;right:20px;bottom:20px;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-end;gap:12px;font-family:Arial,sans-serif;pointer-events:auto}
+      .be-support-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:124px;border:none;border-radius:999px;background:linear-gradient(135deg,#111827,#d4a72c);color:#fff;padding:14px 20px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 18px 40px rgba(17,24,39,.32)}
+      .be-support-panel{display:none;width:min(360px,calc(100vw - 24px));max-height:min(78vh,680px);overflow:auto;border-radius:18px;border:1px solid rgba(17,24,39,.08);background:#fff;color:#111827;box-shadow:0 22px 55px rgba(15,23,42,.22)}
+      .be-support-panel.open{display:block}
+      .be-support-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 12px;border-bottom:1px solid #e5e7eb}
+      .be-support-title{font-size:16px;font-weight:700}
+      .be-support-close{border:none;background:transparent;color:#374151;cursor:pointer;font-size:22px;line-height:1}
+      .be-support-body{padding:16px 18px 18px}
+      .be-support-copy{font-size:13px;color:#4b5563;line-height:1.5;margin-bottom:14px}
+      .be-support-welcome{margin-bottom:14px;padding:14px;border-radius:14px;background:#f9fafb;border:1px solid #e5e7eb}
+      .be-support-agent{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+      .be-support-agent-badge{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:999px;background:#111827;color:#fff;font-size:14px;font-weight:700}
+      .be-support-agent-name{font-size:14px;font-weight:700;color:#111827}
+      .be-support-agent-role{font-size:12px;color:#6b7280}
+      .be-support-welcome-message{font-size:14px;line-height:1.6;color:#111827;margin:0 0 10px}
+      .be-support-session{margin-bottom:14px;padding:12px;border-radius:12px;background:#f9fafb;border:1px solid #e5e7eb;font-size:13px;line-height:1.5}
+      .be-support-grid{display:grid;gap:10px}
+      .be-support-field label{display:block;margin-bottom:6px;font-size:12px;font-weight:700;color:#374151}
+      .be-support-field input,.be-support-field select,.be-support-field textarea{width:100%;border:1px solid #d1d5db;border-radius:12px;padding:11px 12px;font-size:14px;color:#111827;background:#fff}
+      .be-support-field textarea{min-height:110px;resize:vertical}
+      .be-support-actions{display:flex;gap:10px;margin-top:14px}
+      .be-support-submit,.be-support-cancel{flex:1;border:none;border-radius:999px;padding:12px 14px;font-size:14px;font-weight:700;cursor:pointer}
+      .be-support-submit{background:#111827;color:#fff}
+      .be-support-cancel{background:#f3f4f6;color:#111827}
+      .be-support-status{display:none;margin-top:12px;padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.5}
+      .be-support-status.show{display:block}
+      .be-support-status.success{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+      .be-support-status.error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+      @media (max-width:640px){
+        .be-support-widget{left:12px;right:12px;bottom:12px;align-items:stretch}
+        .be-support-toggle{width:100%}
+        .be-support-panel{width:100%}
       }
-      renderWidgetText();
-      renderSession();
-      clearStatus();
-    } else {
-      currentAssistantName = "";
-    }
+    `;
+    document.head.appendChild(style);
   }
 
-  toggleButton.addEventListener("click", () => setOpen(!panel.classList.contains("open")));
-  closeButton.addEventListener("click", () => setOpen(false));
-  cancelButton.addEventListener("click", () => setOpen(false));
+  function createMarkup() {
+    const container = document.createElement("div");
+    container.className = "be-support-widget";
+    container.id = "be-support-widget";
+    container.innerHTML = `
+      <button type="button" class="be-support-toggle">Support</button>
+      <div class="be-support-panel" aria-hidden="true">
+        <div class="be-support-header">
+          <div class="be-support-title">Support Chat</div>
+          <button type="button" class="be-support-close" aria-label="Close support widget">&times;</button>
+        </div>
+        <div class="be-support-body">
+          <p class="be-support-copy">Need help? Send a support message and the Black Eagle team will review it.</p>
+          <div class="be-support-welcome">
+            <div class="be-support-agent">
+              <div class="be-support-agent-badge">B</div>
+              <div>
+                <div class="be-support-agent-name"></div>
+                <div class="be-support-agent-role">Black Eagle Support Assistant</div>
+              </div>
+            </div>
+            <p class="be-support-welcome-message"></p>
+          </div>
+          <div class="be-support-session"></div>
+          <form class="be-support-form">
+            <div class="be-support-grid">
+              <div class="be-support-field be-guest-field">
+                <label for="beSupportName">Name</label>
+                <input id="beSupportName" name="name" type="text" />
+              </div>
+              <div class="be-support-field be-guest-field">
+                <label for="beSupportEmail">Email</label>
+                <input id="beSupportEmail" name="email" type="email" />
+              </div>
+              <div class="be-support-field be-guest-field">
+                <label for="beSupportPhone">Phone (Optional)</label>
+                <input id="beSupportPhone" name="phone" type="text" />
+              </div>
+              <div class="be-support-field be-guest-field">
+                <label for="beSupportUserType">User Type</label>
+                <select id="beSupportUserType" name="userType">
+                  <option value="">Select user type</option>
+                  <option value="customer-candidate">Customer Candidate</option>
+                  <option value="staff-candidate">Staff Candidate</option>
+                </select>
+              </div>
+              <div class="be-support-field">
+                <label for="beSupportMessage">Message</label>
+                <textarea id="beSupportMessage" name="message" placeholder="Write your support request"></textarea>
+              </div>
+            </div>
+            <div class="be-support-actions">
+              <button type="submit" class="be-support-submit">Send</button>
+              <button type="button" class="be-support-cancel">Close</button>
+            </div>
+            <div class="be-support-status"></div>
+          </form>
+        </div>
+      </div>
+    `;
+    return container;
+  }
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    clearStatus();
+  function initWidget() {
+    if (!shouldRenderWidget()) return;
+    if (!document.body) return;
+    if (document.getElementById("be-support-widget")) return;
 
-    const session = renderSession();
-    const formData = new FormData(form);
-    const payload = {
-      userId: session?.userId || "",
-      name: session?.name || String(formData.get("name") || "").trim(),
-      email: session?.email || String(formData.get("email") || "").trim().toLowerCase(),
-      phone: String(formData.get("phone") || "").trim(),
-      role: session?.role || "",
-      userType: session?.userType || String(formData.get("userType") || "").trim(),
-      message: String(formData.get("message") || "").trim(),
-      sourcePage: `${window.location.pathname || "/"}${window.location.search || ""}`,
-      priority: "Normal",
-    };
+    injectStyle();
+    const container = createMarkup();
+    document.body.appendChild(container);
 
-    if (!payload.name || !payload.email || !payload.message || (!payload.role && !payload.userType)) {
-      showStatus(getText("requiredFields"), "error");
-      return;
+    const toggleButton = container.querySelector(".be-support-toggle");
+    const panel = container.querySelector(".be-support-panel");
+    const closeButton = container.querySelector(".be-support-close");
+    const cancelButton = container.querySelector(".be-support-cancel");
+    const form = container.querySelector(".be-support-form");
+    const sessionBox = container.querySelector(".be-support-session");
+    const statusBox = container.querySelector(".be-support-status");
+    const guestFields = Array.from(container.querySelectorAll(".be-guest-field"));
+    const assistantNameBox = container.querySelector(".be-support-agent-name");
+    const welcomeMessageBox = container.querySelector(".be-support-welcome-message");
+    const assistantBadgeBox = container.querySelector(".be-support-agent-badge");
+    const titleBox = container.querySelector(".be-support-title");
+    const copyBox = container.querySelector(".be-support-copy");
+    const agentRoleBox = container.querySelector(".be-support-agent-role");
+    const nameLabel = container.querySelector('label[for="beSupportName"]');
+    const emailLabel = container.querySelector('label[for="beSupportEmail"]');
+    const phoneLabel = container.querySelector('label[for="beSupportPhone"]');
+    const userTypeLabel = container.querySelector('label[for="beSupportUserType"]');
+    const messageLabel = container.querySelector('label[for="beSupportMessage"]');
+    const userTypeSelect = container.querySelector("#beSupportUserType");
+    const userTypeOptions = userTypeSelect ? Array.from(userTypeSelect.options) : [];
+    const messageInput = container.querySelector("#beSupportMessage");
+    const submitButton = container.querySelector(".be-support-submit");
+    let currentAssistantName = "";
+
+    function pickRandomAssistantName() {
+      const names =
+        getLanguage() === "tr"
+          ? TURKISH_SUPPORT_ASSISTANT_NAMES
+          : SUPPORT_ASSISTANT_NAMES;
+      const index = Math.floor(Math.random() * names.length);
+      return names[index];
     }
-    submitButton.disabled = true;
-    submitButton.textContent = getText("sending");
 
-    try {
-      const response = await fetch("/api/support-message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+    function showStatus(message, type) {
+      statusBox.textContent = message;
+      statusBox.className = `be-support-status show ${type}`;
+    }
+
+    function clearStatus() {
+      statusBox.textContent = "";
+      statusBox.className = "be-support-status";
+    }
+
+    function formatRole(role) {
+      if (getLanguage() !== "tr") return role;
+      if (role === "customer") return "musteri";
+      if (role === "staff") return "personel";
+      return role;
+    }
+
+    function renderAssistantIdentity() {
+      if (!currentAssistantName) {
+        currentAssistantName = pickRandomAssistantName();
+      }
+
+      assistantNameBox.textContent = currentAssistantName;
+      assistantBadgeBox.textContent = currentAssistantName.slice(0, 1).toUpperCase();
+      welcomeMessageBox.textContent = getText("welcome")(currentAssistantName);
+    }
+
+    function renderSession() {
+      const session = getSession();
+
+      if (session && session.email) {
+        sessionBox.innerHTML = `<strong>${getText("signedInAs")}</strong><br>${session.name || session.email}<br>${session.email}<br>${getText("role")}: ${formatRole(session.role)}`;
+        guestFields.forEach((field) => {
+          field.style.display = "none";
+        });
+        return session;
+      }
+
+      sessionBox.innerHTML = `<strong>${getText("notSignedIn")}</strong><br>${getText("notSignedInCopy")}`;
+      guestFields.forEach((field) => {
+        field.style.display = "block";
       });
+      return null;
+    }
 
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || data.success === false) {
-        const errorMessage = getLanguage() === "tr" ? getText("sendFailed") : (data.message || getText("sendFailed"));
-        showStatus(errorMessage, "error");
+    function renderWidgetText() {
+      toggleButton.textContent = getText("toggle");
+      titleBox.textContent = getText("title");
+      closeButton.setAttribute("aria-label", getText("closeAria"));
+      copyBox.textContent = getText("copy");
+      agentRoleBox.textContent = getText("agentRole");
+      nameLabel.textContent = getText("name");
+      emailLabel.textContent = getText("email");
+      phoneLabel.textContent = getText("phone");
+      userTypeLabel.textContent = getText("userType");
+      if (userTypeOptions[0]) userTypeOptions[0].textContent = getText("userTypePlaceholder");
+      if (userTypeOptions[1]) userTypeOptions[1].textContent = getText("userTypeCustomer");
+      if (userTypeOptions[2]) userTypeOptions[2].textContent = getText("userTypeStaff");
+      messageLabel.textContent = getText("message");
+      messageInput.setAttribute("placeholder", getText("messagePlaceholder"));
+      submitButton.textContent = submitButton.disabled ? getText("sending") : getText("send");
+      cancelButton.textContent = getText("close");
+      renderAssistantIdentity();
+    }
+
+    function setOpen(isOpen) {
+      panel.classList.toggle("open", isOpen);
+      panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+      if (isOpen) {
+        renderWidgetText();
+        renderSession();
+        clearStatus();
+      } else {
+        currentAssistantName = "";
+      }
+    }
+
+    toggleButton.addEventListener("click", () => {
+      setOpen(!panel.classList.contains("open"));
+    });
+
+    closeButton.addEventListener("click", () => {
+      setOpen(false);
+    });
+
+    cancelButton.addEventListener("click", () => {
+      setOpen(false);
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      clearStatus();
+
+      const session = renderSession();
+      const formData = new FormData(form);
+      const payload = {
+        userId: session?.userId || "",
+        name: session?.name || String(formData.get("name") || "").trim(),
+        email: session?.email || String(formData.get("email") || "").trim().toLowerCase(),
+        phone: String(formData.get("phone") || "").trim(),
+        role: session?.role || "",
+        userType: session?.userType || String(formData.get("userType") || "").trim(),
+        message: String(formData.get("message") || "").trim(),
+        sourcePage: `${window.location.pathname || "/"}${window.location.search || ""}`,
+        priority: "Normal",
+      };
+
+      if (!payload.name || !payload.email || !payload.message || (!payload.role && !payload.userType)) {
+        showStatus(getText("requiredFields"), "error");
         return;
       }
 
-      form.reset();
-      renderSession();
-      showStatus(getText("sentSuccess"), "success");
-    } catch (error) {
-      console.error("Support widget submit error:", error);
-      showStatus(getText("serverFailed"), "error");
-    } finally {
-      submitButton.disabled = false;
-      submitButton.textContent = getText("send");
-    }
-  });
+      submitButton.disabled = true;
+      submitButton.textContent = getText("sending");
 
-  document.querySelectorAll("[data-language-option]").forEach((button) => {
-    button.addEventListener("click", () => {
+      try {
+        const response = await fetch("/api/support-message", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) {
+          const errorMessage =
+            getLanguage() === "tr"
+              ? getText("sendFailed")
+              : data.message || getText("sendFailed");
+          showStatus(errorMessage, "error");
+          return;
+        }
+
+        form.reset();
+        renderSession();
+        showStatus(getText("sentSuccess"), "success");
+      } catch (error) {
+        console.error("Support widget submit error:", error);
+        showStatus(getText("serverFailed"), "error");
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = getText("send");
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-language-option]");
+      if (!button) return;
       window.setTimeout(() => {
         currentAssistantName = "";
         renderWidgetText();
         renderSession();
       }, 0);
     });
-  });
 
-  window.addEventListener("storage", (event) => {
-    if (event.key === LANGUAGE_STORAGE_KEY) {
-      currentAssistantName = "";
-      renderWidgetText();
-      renderSession();
-    }
-  });
+    window.addEventListener("storage", (event) => {
+      if (event.key === LANGUAGE_STORAGE_KEY) {
+        currentAssistantName = "";
+        renderWidgetText();
+        renderSession();
+      }
+    });
 
-  renderWidgetText();
-  renderAssistantIdentity();
-  renderSession();
+    renderWidgetText();
+    renderSession();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initWidget, { once: true });
+  } else {
+    initWidget();
+  }
 })();
