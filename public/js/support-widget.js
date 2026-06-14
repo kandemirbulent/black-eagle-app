@@ -8,12 +8,16 @@
   const PUBLIC_WIDGET_PATHS = new Set([
     "/",
     "/index.html",
+    "/login.html",
+    "/mobile-app.html",
     "/about.html",
     "/contact.html",
     "/references.html",
     "/privacy.html",
     "/terms.html",
     "/account-deletion.html",
+    "/customer-logins/customer-login-create.html",
+    "/staff-logins/staff-login-create.html",
   ]);
   const CUSTOMER_PATHS = new Set([
     "/customer-logins/customer-dashboard.html",
@@ -137,13 +141,13 @@
     return (
       path.includes("/admin") ||
       path.includes("/dashboard") ||
-      path === "/login.html" ||
-      path.includes("/customer-logins/") ||
-      path.includes("/staff-logins/") ||
       path === "/payment.html" ||
       path === "/invoice.html" ||
       path === "/order-detail.html" ||
-      path === "/event-detail.html"
+      path === "/event-detail.html" ||
+      path === "/customer-logins/customer-dashboard.html" ||
+      path === "/customer-logins/create-order.html" ||
+      path === "/staff-logins/staff-dashboard.html"
     );
   }
 

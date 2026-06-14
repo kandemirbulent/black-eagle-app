@@ -16,6 +16,7 @@
       "index.nav.howItWorks": "Nasıl Çalışır",
       "index.nav.platform": "Platform",
       "index.nav.standards": "Standartlar",
+      "index.nav.contact": "İletişim",
       "index.nav.terms": "Şartlar",
       "index.nav.login": "Müşteri ve Personel Girişi",
       "index.hero.eyebrow": "Profesyonel Personel",
