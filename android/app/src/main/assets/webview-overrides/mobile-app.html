@@ -277,6 +277,21 @@
   </main>
 
   <script src="/js/unified-login.js"></script>
-  <script src="/js/support-widget.js" defer></script>
+  <script>
+    (() => {
+      const removeLegacyMobileLogo = () => {
+        document.querySelectorAll(".brand-lockup, img[alt='Black Eagle logo']").forEach((node) => {
+          node.remove();
+        });
+      };
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", removeLegacyMobileLogo, { once: true });
+      } else {
+        removeLegacyMobileLogo();
+      }
+    })();
+  </script>
+  <script src="/js/support-widget.js?v=android-webview-20260614-1" defer></script>
 </body>
 </html>
