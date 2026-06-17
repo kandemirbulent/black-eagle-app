@@ -2,6 +2,8 @@
   const STORAGE_KEY = "preferredLanguage";
   const DEFAULT_LANGUAGE = "en";
   const SUPPORTED_LANGUAGES = new Set(["en", "tr"]);
+  const TURKISH_DEFAULT_HOSTS = new Set(["personelyolda.com", "www.personelyolda.com"]);
+  const TURKISH_DOMAIN_TITLE = "Personel Yolda | Personel ve Hizmet Platformu";
 
   const translations = {
     tr: {
@@ -483,9 +485,16 @@
     }
   };
 
+  const getDomainDefaultLanguage = () => {
+    const hostname = window.location.hostname.toLowerCase();
+    return TURKISH_DEFAULT_HOSTS.has(hostname) ? "tr" : DEFAULT_LANGUAGE;
+  };
+
+  const shouldUseTurkishDomainTitle = () => TURKISH_DEFAULT_HOSTS.has(window.location.hostname.toLowerCase());
+
   const getLanguage = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return SUPPORTED_LANGUAGES.has(stored) ? stored : DEFAULT_LANGUAGE;
+    return SUPPORTED_LANGUAGES.has(stored) ? stored : getDomainDefaultLanguage();
   };
 
   const setLanguage = (language) => {
@@ -542,6 +551,10 @@
         element.textContent = element.dataset.i18nDefaultTitle;
       }
     });
+
+    if (shouldUseTurkishDomainTitle()) {
+      document.title = TURKISH_DOMAIN_TITLE;
+    }
 
     document.querySelectorAll("[data-i18n-aria-label]").forEach((element) => {
       const key = element.dataset.i18nAriaLabel;
