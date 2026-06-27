@@ -6,9 +6,9 @@ const {
   calculateOrderFinancials,
 } = require("../utils/order-utils");
 
-test("calculateLineTotal prefers explicit total or computes from quantity, hours and rate", () => {
-  assert.equal(calculateLineTotal({ quantity: 2, hours: 5, rate: 15 }), 150);
-  assert.equal(calculateLineTotal({ quantity: 2, hours: 5, rate: 15, total: 99 }), 99);
+test("calculateLineTotal applies minimum-hour billing for hourly services", () => {
+  assert.equal(calculateLineTotal({ quantity: 2, hours: 5, rate: 15 }), 180);
+  assert.equal(calculateLineTotal({ quantity: 2, hours: 5, rate: 15, total: 99 }), 180);
 });
 
 test("calculateOrderFinancials computes subtotal, vat and totalWithVat from staff rows", () => {
@@ -22,12 +22,12 @@ test("calculateOrderFinancials computes subtotal, vat and totalWithVat from staf
 
   assert.deepEqual(
     result.staff.map((item) => item.total),
-    [150, 160]
+    [180, 160]
   );
-  assert.equal(result.subtotalAmount, 310);
-  assert.equal(result.totalAmount, 310);
-  assert.equal(result.vatAmount, 62);
-  assert.equal(result.totalWithVat, 372);
+  assert.equal(result.subtotalAmount, 340);
+  assert.equal(result.totalAmount, 340);
+  assert.equal(result.vatAmount, 68);
+  assert.equal(result.totalWithVat, 408);
 });
 
 test("calculateOrderFinancials preserves provided totals when they already exist", () => {
@@ -44,4 +44,16 @@ test("calculateOrderFinancials preserves provided totals when they already exist
   assert.equal(result.totalAmount, 450);
   assert.equal(result.vatAmount, 90);
   assert.equal(result.totalWithVat, 540);
+});
+
+test("calculateOrderFinancials supports manual daily-priced line items", () => {
+  const result = calculateOrderFinancials({
+    staff: [{ service: "Waiter", quantity: 3, days: 2, hours: 8, rate: 120, pricingUnit: "day" }],
+    vatRate: 0.2,
+  });
+
+  assert.equal(result.staff[0].total, 720);
+  assert.equal(result.subtotalAmount, 720);
+  assert.equal(result.vatAmount, 144);
+  assert.equal(result.totalWithVat, 864);
 });

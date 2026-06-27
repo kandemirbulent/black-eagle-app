@@ -63,10 +63,14 @@ test("serializeCustomer keeps public fields and excludes sensitive ones", () => 
     companyNumber: "",
     companyHouseNumber: "",
     utrNumber: "",
+    heardAboutUs: "",
     status: "approved",
     approvedAt: null,
     createdAt: null,
     notes: "",
+    createdByAdmin: false,
+    adminCreatedAt: null,
+    createdBySuperAdminEmail: "",
     eventDate: null,
   });
 });

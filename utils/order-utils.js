@@ -6,14 +6,36 @@ const CLEANING_SERVICES = new Set([
   "Window Cleaner",
 ]);
 
+const STANDARD_SHIFT_HOURS = 8;
+
 function getMinimumHoursForService(service = "") {
   return CLEANING_SERVICES.has(String(service || "").trim()) ? 3 : 6;
 }
 
 function normalizeStaffLineItem(item = {}) {
   const quantity = Number(item.quantity || 0);
-  const requestedHours = Number(item.hours || item.originalHours || 0);
   const rate = Number(item.rate || 0);
+  const requestedDays = Number(item.days || 0);
+  const pricingUnit = String(item.pricingUnit || "").trim().toLowerCase();
+
+  if (pricingUnit === "day" || requestedDays > 0) {
+    const billableDays = Math.max(requestedDays, 1);
+    const total = Number((quantity * billableDays * rate).toFixed(2));
+
+    return {
+      ...item,
+      quantity,
+      days: billableDays,
+      hours: Number(item.hours || STANDARD_SHIFT_HOURS) || STANDARD_SHIFT_HOURS,
+      originalHours:
+        Number(item.originalHours || STANDARD_SHIFT_HOURS) || STANDARD_SHIFT_HOURS,
+      rate,
+      pricingUnit: "day",
+      total,
+    };
+  }
+
+  const requestedHours = Number(item.hours || item.originalHours || 0);
   const minimumHours = getMinimumHoursForService(item.service);
   const billableHours = Math.max(requestedHours, minimumHours);
   const total = Number((quantity * billableHours * rate).toFixed(2));
@@ -21,10 +43,12 @@ function normalizeStaffLineItem(item = {}) {
   return {
     ...item,
     quantity,
+    days: Number(item.days || 0) > 0 ? Number(item.days) : 1,
     hours: billableHours,
     originalHours:
       Number.isFinite(requestedHours) && requestedHours > 0 ? requestedHours : billableHours,
     rate,
+    pricingUnit: pricingUnit || "hour",
     total,
   };
 }
@@ -81,6 +105,7 @@ function calculateOrderFinancials(orderLike = {}) {
 
 module.exports = {
   CLEANING_SERVICES,
+  STANDARD_SHIFT_HOURS,
   calculateLineTotal,
   calculateOrderFinancials,
   getMinimumHoursForService,

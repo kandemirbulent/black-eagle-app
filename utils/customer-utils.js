@@ -41,10 +41,14 @@ function serializeCustomer(customer) {
     companyNumber: source.companyNumber || "",
     companyHouseNumber: source.companyHouseNumber || "",
     utrNumber: source.utrNumber || "",
+    heardAboutUs: source.heardAboutUs || "",
     status: source.status || "pending",
     approvedAt: source.approvedAt || null,
     createdAt: source.createdAt || null,
     notes: source.notes || "",
+    createdByAdmin: Boolean(source.createdByAdmin),
+    adminCreatedAt: source.adminCreatedAt || null,
+    createdBySuperAdminEmail: source.createdBySuperAdminEmail || "",
     eventDate: source.eventDate || null,
   };
 }
