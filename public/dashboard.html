@@ -599,6 +599,18 @@
             <input id="staffCityFilter" type="text" placeholder="City" />
           </div>
           <div>
+            <label for="staffEmailFilter">Email</label>
+            <input id="staffEmailFilter" type="text" placeholder="Email" />
+          </div>
+          <div>
+            <label for="staffMobileFilter">Phone</label>
+            <input id="staffMobileFilter" type="text" placeholder="Phone" />
+          </div>
+          <div>
+            <label for="staffRoleFilter">Role</label>
+            <input id="staffRoleFilter" type="text" placeholder="Role" />
+          </div>
+          <div>
             <label for="staffRegionFilter">Region</label>
             <input id="staffRegionFilter" type="text" placeholder="Region" />
           </div>
@@ -614,6 +626,54 @@
               <option value="pending">Pending</option>
               <option value="inactive">Inactive</option>
               <option value="rejected">Rejected</option>
+            </select>
+          </div>
+          <div>
+            <label for="staffPostcodeFilter">Postcode</label>
+            <input id="staffPostcodeFilter" type="text" placeholder="Postcode" />
+          </div>
+          <div>
+            <label for="staffBankFilter">Bank details</label>
+            <select id="staffBankFilter">
+              <option value="">All</option>
+              <option value="true">Missing</option>
+              <option value="false">Complete</option>
+            </select>
+          </div>
+          <div>
+            <label for="staffCreatedFrom">Created from</label>
+            <input id="staffCreatedFrom" type="date" />
+          </div>
+          <div>
+            <label for="staffCreatedTo">Created to</label>
+            <input id="staffCreatedTo" type="date" />
+          </div>
+          <div>
+            <label for="staffSortBy">Sort by</label>
+            <select id="staffSortBy">
+              <option value="createdAt">Created</option>
+              <option value="firstName">First name</option>
+              <option value="lastName">Last name</option>
+              <option value="email">Email</option>
+              <option value="status">Status</option>
+              <option value="city">City</option>
+              <option value="postcode">Postcode</option>
+            </select>
+          </div>
+          <div>
+            <label for="staffSortOrder">Order</label>
+            <select id="staffSortOrder">
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </div>
+          <div>
+            <label for="staffPageSize">Rows</label>
+            <select id="staffPageSize">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
             </select>
           </div>
         </div>
@@ -664,6 +724,11 @@
               <tr><td colspan="11">Run report to load staff data.</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="btn-row" style="margin-top:14px; align-items:center;">
+          <button type="button" class="btn btn-secondary" id="staffPreviousPage">Previous</button>
+          <span id="staffPageSummary" class="subtle">Page 1 of 1</span>
+          <button type="button" class="btn btn-secondary" id="staffNextPage">Next</button>
         </div>
       </section>
 
@@ -829,6 +894,19 @@
         </div>
       </div>
 
+      <div id="staffDetailsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="staffDetailsModalTitle">
+        <div class="modal-panel">
+          <div class="modal-header">
+            <div>
+              <h3 id="staffDetailsModalTitle" class="modal-title">Staff Details</h3>
+              <p class="subtle">Superadmin-only personnel information</p>
+            </div>
+            <button type="button" class="icon-button" id="closeStaffDetailsModal" aria-label="Close staff details">&times;</button>
+          </div>
+          <div id="staffDetailsContent"></div>
+        </div>
+      </div>
+
       <section id="adminManagementSection" class="section hidden">
         <h2>Admin Management</h2>
         <div class="form-grid">
@@ -901,12 +979,16 @@
     const manualAdminResult = document.getElementById("manualAdminResult");
     const supportMessageModal = document.getElementById("supportMessageModal");
     const closeSupportMessageModalButton = document.getElementById("closeSupportMessageModal");
+    const staffDetailsModal = document.getElementById("staffDetailsModal");
+    const closeStaffDetailsModalButton = document.getElementById("closeStaffDetailsModal");
 
     let currentAdmin = null;
     let dashboardSummary = null;
     let customersCache = [];
     let ordersCache = [];
     let staffRows = [];
+    let currentStaffPage = 1;
+    let staffPagination = { page: 1, totalPages: 1, totalItems: 0, limit: 25 };
     let allStaffCache = [];
     let supportMessagesCache = [];
     let manualOrderLineItems = [];
@@ -1019,6 +1101,13 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+    }
+
+    function createTextElement(tagName, value, className = "") {
+      const element = document.createElement(tagName);
+      element.textContent = value == null || value === "" ? "-" : String(value);
+      if (className) element.className = className;
+      return element;
     }
 
     function getManualServiceDefinition(service) {
@@ -1409,15 +1498,22 @@
     function renderCountMap(targetId, mapObject) {
       const tbody = document.getElementById(targetId);
       const entries = Object.entries(mapObject || {}).sort((a, b) => b[1] - a[1]);
+      tbody.replaceChildren();
 
       if (!entries.length) {
-        tbody.innerHTML = "<tr><td colspan='2'>No data available.</td></tr>";
+        const row = document.createElement("tr");
+        const cell = createTextElement("td", "No data available.");
+        cell.colSpan = 2;
+        row.appendChild(cell);
+        tbody.appendChild(row);
         return;
       }
 
-      tbody.innerHTML = entries
-        .map(([label, count]) => `<tr><td>${label}</td><td>${count}</td></tr>`)
-        .join("");
+      entries.forEach(([label, count]) => {
+        const row = document.createElement("tr");
+        row.append(createTextElement("td", label), createTextElement("td", count));
+        tbody.appendChild(row);
+      });
     }
 
     async function loadCurrentAdmin() {
@@ -1437,6 +1533,8 @@
         adminNavButton.classList.remove("hidden");
         supportMessagesSection.classList.remove("hidden");
         supportMessagesNavButton.classList.remove("hidden");
+      } else {
+        document.getElementById("downloadCsvButton").classList.add("hidden");
       }
     }
 
@@ -1558,70 +1656,140 @@
       `).join("");
     }
 
-    async function runStaffReport() {
+    function buildStaffReportParams({ csv = false } = {}) {
       const params = new URLSearchParams();
-      const search = document.getElementById("staffSearch").value.trim();
-      const city = document.getElementById("staffCityFilter").value.trim();
-      const region = document.getElementById("staffRegionFilter").value.trim();
-      const position = document.getElementById("staffProfessionFilter").value.trim();
-      const status = document.getElementById("staffStatusFilter").value;
+      const fields = {
+        search: "staffSearch",
+        email: "staffEmailFilter",
+        mobile: "staffMobileFilter",
+        role: "staffRoleFilter",
+        city: "staffCityFilter",
+        region: "staffRegionFilter",
+        position: "staffProfessionFilter",
+        status: "staffStatusFilter",
+        postcode: "staffPostcodeFilter",
+        bankDetailsMissing: "staffBankFilter",
+        createdFrom: "staffCreatedFrom",
+        createdTo: "staffCreatedTo",
+        sortBy: "staffSortBy",
+        sortOrder: "staffSortOrder",
+      };
 
-      if (search) params.set("search", search);
-      if (city) params.set("city", city);
-      if (region) params.set("region", region);
-      if (position) params.set("position", position);
-      if (status) params.set("status", status);
+      Object.entries(fields).forEach(([key, elementId]) => {
+        const value = document.getElementById(elementId).value.trim();
+        if (value) params.set(key, value);
+      });
 
-      const response = await authFetch(`/admin/staff-report?${params.toString()}`);
-      const data = await response.json();
-      staffRows = Array.isArray(data.rows) ? data.rows : [];
+      if (csv) {
+        params.set("format", "csv");
+      } else {
+        params.set("page", String(currentStaffPage));
+        params.set("limit", document.getElementById("staffPageSize").value);
+      }
 
-      renderCountMap("filteredStaffByCityTable", data.summary?.byCity || {});
-      renderCountMap("filteredStaffByProfessionTable", data.summary?.byProfession || {});
+      return params;
+    }
 
+    function appendStaffCell(rowElement, value, className = "") {
+      rowElement.appendChild(createTextElement("td", value, className));
+    }
+
+    function renderStaffRows() {
       const tbody = document.getElementById("staffReportTable");
+      tbody.replaceChildren();
 
       if (!staffRows.length) {
-        tbody.innerHTML = "<tr><td colspan='11'>No staff matched the selected filters.</td></tr>";
+        const row = document.createElement("tr");
+        const cell = createTextElement("td", "No staff matched the selected filters.");
+        cell.colSpan = 11;
+        row.appendChild(cell);
+        tbody.appendChild(row);
         return;
       }
 
-      tbody.innerHTML = staffRows.map((row) => `
-        <tr>
-          <td>${row.fullName || "-"}</td>
-          <td>${row.email || "-"}</td>
-          <td>${row.mobile || "-"}</td>
-          <td>${row.city || "-"}</td>
-          <td>${row.region || "-"}</td>
-          <td>${row.postcode || "-"}</td>
-          <td>${row.address || "-"}</td>
-          <td>${row.profession || "-"}</td>
-          <td><span class="tag">${row.status || "-"}</span></td>
-          <td>${formatDate(row.createdAt)}</td>
-          <td>
-            <div class="btn-row">
-              ${canDelete() ? `<button type="button" class="btn btn-danger" onclick="deleteStaff('${row.staffId}')">Delete</button>` : `<span class="subtle">View only</span>`}
-            </div>
-          </td>
-        </tr>
-      `).join("");
+      staffRows.forEach((staffRow) => {
+        const row = document.createElement("tr");
+        const nameCell = document.createElement("td");
+
+        if (canDelete()) {
+          const nameButton = document.createElement("button");
+          nameButton.type = "button";
+          nameButton.className = "btn btn-muted";
+          nameButton.textContent = staffRow.fullName || "-";
+          nameButton.addEventListener("click", async () => {
+            try {
+              await openStaffDetails(staffRow.staffId);
+            } catch (error) {
+              showMessage(error.message || "Could not load staff details.", "error");
+            }
+          });
+          nameCell.appendChild(nameButton);
+        } else {
+          nameCell.textContent = staffRow.fullName || "-";
+        }
+
+        row.appendChild(nameCell);
+        appendStaffCell(row, staffRow.email);
+        appendStaffCell(row, staffRow.mobile);
+        appendStaffCell(row, staffRow.city);
+        appendStaffCell(row, staffRow.region);
+        appendStaffCell(row, staffRow.postcode);
+        appendStaffCell(row, staffRow.address);
+        appendStaffCell(row, staffRow.profession);
+
+        const statusCell = document.createElement("td");
+        statusCell.appendChild(createTextElement("span", staffRow.status, "tag"));
+        row.appendChild(statusCell);
+        appendStaffCell(row, formatDate(staffRow.createdAt));
+
+        const actionsCell = document.createElement("td");
+        if (canDelete()) {
+          const deleteButton = document.createElement("button");
+          deleteButton.type = "button";
+          deleteButton.className = "btn btn-danger";
+          deleteButton.textContent = "Delete";
+          deleteButton.addEventListener("click", () => window.deleteStaff(staffRow.staffId));
+          actionsCell.appendChild(deleteButton);
+        } else {
+          actionsCell.appendChild(createTextElement("span", "View only", "subtle"));
+        }
+        row.appendChild(actionsCell);
+        tbody.appendChild(row);
+      });
+    }
+
+    function updateStaffPagination() {
+      const summary = document.getElementById("staffPageSummary");
+      summary.textContent = `Page ${staffPagination.page} of ${staffPagination.totalPages} (${staffPagination.totalItems} staff)`;
+      document.getElementById("staffPreviousPage").disabled = staffPagination.page <= 1;
+      document.getElementById("staffNextPage").disabled = staffPagination.page >= staffPagination.totalPages;
+    }
+
+    async function runStaffReport({ resetPage = false } = {}) {
+      if (resetPage) currentStaffPage = 1;
+      const params = buildStaffReportParams();
+
+      const response = await authFetch(`/admin/staff-report?${params.toString()}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Could not load staff report.");
+      staffRows = Array.isArray(data.rows) ? data.rows : [];
+      staffPagination = data.pagination || staffPagination;
+      currentStaffPage = staffPagination.page || 1;
+
+      renderCountMap("filteredStaffByCityTable", data.summary?.byCity || {});
+      renderCountMap("filteredStaffByProfessionTable", data.summary?.byProfession || {});
+      renderStaffRows();
+      updateStaffPagination();
     }
 
     async function downloadStaffCsv() {
-      const params = new URLSearchParams({ format: "csv" });
-      const search = document.getElementById("staffSearch").value.trim();
-      const city = document.getElementById("staffCityFilter").value.trim();
-      const region = document.getElementById("staffRegionFilter").value.trim();
-      const position = document.getElementById("staffProfessionFilter").value.trim();
-      const status = document.getElementById("staffStatusFilter").value;
-
-      if (search) params.set("search", search);
-      if (city) params.set("city", city);
-      if (region) params.set("region", region);
-      if (position) params.set("position", position);
-      if (status) params.set("status", status);
+      const params = buildStaffReportParams({ csv: true });
 
       const response = await authFetch(`/admin/staff-report?${params.toString()}`);
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Could not export CSV.");
+      }
       const csvText = await response.text();
       const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
@@ -1632,6 +1800,112 @@
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+    }
+
+    function closeStaffDetailsModal() {
+      staffDetailsModal.classList.add("hidden");
+      document.getElementById("staffDetailsContent").replaceChildren();
+    }
+
+    function createDetailCard(label, value) {
+      const card = document.createElement("div");
+      card.className = "support-detail-card";
+      card.append(createTextElement("strong", label), createTextElement("div", value));
+      return card;
+    }
+
+    function createWorkSection(title, workItems) {
+      const section = document.createElement("div");
+      section.className = "support-message-full";
+      section.appendChild(createTextElement("strong", title));
+
+      if (!Array.isArray(workItems) || !workItems.length) {
+        section.appendChild(createTextElement("div", "No records available."));
+        return section;
+      }
+
+      const list = document.createElement("ul");
+      workItems.forEach((item) => {
+        const event = item.event || {};
+        const text = [
+          event.title || "Event",
+          formatDate(event.eventDate),
+          item.role || "",
+          item.status || "",
+          event.location || "",
+        ].filter(Boolean).join(" | ");
+        list.appendChild(createTextElement("li", text));
+      });
+      section.appendChild(list);
+      return section;
+    }
+
+    function renderStaffDetails(staff) {
+      const content = document.getElementById("staffDetailsContent");
+      content.replaceChildren();
+      document.getElementById("staffDetailsModalTitle").textContent = staff.fullName || "Staff Details";
+
+      const grid = document.createElement("div");
+      grid.className = "support-detail-grid";
+      const bank = staff.bankDetails || {};
+      const emergency = staff.emergencyContact || {};
+      const details = [
+        ["Name", staff.fullName], ["Email", staff.email], ["Phone", staff.mobile],
+        ["Address", staff.address], ["City", staff.city], ["Postcode", staff.postcode],
+        ["Role", staff.role], ["Positions", (staff.positions || []).join(", ")],
+        ["Status", staff.status], ["Approval", staff.approvalStatus],
+        ["Verification", staff.verificationStatus],
+        ["Active", staff.isActive ? "Yes" : "No"], ["NI number", staff.niNumber],
+        ["Date of birth", formatDate(staff.dob)], ["Availability", staff.availability],
+        ["Experience", staff.experience], ["Emergency contact", emergency.name],
+        ["Emergency phone", emergency.phone], ["Bank details", bank.hasBankDetails ? "Saved (masked)" : "Missing"],
+        ["Account holder", bank.accountHolder], ["Bank name", bank.bankName],
+        ["Sort code", bank.sortCode], ["Account number", bank.accountNumber],
+        ["IBAN", bank.iban], ["Worked hours", staff.workedHours],
+        ["Hourly rate", staff.hourlyRate], ["Total earnings", staff.totalEarnings],
+        ["Pending payment", staff.pendingPayment], ["Completed payments", staff.completedPayments],
+        ["Notes", staff.notes], ["Created", formatDateTime(staff.createdAt)],
+        ["Updated", formatDateTime(staff.updatedAt)],
+      ];
+      details.forEach(([label, value]) => grid.appendChild(createDetailCard(label, value)));
+      content.appendChild(grid);
+
+      if (/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(String(staff.selfieData || ""))) {
+        const photoSection = document.createElement("div");
+        photoSection.className = "support-message-full";
+        photoSection.appendChild(createTextElement("strong", "Uploaded staff photo"));
+        const photo = document.createElement("img");
+        photo.src = staff.selfieData;
+        photo.alt = "Uploaded staff photo";
+        photo.style.maxWidth = "220px";
+        photo.style.maxHeight = "220px";
+        photo.style.objectFit = "cover";
+        photoSection.appendChild(photo);
+        content.appendChild(photoSection);
+      }
+
+      content.append(
+        createWorkSection("Upcoming work", staff.upcomingWork),
+        createWorkSection("Past work", staff.pastWork)
+      );
+    }
+
+    async function openStaffDetails(staffId) {
+      if (!canDelete()) {
+        throw new Error("Superadmin access is required.");
+      }
+
+      const content = document.getElementById("staffDetailsContent");
+      content.replaceChildren(createTextElement("p", "Loading staff details..."));
+      staffDetailsModal.classList.remove("hidden");
+
+      const response = await authFetch(`/admin/staff/${encodeURIComponent(staffId)}/details`);
+      const data = await response.json();
+      if (!response.ok) {
+        closeStaffDetailsModal();
+        throw new Error(data.message || "Could not load staff details.");
+      }
+      renderStaffDetails(data.staff || {});
     }
 
     async function loadAdminUsers() {
@@ -1888,6 +2162,7 @@
     document.getElementById("logoutButton").addEventListener("click", logout);
     closeManualAdminModalButton.addEventListener("click", closeManualAdminModal);
     closeSupportMessageModalButton.addEventListener("click", closeSupportMessageModal);
+    closeStaffDetailsModalButton.addEventListener("click", closeStaffDetailsModal);
     manualAdminModal.addEventListener("click", (event) => {
       if (event.target === manualAdminModal) {
         closeManualAdminModal();
@@ -1898,12 +2173,18 @@
         closeSupportMessageModal();
       }
     });
+    staffDetailsModal.addEventListener("click", (event) => {
+      if (event.target === staffDetailsModal) closeStaffDetailsModal();
+    });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !manualAdminModal.classList.contains("hidden")) {
         closeManualAdminModal();
       }
       if (event.key === "Escape" && !supportMessageModal.classList.contains("hidden")) {
         closeSupportMessageModal();
+      }
+      if (event.key === "Escape" && !staffDetailsModal.classList.contains("hidden")) {
+        closeStaffDetailsModal();
       }
     });
     document.getElementById("openManualCustomerButton").addEventListener("click", () => {
@@ -1937,10 +2218,20 @@
     });
     document.getElementById("runReportButton").addEventListener("click", async () => {
       try {
-        await runStaffReport();
+        await runStaffReport({ resetPage: true });
       } catch (error) {
         showMessage(error.message || "Could not run staff report.", "error");
       }
+    });
+    document.getElementById("staffPreviousPage").addEventListener("click", async () => {
+      if (currentStaffPage <= 1) return;
+      currentStaffPage -= 1;
+      try { await runStaffReport(); } catch (error) { showMessage(error.message, "error"); }
+    });
+    document.getElementById("staffNextPage").addEventListener("click", async () => {
+      if (currentStaffPage >= staffPagination.totalPages) return;
+      currentStaffPage += 1;
+      try { await runStaffReport(); } catch (error) { showMessage(error.message, "error"); }
     });
     document.getElementById("downloadCsvButton").addEventListener("click", async () => {
       try {

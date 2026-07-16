@@ -41,6 +41,14 @@ const {
   getStaffLocationSummary,
 } = require("./utils/staff-utils");
 const {
+  escapeRegex,
+  hasCompleteBankDetails,
+  isSuperAdminUser,
+  parseBooleanFilter,
+  parseStaffListOptions,
+  serializeMaskedBankDetails,
+} = require("./utils/admin-staff-utils");
+const {
   SUPPORT_MESSAGE_PRIORITIES,
   SUPPORT_MESSAGE_STATUSES,
   validateSupportMessageInput,
@@ -438,7 +446,7 @@ async function requireAdminAuth(req, res, next) {
 }
 
 function requireSuperAdmin(req, res, next) {
-  if (!req.adminUser || req.adminUser.role !== "superadmin") {
+  if (!isSuperAdminUser(req.adminUser)) {
     return res.status(403).json({
       success: false,
       message: "Superadmin access is required.",
@@ -2083,24 +2091,39 @@ app.get("/admin/customer-orders/:applicationId", requireAdminAuth, async (req, r
 app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
   try {
     const search = String(req.query.search || "").trim();
+    const email = String(req.query.email || "").trim();
+    const mobile = String(req.query.mobile || "").trim();
+    const role = String(req.query.role || "").trim().toLowerCase();
     const status = String(req.query.status || "").trim().toLowerCase();
     const position = String(req.query.position || "").trim();
     const city = String(req.query.city || "").trim().toLowerCase();
     const region = String(req.query.region || "").trim().toLowerCase();
+    const postcode = String(req.query.postcode || "").trim();
+    const createdFrom = String(req.query.createdFrom || "").trim();
+    const createdTo = String(req.query.createdTo || "").trim();
+    const bankDetailsMissing = parseBooleanFilter(req.query.bankDetailsMissing);
     const format = String(req.query.format || "json").trim().toLowerCase();
-    const filter = {};
+    const { page, limit, sortBy, sortOrder, paginationRequested } =
+      parseStaffListOptions(req.query);
+    const filterParts = [];
 
     if (status) {
-      filter.status = status;
+      filterParts.push({ status });
+    }
+
+    if (role) {
+      filterParts.push({ role });
     }
 
     if (position) {
-      filter.positions = position;
+      filterParts.push({
+        positions: new RegExp(`^${escapeRegex(position)}$`, "i"),
+      });
     }
 
     if (search) {
-      const searchRegex = new RegExp(search, "i");
-      filter.$or = [
+      const searchRegex = new RegExp(escapeRegex(search), "i");
+      filterParts.push({ $or: [
         { firstName: searchRegex },
         { lastName: searchRegex },
         { name: searchRegex },
@@ -2109,12 +2132,90 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
         { postcode: searchRegex },
         { address: searchRegex },
         { positions: searchRegex },
-      ];
+      ] });
     }
 
-    const [staffMembers, applicationStats, assignmentStats] = await Promise.all([
-      Staff.find(filter).sort({ createdAt: -1 }).lean(),
+    if (email) {
+      filterParts.push({ email: new RegExp(escapeRegex(email), "i") });
+    }
+
+    if (mobile) {
+      filterParts.push({ mobile: new RegExp(escapeRegex(mobile), "i") });
+    }
+
+    if (postcode) {
+      filterParts.push({ postcode: new RegExp(escapeRegex(postcode), "i") });
+    }
+
+    if (city) {
+      const cityRegex = new RegExp(escapeRegex(city), "i");
+      filterParts.push({ $or: [{ city: cityRegex }, { address: cityRegex }] });
+    }
+
+    if (region) {
+      filterParts.push({ address: new RegExp(escapeRegex(region), "i") });
+    }
+
+    const createdAt = {};
+    const fromDate = createdFrom ? new Date(createdFrom) : null;
+    const toDate = createdTo ? new Date(createdTo) : null;
+    if (fromDate && !Number.isNaN(fromDate.getTime())) createdAt.$gte = fromDate;
+    if (toDate && !Number.isNaN(toDate.getTime())) {
+      toDate.setHours(23, 59, 59, 999);
+      createdAt.$lte = toDate;
+    }
+    if (Object.keys(createdAt).length) filterParts.push({ createdAt });
+
+    if (bankDetailsMissing === true) {
+      filterParts.push({ $or: [
+        { "bankDetails.accountHolder": { $exists: false } },
+        { "bankDetails.accountHolder": "" },
+        { "bankDetails.sortCode": { $exists: false } },
+        { "bankDetails.sortCode": "" },
+        { "bankDetails.accountNumber": { $exists: false } },
+        { "bankDetails.accountNumber": "" },
+      ] });
+    } else if (bankDetailsMissing === false) {
+      filterParts.push({
+        "bankDetails.accountHolder": { $nin: [null, ""] },
+        "bankDetails.sortCode": { $nin: [null, ""] },
+        "bankDetails.accountNumber": { $nin: [null, ""] },
+      });
+    }
+
+    const filter = filterParts.length ? { $and: filterParts } : {};
+    const safeProjection = {
+      name: 1, firstName: 1, lastName: 1, email: 1, mobile: 1, role: 1,
+      status: 1, positions: 1, postcode: 1, city: 1, address: 1,
+      addressLine1: 1, addressLine2: 1, experience: 1, averageRating: 1,
+      feedbackCount: 1, createdAt: 1, bankDetails: 1,
+    };
+
+    if (format === "csv" && req.adminUser.role !== "superadmin") {
+      return res.status(403).json({
+        success: false,
+        message: "Superadmin access is required for CSV export.",
+      });
+    }
+
+    const staffQuery = Staff.find(filter, safeProjection)
+      .sort({ [sortBy]: sortOrder, _id: sortOrder });
+    if (format !== "csv" && paginationRequested) {
+      staffQuery.skip((page - 1) * limit).limit(limit);
+    }
+
+    const [totalCount, staffMembers, summaryMembers] = await Promise.all([
+      Staff.countDocuments(filter),
+      staffQuery.lean(),
+      Staff.find(filter, {
+        positions: 1, city: 1, address: 1, addressLine1: 1, addressLine2: 1,
+      }).lean(),
+    ]);
+
+    const staffIds = staffMembers.map((item) => item._id);
+    const [applicationStats, assignmentStats] = await Promise.all([
       EventApplication.aggregate([
+        { $match: { staff: { $in: staffIds } } },
         {
           $group: {
             _id: "$staff",
@@ -2128,6 +2229,7 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
         },
       ]),
       EventAssignment.aggregate([
+        { $match: { staff: { $in: staffIds } } },
         {
           $group: {
             _id: "$staff",
@@ -2161,6 +2263,7 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
           `${staffMember.firstName || ""} ${staffMember.lastName || ""}`.trim(),
         email: staffMember.email || "",
         mobile: staffMember.mobile || "",
+        role: staffMember.role || "staff",
         status: staffMember.status || "",
         profession: Array.isArray(staffMember.positions)
           ? staffMember.positions.join(", ")
@@ -2176,28 +2279,25 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
         approvedApplicationsCount: Number(applicationRow.approvedApplicationsCount || 0),
         assignmentsCount: Number(assignmentRow.assignmentsCount || 0),
         completedAssignmentsCount: Number(assignmentRow.completedAssignmentsCount || 0),
+        bankDetailsMissing: !hasCompleteBankDetails(staffMember.bankDetails),
         createdAt: staffMember.createdAt || null,
       };
-    }).filter((row) => {
-      if (city && String(row.city || "").trim().toLowerCase() !== city) return false;
-      if (region && String(row.region || "").trim().toLowerCase() !== region) return false;
-      return true;
     });
 
     const summary = {
-      totalStaff: rows.length,
+      totalStaff: totalCount,
       byProfession: {},
       byCity: {},
     };
 
-    for (const row of rows) {
-      const cityKey = row.city || "Unknown";
+    for (const staffMember of summaryMembers) {
+      const location = getStaffLocationSummary(staffMember);
+      const cityKey = location.city || "Unknown";
       summary.byCity[cityKey] = Number(summary.byCity[cityKey] || 0) + 1;
 
-      const professionList = String(row.profession || "")
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
+      const professionList = Array.isArray(staffMember.positions)
+        ? staffMember.positions.map((item) => String(item || "").trim()).filter(Boolean)
+        : [];
 
       if (!professionList.length) {
         summary.byProfession.Unknown = Number(summary.byProfession.Unknown || 0) + 1;
@@ -2223,6 +2323,14 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
       count: rows.length,
       summary,
       rows,
+      pagination: {
+        page,
+        limit: paginationRequested ? limit : totalCount,
+        totalItems: totalCount,
+        totalPages: paginationRequested
+          ? Math.max(Math.ceil(totalCount / limit), 1)
+          : 1,
+      },
     });
   } catch (error) {
     console.error("❌ Error generating staff report:", error);
@@ -2232,6 +2340,133 @@ app.get("/admin/staff-report", requireAdminAuth, async (req, res) => {
     });
   }
 });
+
+app.get(
+  "/admin/staff/:id/details",
+  requireAdminAuth,
+  requireSuperAdmin,
+  async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+
+    try {
+      if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Valid staff ID is required.",
+        });
+      }
+
+      const staffMember = await Staff.findById(req.params.id, {
+        name: 1, firstName: 1, lastName: 1, email: 1, mobile: 1,
+        address: 1, addressLine1: 1, addressLine2: 1, city: 1, postcode: 1,
+        role: 1, positions: 1, status: 1, isVerified: 1, isPasswordSet: 1,
+        bankDetails: 1, niNumber: 1, dob: 1, emergencyContact: 1,
+        availability: 1, experience: 1, selfieData: 1, averageRating: 1,
+        feedbackCount: 1, createdAt: 1, updatedAt: 1,
+      }).lean();
+
+      if (!staffMember) {
+        return res.status(404).json({
+          success: false,
+          message: "Staff member not found.",
+        });
+      }
+
+      const [applications, assignments] = await Promise.all([
+        EventApplication.find({ staff: staffMember._id }, {
+          role: 1, status: 1, appliedAt: 1, createdAt: 1, event: 1,
+        })
+          .populate({
+            path: "event",
+            select: "title location eventDate startTime endTime status order",
+          })
+          .sort({ createdAt: -1 })
+          .lean(),
+        EventAssignment.find({ staff: staffMember._id }, {
+          role: 1, status: 1, assignedAt: 1, createdAt: 1, event: 1,
+        })
+          .populate({
+            path: "event",
+            select: "title location eventDate startTime endTime status order",
+          })
+          .sort({ createdAt: -1 })
+          .lean(),
+      ]);
+
+      const now = new Date();
+      const serializeWorkItem = (item) => ({
+        id: String(item._id),
+        role: item.role || "",
+        status: item.status || "",
+        event: item.event ? {
+          id: String(item.event._id),
+          title: item.event.title || "",
+          location: item.event.location || "",
+          eventDate: item.event.eventDate || null,
+          startTime: item.event.startTime || "",
+          endTime: item.event.endTime || "",
+          status: item.event.status || "",
+        } : null,
+        createdAt: item.appliedAt || item.assignedAt || item.createdAt || null,
+      });
+      const location = getStaffLocationSummary(staffMember);
+      const workItems = assignments.length ? assignments : applications;
+      const serializedWorkItems = workItems.map(serializeWorkItem);
+
+      return res.json({
+        success: true,
+        staff: {
+          id: String(staffMember._id),
+          fullName: staffMember.name || `${staffMember.firstName || ""} ${staffMember.lastName || ""}`.trim(),
+          firstName: staffMember.firstName || "",
+          lastName: staffMember.lastName || "",
+          email: staffMember.email || "",
+          mobile: staffMember.mobile || "",
+          address: location.address || staffMember.address || "",
+          addressLine1: location.addressLine1 || "",
+          addressLine2: location.addressLine2 || "",
+          city: location.city || "",
+          postcode: staffMember.postcode || "",
+          role: staffMember.role || "staff",
+          positions: Array.isArray(staffMember.positions) ? staffMember.positions : [],
+          status: staffMember.status || "",
+          approvalStatus: "Not available",
+          verificationStatus: staffMember.isVerified ? "verified" : "pending",
+          isActive: staffMember.status === "active",
+          isPasswordSet: Boolean(staffMember.isPasswordSet),
+          bankDetails: serializeMaskedBankDetails(staffMember.bankDetails),
+          niNumber: staffMember.niNumber || "",
+          dob: staffMember.dob || null,
+          emergencyContact: {
+            name: staffMember.emergencyContact?.name || "",
+            phone: staffMember.emergencyContact?.phone || "",
+          },
+          availability: staffMember.availability || "",
+          experience: Number(staffMember.experience || 0),
+          selfieData: staffMember.selfieData || "",
+          averageRating: Number(staffMember.averageRating || 0),
+          feedbackCount: Number(staffMember.feedbackCount || 0),
+          pastWork: serializedWorkItems.filter((item) => item.event?.eventDate && new Date(item.event.eventDate) < now),
+          upcomingWork: serializedWorkItems.filter((item) => item.event?.eventDate && new Date(item.event.eventDate) >= now),
+          workedHours: "Not available",
+          hourlyRate: "Not available",
+          totalEarnings: "Not available",
+          pendingPayment: "Not available",
+          completedPayments: "Not available",
+          notes: "Not available",
+          createdAt: staffMember.createdAt || null,
+          updatedAt: staffMember.updatedAt || null,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Error loading staff details:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Server error while loading staff details.",
+      });
+    }
+  }
+);
 
 async function handleCustomerForgotPassword(req, res) {
   try {
