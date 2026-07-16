@@ -34,6 +34,7 @@ const {
 } = require("./utils/event-utils");
 const {
   calculateOrderFinancials,
+  STANDARD_SHIFT_HOURS,
 } = require("./utils/order-utils");
 const {
   buildStaffAddress,
@@ -899,6 +900,254 @@ async function ensureEventForOrder(order) {
   console.log("✅ Event created for order:", order.orderId);
 }
 
+const MANUAL_ORDER_SERVICE_DEFINITIONS = {
+  Bartender: { label: "Bartender", rate: 27 },
+  Waiter: { label: "Waiter", rate: 18 },
+  Barback: { label: "Barback", rate: 18 },
+  Chef: { label: "Chef", rate: 30 },
+  "Kitchen Assistant": { label: "Kitchen Assistant", rate: 19 },
+  "Event Staff": { label: "Event Staff", rate: 20 },
+  "House Cleaning": { label: "House Cleaning", rate: 19 },
+  "Office Cleaning": { label: "Office Cleaning", rate: 20 },
+  "Deep Cleaning": { label: "Deep Cleaning", rate: 24 },
+  "End of Tenancy Cleaning": { label: "End of Tenancy Cleaning", rate: 26 },
+  "Window Cleaner": { label: "Window Cleaner", rate: 25 },
+  Security: { label: "Security", rate: 24 },
+  "Door Supervisor": { label: "Door Supervisor", rate: 26 },
+  "Event Security": { label: "Event Security", rate: 25 },
+  "Construction Worker": { label: "Construction Worker", rate: 28 },
+  "General Labourer": { label: "General Labourer", rate: 25 },
+  Handyman: { label: "Handyman", rate: 35 },
+  Painter: { label: "Painter", rate: 30 },
+  Electrician: { label: "Electrician", rate: 42 },
+  Plumber: { label: "Plumber", rate: 42 },
+  "Delivery Driver": { label: "Delivery Driver", rate: 20 },
+  "Warehouse Staff": { label: "Warehouse Staff", rate: 19 },
+  "Picker/Packer": { label: "Picker/Packer", rate: 18 },
+  "Care Assistant": { label: "Care Assistant", rate: 22 },
+  "Support Worker": { label: "Support Worker", rate: 23 },
+  "Admin Assistant": { label: "Admin Assistant", rate: 21 },
+  Receptionist: { label: "Receptionist", rate: 20 },
+  "Customer Service": { label: "Customer Service", rate: 20 },
+};
+
+function getManualOrderServiceDefinition(service = "") {
+  const key = String(service || "").trim();
+  return MANUAL_ORDER_SERVICE_DEFINITIONS[key] || {
+    label: key || "Manual Event",
+    rate: 0,
+  };
+}
+
+function normalizeTimeValue(value) {
+  const normalized = String(value || "").trim();
+  return /^\d{2}:\d{2}$/.test(normalized) ? normalized : "";
+}
+
+function addHoursToTime(startTime, hoursToAdd = STANDARD_SHIFT_HOURS) {
+  const normalizedStart = normalizeTimeValue(startTime);
+  if (!normalizedStart) {
+    return "";
+  }
+
+  const [hoursPart, minutesPart] = normalizedStart.split(":").map(Number);
+  const baseMinutes = (hoursPart * 60) + minutesPart;
+  const extraMinutes = Math.round(Number(hoursToAdd || 0) * 60);
+  const totalMinutes = (baseMinutes + extraMinutes) % (24 * 60);
+  const safeMinutes = totalMinutes < 0 ? totalMinutes + (24 * 60) : totalMinutes;
+  const nextHours = Math.floor(safeMinutes / 60);
+  const nextMinutes = safeMinutes % 60;
+
+  return `${String(nextHours).padStart(2, "0")}:${String(nextMinutes).padStart(2, "0")}`;
+}
+
+async function createManualAdminOrderDraft({
+  customer,
+  eventName,
+  location,
+  staff = [],
+  notes,
+  assignedStaffIds = [],
+  providedFinancials = {},
+  paymentStatus = "Awaiting Deposit",
+  orderStatus = "Draft - Awaiting Payment",
+  createdBySuperAdminEmail = "",
+}) {
+  if (!customer?._id) {
+    throw new Error("Customer not found.");
+  }
+
+  const normalizedEventName =
+    String(eventName || "").trim() || customer.companyName || "Manual Event";
+  const normalizedAddress = String(location || customer.companyAddress || "").trim();
+  const normalizedNotes = String(notes || "").trim();
+  const sourceStaff = Array.isArray(staff)
+    ? staff.map((item) => {
+        const serviceDefinition = getManualOrderServiceDefinition(item?.service);
+        const hours = Number(item?.hours || item?.originalHours || 0) || STANDARD_SHIFT_HOURS;
+        return {
+          ...item,
+          service: String(item?.service || "").trim(),
+          displayService: String(item?.displayService || serviceDefinition.label).trim(),
+          quantity: Number(item?.quantity || 0),
+          days: Number(item?.days || 0),
+          hours,
+          originalHours: Number(item?.originalHours || hours),
+          rate: Number(item?.rate || serviceDefinition.rate || 0),
+          pricingUnit: String(item?.pricingUnit || "hour").trim(),
+          total: Number(item?.total || 0),
+          date: String(item?.date || "").trim(),
+          startTime: normalizeTimeValue(item?.startTime),
+          endTime:
+            normalizeTimeValue(item?.endTime) ||
+            addHoursToTime(item?.startTime, hours),
+        };
+      })
+    : [];
+
+  if (!normalizedAddress) {
+    throw new Error("Event venue is required.");
+  }
+
+  if (!sourceStaff.length) {
+    throw new Error("At least one staff line item is required.");
+  }
+
+  const firstStaffLine = sourceStaff[0];
+  const eventDate = new Date(firstStaffLine.date);
+  if (Number.isNaN(eventDate.getTime())) {
+    throw new Error("Event date is invalid.");
+  }
+
+  const assignedStaffIdsList = Array.isArray(assignedStaffIds)
+    ? assignedStaffIds.map((item) => String(item || "").trim()).filter(Boolean)
+    : [];
+
+  let assignedStaff = [];
+
+  if (assignedStaffIdsList.length) {
+    const selectedStaff = await Staff.find({
+      _id: { $in: assignedStaffIdsList },
+      status: "active",
+    }).lean();
+
+    assignedStaff = selectedStaff.map((staffMember) => ({
+      staffId: String(staffMember._id),
+      staffName:
+        staffMember.name ||
+        `${staffMember.firstName || ""} ${staffMember.lastName || ""}`.trim(),
+      city: getStaffLocationSummary(staffMember).city || "",
+      positions: Array.isArray(staffMember.positions) ? staffMember.positions : [],
+    }));
+  }
+
+  const invalidStaffLine = sourceStaff.find((item) => {
+    const serviceDefinition = getManualOrderServiceDefinition(item.service);
+    return (
+      !item.service ||
+      Number(item.quantity || 0) <= 0 ||
+      Number(item.rate || serviceDefinition.rate || 0) <= 0 ||
+      !item.date ||
+      !item.startTime
+    );
+  });
+
+  if (invalidStaffLine) {
+    throw new Error("Service, quantity, rate, date, and time are required for each line.");
+  }
+
+  const financials = calculateOrderFinancials({
+    staff: sourceStaff.map((item) => ({
+      ...item,
+      displayService: item.displayService || getManualOrderServiceDefinition(item.service).label,
+      rate: Number(item.rate || getManualOrderServiceDefinition(item.service).rate || 0),
+    })),
+    subtotalAmount: providedFinancials.subtotalAmount,
+    totalAmount: providedFinancials.totalAmount,
+    vatRate: providedFinancials.vatRate ?? 0.2,
+    vatAmount: providedFinancials.vatAmount,
+    totalWithVat: providedFinancials.totalWithVat,
+    minimumPaymentAmount: providedFinancials.minimumPaymentAmount,
+  });
+
+  const totalStaffCount = financials.staff.reduce(
+    (sum, item) => sum + Number(item.quantity || 0),
+    0
+  );
+  const primaryService = String(firstStaffLine.service || "").trim();
+
+  const order = new Order({
+    customerApplicationId: customer.applicationId || "",
+    customerCode: customer.customerCode || "",
+    customerName: `${customer.firstName || ""} ${customer.lastName || ""}`.trim(),
+    companyName: customer.companyName || "",
+    eventName: normalizedEventName,
+    category: primaryService,
+    serviceType: primaryService,
+    eventDate,
+    startTime: firstStaffLine.startTime || "",
+    endTime: firstStaffLine.endTime || "",
+    phone: customer.mobilePhone || "",
+    email: customer.email || "",
+    location: normalizedAddress,
+    city: customer.city || "",
+    postcode: customer.postcode || "",
+    description: normalizedNotes || getManualOrderServiceDefinition(primaryService).label,
+    staffCount: totalStaffCount,
+    assignedStaff,
+    staff: financials.staff,
+    subtotalAmount: financials.subtotalAmount,
+    vatRate: financials.vatRate,
+    vatAmount: financials.vatAmount,
+    totalAmount: financials.totalAmount,
+    totalWithVat: financials.totalWithVat,
+    minimumPaymentAmount: financials.minimumPaymentAmount,
+    status: "draft",
+    paymentStatus,
+    orderStatus,
+    isVisibleToCustomer: true,
+    notes: normalizedNotes,
+    createdByAdmin: true,
+    adminCreatedAt: new Date(),
+    createdBySuperAdminEmail: String(createdBySuperAdminEmail || "").trim().toLowerCase(),
+  });
+
+  await order.save();
+  await ensureEventForOrder(order);
+  const event = await Event.findOne({ order: order._id }).lean();
+
+  if (event && assignedStaff.length) {
+    for (const staffMember of assignedStaff) {
+      const matchingRoleRequirement = (event.roleRequirements || []).find((item) => {
+        const normalizedRequirementRole = normalizeRole(item.role);
+        return Array.isArray(staffMember.positions)
+          && staffMember.positions.some((position) => normalizeRole(position) === normalizedRequirementRole);
+      });
+
+      await EventAssignment.updateOne(
+        {
+          event: event._id,
+          staff: staffMember.staffId,
+        },
+        {
+          $setOnInsert: {
+            role: matchingRoleRequirement?.role || normalizeRole(primaryService),
+            status: "assigned",
+            assignedAt: new Date(),
+          },
+        },
+        { upsert: true }
+      );
+    }
+  }
+
+  return order;
+}
+
+function buildPaymentPlaceholderLink(orderReference) {
+  return `${getBaseUrl()}/payment-placeholder.html?orderId=${encodeURIComponent(String(orderReference || ""))}`;
+}
+
 async function autoApproveApplicationsForEvent(eventId) {
   if (!eventId) return;
 
@@ -1539,6 +1788,219 @@ app.get("/admin/staff", requireAdminAuth, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error while loading staff.",
+    });
+  }
+});
+
+app.post("/admin/manual-customers", requireAdminAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await registerCustomer({
+      Customer,
+      input: {
+        ...req.body,
+        mobilePhone: req.body?.mobilePhone,
+      },
+      generateApplicationId: () =>
+        `BE-CUST-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      generateCustomerCode: () =>
+        "BE-" + Math.floor(100000 + Math.random() * 900000),
+      now: () => new Date(),
+    });
+
+    if (!result.customer) {
+      return res.status(result.statusCode).json(result.body);
+    }
+
+    const now = new Date();
+    const customer = result.customer;
+
+    customer.notes = String(req.body?.adminNotes || "").trim();
+    customer.website = String(req.body?.website || "").trim();
+    customer.vatNumber = String(req.body?.vatNumber || "").trim();
+    customer.companyHouseNumber = String(req.body?.companyHouseNumber || "").trim();
+    customer.utrNumber = String(req.body?.utrNumber || "").trim();
+    customer.companyNumber =
+      customer.companyHouseNumber ||
+      customer.utrNumber ||
+      String(customer.companyNumber || "").trim();
+    customer.heardAboutUs = String(req.body?.heardAboutUs || "").trim();
+    customer.createdByAdmin = true;
+    customer.adminCreatedAt = now;
+    customer.createdBySuperAdminEmail = String(req.adminUser?.email || "").trim().toLowerCase();
+    customer.status = "approved";
+    customer.approvedAt = now;
+    await customer.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Manual customer created successfully.",
+      customer: serializeCustomer(customer),
+    });
+  } catch (error) {
+    console.error("Error creating manual customer:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Manual customer could not be created.",
+    });
+  }
+});
+
+async function handleManualOrderCreate(req, res) {
+  try {
+    const customerId = String(req.body?.customerId || "").trim();
+    const eventName = String(req.body?.eventName || "").trim();
+    const location = String(req.body?.location || "").trim();
+    const notes = String(req.body?.notes || "").trim();
+    const staff = Array.isArray(req.body?.staff) ? req.body.staff : [];
+    const assignedStaffIds = Array.isArray(req.body?.assignedStaff)
+      ? req.body.assignedStaff.map((item) => String(item || "").trim()).filter(Boolean)
+      : [];
+
+    if (!customerId || !location || !staff.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Customer, venue, and at least one staff line are required.",
+      });
+    }
+
+    const customer = await Customer.findById(customerId);
+
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        message: "Customer not found.",
+      });
+    }
+
+    const order = await createManualAdminOrderDraft({
+      customer,
+      eventName,
+      location,
+      staff,
+      notes,
+      assignedStaffIds,
+      providedFinancials: {
+        subtotalAmount: req.body?.subtotalAmount,
+        totalAmount: req.body?.totalAmount,
+        vatRate: req.body?.vatRate,
+        vatAmount: req.body?.vatAmount,
+        totalWithVat: req.body?.totalWithVat,
+        minimumPaymentAmount: req.body?.minimumPaymentAmount,
+      },
+      paymentStatus: String(req.body?.paymentStatus || "Awaiting Deposit").trim(),
+      orderStatus: String(req.body?.orderStatus || "Draft - Awaiting Payment").trim(),
+      createdBySuperAdminEmail: String(req.adminUser?.email || "").trim().toLowerCase(),
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Manual event created successfully.",
+      order: {
+        id: String(order._id),
+        orderId: order.orderId || "",
+        customerName: order.customerName || "",
+        companyName: order.companyName || "",
+        eventName: order.eventName || "",
+        eventDate: order.eventDate || null,
+        startTime: order.startTime || "",
+        endTime: order.endTime || "",
+        location: order.location || "",
+        city: order.city || "",
+        postcode: order.postcode || "",
+        serviceType: order.serviceType || order.category || "",
+        staffCount: Number(order.staffCount || 0),
+        assignedStaff: Array.isArray(order.assignedStaff) ? order.assignedStaff : [],
+        subtotalAmount: Number(order.subtotalAmount || 0),
+        vatAmount: Number(order.vatAmount || 0),
+        totalAmount: Number(order.totalWithVat || order.totalAmount || 0),
+        status: order.orderStatus || order.status || "draft",
+      },
+      paymentLink: buildPaymentPlaceholderLink(order.orderId || order._id),
+    });
+  } catch (error) {
+    console.error("Error creating manual order:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Manual event could not be created.",
+    });
+  }
+}
+
+app.post("/admin/manual-orders", requireAdminAuth, requireSuperAdmin, handleManualOrderCreate);
+app.post("/admin/manual-events", requireAdminAuth, requireSuperAdmin, handleManualOrderCreate);
+
+app.get("/admin/events", requireAdminAuth, async (req, res) => {
+  try {
+    const events = await Event.find().sort({ eventDate: -1, createdAt: -1 }).lean();
+    const orderIds = events.map((event) => event.order).filter(Boolean);
+    const orders = await Order.find({ _id: { $in: orderIds } }).lean();
+    const orderMap = new Map(orders.map((order) => [String(order._id), order]));
+
+    return res.json(events.map((event) => {
+      const linkedOrder = orderMap.get(String(event.order)) || {};
+      return {
+        id: String(event._id),
+        orderId: linkedOrder.orderId || "",
+        title: event.title || linkedOrder.eventName || "",
+        eventDate: event.eventDate || null,
+        location: event.location || linkedOrder.location || "",
+        status: event.status || "draft",
+        orderStatus: linkedOrder.orderStatus || linkedOrder.status || "",
+        paymentStatus: linkedOrder.paymentStatus || "",
+        assignedStaffCount: Array.isArray(linkedOrder.assignedStaff) ? linkedOrder.assignedStaff.length : 0,
+      };
+    }));
+  } catch (error) {
+    console.error("Error loading admin events:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while loading events.",
+    });
+  }
+});
+
+app.patch("/admin/orders/:id/status", requireAdminAuth, async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    if (typeof req.body?.orderStatus === "string" && req.body.orderStatus.trim()) {
+      order.orderStatus = req.body.orderStatus.trim();
+    }
+
+    if (typeof req.body?.paymentStatus === "string" && req.body.paymentStatus.trim()) {
+      order.paymentStatus = req.body.paymentStatus.trim();
+    }
+
+    if (typeof req.body?.status === "string" && req.body.status.trim()) {
+      order.status = req.body.status.trim();
+    }
+
+    await order.save();
+
+    const event = await Event.findOne({ order: order._id });
+    if (event && typeof req.body?.eventStatus === "string" && req.body.eventStatus.trim()) {
+      event.status = req.body.eventStatus.trim();
+      await event.save();
+    }
+
+    return res.json({
+      success: true,
+      message: "Order status updated successfully.",
+      order,
+      event,
+    });
+  } catch (error) {
+    console.error("Error updating order status:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while updating status.",
     });
   }
 });

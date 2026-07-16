@@ -5,14 +5,25 @@ const StaffSchema = new mongoose.Schema({
   staffId: { type: String, default: "" },
   staffName: { type: String, default: "" },
   service: { type: String, default: "" },
+  displayService: { type: String, default: "" },
   quantity: { type: Number, default: 0 },
+  days: { type: Number, default: 1 },
   hours: { type: Number, default: 0 },
+  originalHours: { type: Number, default: 0 },
   rate: { type: Number, default: 0 },
+  pricingUnit: { type: String, default: "hour" },
   total: { type: Number, default: 0 },
   date: { type: String, default: "" },
   startTime: { type: String, default: "" },
   endTime: { type: String, default: "" },
 });
+
+const AssignedStaffSchema = new mongoose.Schema({
+  staffId: { type: String, default: "" },
+  staffName: { type: String, default: "" },
+  city: { type: String, default: "" },
+  positions: { type: [String], default: [] },
+}, { _id: false });
 
 const orderSchema = new mongoose.Schema({
   customerApplicationId: { type: String, default: "", index: true },
@@ -25,11 +36,18 @@ const orderSchema = new mongoose.Schema({
   eventName: { type: String, default: "" },
   category: { type: String, default: "" },
   eventDate: { type: Date, default: null },
+  startTime: { type: String, default: "" },
+  endTime: { type: String, default: "" },
   phone: { type: String, default: "" },
   email: { type: String, default: "", trim: true, lowercase: true },
   location: { type: String, default: "" },
+  city: { type: String, default: "" },
+  postcode: { type: String, default: "" },
+  serviceType: { type: String, default: "" },
+  staffCount: { type: Number, default: 0 },
   description: { type: String, default: "Event Staff Service" },
   staff: { type: [StaffSchema], default: [] },
+  assignedStaff: { type: [AssignedStaffSchema], default: [] },
 
   subtotalAmount: { type: Number, default: 0 },
   vatRate: { type: Number, default: 0.2 },
@@ -45,6 +63,9 @@ const orderSchema = new mongoose.Schema({
   isVisibleToCustomer: { type: Boolean, default: false },
   applicationDeadline: { type: Date, default: null },
   notes: { type: String, default: "" },
+  createdByAdmin: { type: Boolean, default: false },
+  adminCreatedAt: { type: Date, default: null },
+  createdBySuperAdminEmail: { type: String, default: "" },
   createdAt: { type: Date, default: Date.now },
 });
 

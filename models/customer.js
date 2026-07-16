@@ -37,6 +37,7 @@ const customerSchema = new mongoose.Schema({
   companyNumber: { type: String, default: "" },
   companyHouseNumber: { type: String, default: "" },
   utrNumber: { type: String, default: "" },
+  heardAboutUs: { type: String, default: "" },
 
   // ⚙️ Hesap durumu
   status: { type: String, default: "pending" }, // "pending", "approved", "rejected", "banned"
@@ -49,6 +50,9 @@ const customerSchema = new mongoose.Schema({
 
   // 📝 Notlar (admin veya sistem tarafından eklenebilir)
   notes: { type: String, default: "" },
+  createdByAdmin: { type: Boolean, default: false },
+  adminCreatedAt: { type: Date, default: null },
+  createdBySuperAdminEmail: { type: String, default: "" },
 
   // 📅 Müşteriye özel etkinlik tarihi (opsiyonel)
   eventDate: { type: Date, default: null }

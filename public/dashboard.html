@@ -199,6 +199,7 @@
 
     input,
     select,
+    textarea,
     button {
       width: 100%;
       padding: 10px 12px;
@@ -358,6 +359,76 @@
       line-height: 1.6;
     }
 
+    .manual-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .manual-actions .btn {
+      width: auto;
+    }
+
+    .manual-list-select {
+      min-height: 120px;
+    }
+
+    .order-summary-box {
+      margin-top: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 14px;
+      background: #f9fafb;
+    }
+
+    .order-summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .order-summary-row.total {
+      padding-top: 8px;
+      border-top: 1px solid #d1d5db;
+      font-weight: 700;
+    }
+
+    .manual-result {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid #d1fae5;
+      background: #ecfdf5;
+    }
+
+    .manual-result h4 {
+      margin-bottom: 8px;
+    }
+
+    .manual-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .manual-meta-item {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #d1fae5;
+      padding: 10px 12px;
+    }
+
+    .manual-meta-item strong {
+      display: block;
+      font-size: 12px;
+      color: #6b7280;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+    }
+
     @media (max-width: 920px) {
       .layout {
         grid-template-columns: 1fr;
@@ -395,6 +466,7 @@
       <button type="button" data-target="customersSection">Customers</button>
       <button type="button" data-target="ordersSection">Orders</button>
       <button type="button" data-target="staffReportsSection">Staff Reports</button>
+      <button type="button" id="manualOpsNavButton" class="hidden" data-target="manualOperationsSection">Manual Operations</button>
       <button type="button" id="supportMessagesNavButton" class="hidden" data-target="supportMessagesSection">Support Messages</button>
       <button type="button" id="adminNavButton" class="hidden" data-target="adminManagementSection">Admin Management</button>
       <button type="button" id="logoutButton">Logout</button>
@@ -686,6 +758,114 @@
         </div>
       </section>
 
+      <section id="manualOperationsSection" class="section hidden">
+        <h2>Manual Operations</h2>
+        <p class="subtle" style="margin-bottom:14px;">Create a customer manually, then create a manual event/order that becomes a normal order and event record.</p>
+        <div class="manual-actions">
+          <button type="button" class="btn btn-primary" id="openManualCustomerButton">Manual Customer</button>
+          <button type="button" class="btn btn-success" id="openManualEventButton">Manual Event</button>
+        </div>
+      </section>
+
+      <div id="manualAdminModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="manualAdminModalTitle">
+        <div class="modal-panel">
+          <div class="modal-header">
+            <div>
+              <h3 id="manualAdminModalTitle" class="modal-title">Manual Record</h3>
+              <p class="subtle" id="manualAdminModalSubtitle">Superadmin operation</p>
+            </div>
+            <button type="button" class="icon-button" id="closeManualAdminModal" aria-label="Close manual modal">&times;</button>
+          </div>
+
+          <form id="manualCustomerForm" class="hidden">
+            <div class="form-grid">
+              <div><label for="manualCustomerCompanyName">Company Name</label><input id="manualCustomerCompanyName" type="text" required /></div>
+              <div><label for="manualCustomerCompanyAddress">Address</label><input id="manualCustomerCompanyAddress" type="text" required /></div>
+              <div><label for="manualCustomerCity">City</label><input id="manualCustomerCity" type="text" required /></div>
+              <div><label for="manualCustomerPostcode">Postcode</label><input id="manualCustomerPostcode" type="text" required /></div>
+              <div><label for="manualCustomerFirstName">First Name</label><input id="manualCustomerFirstName" type="text" required /></div>
+              <div><label for="manualCustomerLastName">Last Name</label><input id="manualCustomerLastName" type="text" required /></div>
+              <div><label for="manualCustomerPhone">Phone</label><input id="manualCustomerPhone" type="tel" required /></div>
+              <div><label for="manualCustomerEmail">Email</label><input id="manualCustomerEmail" type="email" required /></div>
+              <div><label for="manualCustomerWebsite">Website</label><input id="manualCustomerWebsite" type="text" /></div>
+              <div><label for="manualCustomerVatNumber">VAT Number</label><input id="manualCustomerVatNumber" type="text" /></div>
+              <div><label for="manualCustomerCompanyHouseNumber">Company House Number</label><input id="manualCustomerCompanyHouseNumber" type="text" /></div>
+              <div><label for="manualCustomerUtrNumber">UTR Number</label><input id="manualCustomerUtrNumber" type="text" /></div>
+              <div><label for="manualCustomerHeardAboutUs">Source</label><input id="manualCustomerHeardAboutUs" type="text" placeholder="Phone / WhatsApp / Referral" /></div>
+              <div style="grid-column:1 / -1;"><label for="manualCustomerAdminNotes">Notes</label><textarea id="manualCustomerAdminNotes" rows="3"></textarea></div>
+            </div>
+            <div class="btn-row">
+              <button type="submit" class="btn btn-primary" id="manualCustomerSubmitButton">Create Customer</button>
+            </div>
+          </form>
+
+          <form id="manualEventForm" class="hidden">
+            <div class="form-grid">
+              <div>
+                <label for="manualEventCustomerId">Customer</label>
+                <select id="manualEventCustomerId">
+                  <option value="">Select a customer</option>
+                </select>
+              </div>
+              <div style="align-self:end;">
+                <button type="button" class="btn btn-primary" id="manualEventCreateCustomerButton">Create New Customer</button>
+              </div>
+              <div><label for="manualEventCustomerName">Customer Name</label><input id="manualEventCustomerName" type="text" readonly /></div>
+              <div><label for="manualEventCompanyName">Company</label><input id="manualEventCompanyName" type="text" readonly /></div>
+              <div><label for="manualEventPhone">Phone</label><input id="manualEventPhone" type="text" readonly /></div>
+              <div><label for="manualEventEmail">Email</label><input id="manualEventEmail" type="text" readonly /></div>
+              <div style="grid-column:1 / -1;"><label for="manualEventLocation">Venue</label><input id="manualEventLocation" type="text" required /></div>
+              <div><label for="manualEventServiceType">Staff Role</label><select id="manualEventServiceType"></select></div>
+              <div><label for="manualEventQuantity">Number of Staff</label><input id="manualEventQuantity" type="number" min="1" /></div>
+              <div><label for="manualEventHours">Hours</label><input id="manualEventHours" type="number" min="1" step="1" /></div>
+              <div><label for="manualEventDate">Date</label><input id="manualEventDate" type="date" /></div>
+              <div><label for="manualEventStartTime">Start Time</label><input id="manualEventStartTime" type="time" /></div>
+              <div style="grid-column:1 / -1;"><label for="manualEventAssignedStaff">Assign Staff (Optional)</label><select id="manualEventAssignedStaff" class="manual-list-select" multiple></select></div>
+              <div style="grid-column:1 / -1;"><button type="button" class="btn btn-secondary" id="manualEventAddLineButton">Add Line Item</button></div>
+            </div>
+
+            <div class="table-wrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Role</th>
+                    <th>Qty</th>
+                    <th>Hours</th>
+                    <th>Rate</th>
+                    <th>Total</th>
+                    <th>Date</th>
+                    <th>Start</th>
+                    <th>Finish</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="manualEventTableBody">
+                  <tr><td colspan="9">No line items added yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="order-summary-box">
+              <div class="order-summary-row"><span>Subtotal</span><strong id="manualEventSubtotal">GBP 0.00</strong></div>
+              <div class="order-summary-row"><span>VAT (20%)</span><strong id="manualEventVat">GBP 0.00</strong></div>
+              <div class="order-summary-row total"><span>Total</span><strong id="manualEventTotal">GBP 0.00</strong></div>
+              <div class="order-summary-row"><span>Deposit (33%)</span><strong id="manualEventDeposit">GBP 0.00</strong></div>
+            </div>
+
+            <div class="form-grid" style="margin-top:14px;">
+              <div style="grid-column:1 / -1;"><label for="manualEventName">Event Title</label><input id="manualEventName" type="text" placeholder="Optional" /></div>
+              <div style="grid-column:1 / -1;"><label for="manualEventOrderNotes">Notes</label><textarea id="manualEventOrderNotes" rows="3"></textarea></div>
+            </div>
+
+            <div class="btn-row">
+              <button type="submit" class="btn btn-success" id="manualEventSubmitButton">Create Manual Event</button>
+            </div>
+          </form>
+
+          <div id="manualAdminResult" class="manual-result hidden"></div>
+        </div>
+      </div>
+
       <div id="supportMessageModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="supportMessageModalTitle">
         <div class="modal-panel">
           <div class="modal-header">
@@ -784,10 +964,19 @@
     const pageMessage = document.getElementById("pageMessage");
     const roleBadge = document.getElementById("roleBadge");
     const welcomeText = document.getElementById("welcomeText");
+    const manualOperationsSection = document.getElementById("manualOperationsSection");
+    const manualOpsNavButton = document.getElementById("manualOpsNavButton");
     const adminManagementSection = document.getElementById("adminManagementSection");
     const adminNavButton = document.getElementById("adminNavButton");
     const supportMessagesSection = document.getElementById("supportMessagesSection");
     const supportMessagesNavButton = document.getElementById("supportMessagesNavButton");
+    const manualAdminModal = document.getElementById("manualAdminModal");
+    const manualAdminModalTitle = document.getElementById("manualAdminModalTitle");
+    const manualAdminModalSubtitle = document.getElementById("manualAdminModalSubtitle");
+    const closeManualAdminModalButton = document.getElementById("closeManualAdminModal");
+    const manualCustomerForm = document.getElementById("manualCustomerForm");
+    const manualEventForm = document.getElementById("manualEventForm");
+    const manualAdminResult = document.getElementById("manualAdminResult");
     const supportMessageModal = document.getElementById("supportMessageModal");
     const closeSupportMessageModalButton = document.getElementById("closeSupportMessageModal");
     const staffDetailsModal = document.getElementById("staffDetailsModal");
@@ -800,7 +989,43 @@
     let staffRows = [];
     let currentStaffPage = 1;
     let staffPagination = { page: 1, totalPages: 1, totalItems: 0, limit: 25 };
+    let allStaffCache = [];
     let supportMessagesCache = [];
+    let manualOrderLineItems = [];
+    let activeManualMode = "customer";
+    let activeManualCustomerForOrderId = "";
+
+    const MANUAL_ORDER_VAT_RATE = 0.2;
+    const MANUAL_SERVICE_DEFINITIONS = {
+      Bartender: { label: "Bartender", rate: 27 },
+      Waiter: { label: "Waiter", rate: 18 },
+      Barback: { label: "Barback", rate: 18 },
+      Chef: { label: "Chef", rate: 30 },
+      "Kitchen Assistant": { label: "Kitchen Assistant", rate: 19 },
+      "Event Staff": { label: "Event Staff", rate: 20 },
+      "House Cleaning": { label: "House Cleaning", rate: 19 },
+      "Office Cleaning": { label: "Office Cleaning", rate: 20 },
+      "Deep Cleaning": { label: "Deep Cleaning", rate: 24 },
+      "End of Tenancy Cleaning": { label: "End of Tenancy Cleaning", rate: 26 },
+      "Window Cleaner": { label: "Window Cleaner", rate: 25 },
+      Security: { label: "Security", rate: 24 },
+      "Door Supervisor": { label: "Door Supervisor", rate: 26 },
+      "Event Security": { label: "Event Security", rate: 25 },
+      "Construction Worker": { label: "Construction Worker", rate: 28 },
+      "General Labourer": { label: "General Labourer", rate: 25 },
+      Handyman: { label: "Handyman", rate: 35 },
+      Painter: { label: "Painter", rate: 30 },
+      Electrician: { label: "Electrician", rate: 42 },
+      Plumber: { label: "Plumber", rate: 42 },
+      "Delivery Driver": { label: "Delivery Driver", rate: 20 },
+      "Warehouse Staff": { label: "Warehouse Staff", rate: 19 },
+      "Picker/Packer": { label: "Picker/Packer", rate: 18 },
+      "Care Assistant": { label: "Care Assistant", rate: 22 },
+      "Support Worker": { label: "Support Worker", rate: 23 },
+      "Admin Assistant": { label: "Admin Assistant", rate: 21 },
+      Receptionist: { label: "Receptionist", rate: 20 },
+      "Customer Service": { label: "Customer Service", rate: 20 }
+    };
 
     if (!token) {
       window.location.href = "/login.html";
@@ -885,6 +1110,364 @@
       return element;
     }
 
+    function getManualServiceDefinition(service) {
+      return MANUAL_SERVICE_DEFINITIONS[service] || {
+        label: service || "Manual Event",
+        rate: 0
+      };
+    }
+
+    function setActionButtonState(button, isLoading, loadingText = "Saving...") {
+      if (!button) return;
+      if (!button.dataset.defaultText) {
+        button.dataset.defaultText = button.textContent;
+      }
+      button.disabled = isLoading;
+      button.textContent = isLoading ? loadingText : button.dataset.defaultText;
+    }
+
+    function calculateEndTime(startTime, hours) {
+      if (!startTime || !hours) return "";
+      const [h, m] = String(startTime).split(":").map(Number);
+      const totalMinutes = (h * 60) + m + Math.round(Number(hours || 0) * 60);
+      const endHours = Math.floor((totalMinutes / 60) % 24);
+      const endMinutes = totalMinutes % 60;
+      return `${String(endHours).padStart(2, "0")}:${String(endMinutes).padStart(2, "0")}`;
+    }
+
+    function populateManualServiceOptions() {
+      const select = document.getElementById("manualEventServiceType");
+      if (!select) return;
+
+      const options = Object.entries(MANUAL_SERVICE_DEFINITIONS)
+        .map(([value, def]) => `<option value="${escapeHtml(value)}">${escapeHtml(def.label)} - ${formatMoney(def.rate)}/hr</option>`)
+        .join("");
+
+      select.innerHTML = `<option value="">Select a role</option>${options}`;
+    }
+
+    function populateManualEventCustomerSelect() {
+      const select = document.getElementById("manualEventCustomerId");
+      if (!select) return;
+
+      const options = customersCache
+        .filter((customer) => String(customer.status || "").toLowerCase() === "approved")
+        .map((customer) => {
+          const label = [customer.companyName || "-", `${customer.firstName || ""} ${customer.lastName || ""}`.trim()]
+            .filter(Boolean)
+            .join(" - ");
+          return `<option value="${escapeHtml(customer._id || "")}">${escapeHtml(label)}</option>`;
+        })
+        .join("");
+
+      select.innerHTML = `<option value="">Select a customer</option>${options}`;
+    }
+
+    function fillManualOrderCustomerDetails(customerId) {
+      const customer = customersCache.find((item) => String(item._id || "") === String(customerId || ""));
+      document.getElementById("manualEventCustomerName").value = customer
+        ? `${customer.firstName || ""} ${customer.lastName || ""}`.trim()
+        : "";
+      document.getElementById("manualEventCompanyName").value = customer?.companyName || "";
+      document.getElementById("manualEventPhone").value = customer?.mobilePhone || "";
+      document.getElementById("manualEventEmail").value = customer?.email || "";
+      if (!document.getElementById("manualEventLocation").value) {
+        document.getElementById("manualEventLocation").value = customer?.companyAddress || "";
+      }
+    }
+
+    function populateManualOrderStaffSelect() {
+      const select = document.getElementById("manualEventAssignedStaff");
+      if (!select) return;
+
+      const approvedStaff = allStaffCache
+        .filter((staffMember) => String(staffMember.status || "").toLowerCase() === "active")
+        .sort((left, right) => String(left.fullName || "").localeCompare(String(right.fullName || "")));
+
+      if (!approvedStaff.length) {
+        select.innerHTML = `<option value="">No active staff found</option>`;
+        return;
+      }
+
+      select.innerHTML = approvedStaff.map((staffMember) => {
+        const summary = [
+          staffMember.fullName || "-",
+          staffMember.city || "No city",
+          Array.isArray(staffMember.positions) ? staffMember.positions.join(", ") : ""
+        ].filter(Boolean).join(" | ");
+        return `<option value="${escapeHtml(staffMember.id || "")}">${escapeHtml(summary)}</option>`;
+      }).join("");
+    }
+
+    function resetManualResult() {
+      manualAdminResult.classList.add("hidden");
+      manualAdminResult.innerHTML = "";
+    }
+
+    function resetManualForms() {
+      manualCustomerForm.reset();
+      manualEventForm.reset();
+      manualOrderLineItems = [];
+      updateManualOrderTable();
+      resetManualResult();
+      populateManualServiceOptions();
+      populateManualEventCustomerSelect();
+      populateManualOrderStaffSelect();
+    }
+
+    function setManualModalMode(mode) {
+      activeManualMode = mode;
+      manualCustomerForm.classList.toggle("hidden", mode !== "customer");
+      manualEventForm.classList.toggle("hidden", mode !== "event");
+      resetManualResult();
+
+      if (mode === "customer") {
+        manualAdminModalTitle.textContent = "Manual Customer";
+        manualAdminModalSubtitle.textContent = "Create an approved customer without the public request flow.";
+      } else {
+        manualAdminModalTitle.textContent = "Manual Event";
+        manualAdminModalSubtitle.textContent = "Create a manual admin order that becomes a normal event record.";
+        populateManualEventCustomerSelect();
+        populateManualOrderStaffSelect();
+        if (activeManualCustomerForOrderId) {
+          document.getElementById("manualEventCustomerId").value = activeManualCustomerForOrderId;
+        }
+        fillManualOrderCustomerDetails(document.getElementById("manualEventCustomerId").value);
+      }
+    }
+
+    function openManualAdminModal(mode) {
+      if (mode !== activeManualMode) {
+        resetManualForms();
+      }
+      setManualModalMode(mode);
+      manualAdminModal.classList.remove("hidden");
+    }
+
+    function closeManualAdminModal() {
+      manualAdminModal.classList.add("hidden");
+    }
+
+    function renderManualResult({ title, message, details = [] }) {
+      const detailHtml = details.length
+        ? `<div class="manual-meta">${details.map((item) => `
+            <div class="manual-meta-item">
+              <strong>${escapeHtml(item.label)}</strong>
+              <span>${escapeHtml(item.value)}</span>
+            </div>
+          `).join("")}</div>`
+        : "";
+
+      manualAdminResult.innerHTML = `
+        <h4>${escapeHtml(title)}</h4>
+        <p>${escapeHtml(message)}</p>
+        ${detailHtml}
+      `;
+      manualAdminResult.classList.remove("hidden");
+    }
+
+    function updateManualOrderTable() {
+      const tbody = document.getElementById("manualEventTableBody");
+      if (!tbody) return;
+
+      if (!manualOrderLineItems.length) {
+        tbody.innerHTML = `<tr><td colspan="9">No line items added yet.</td></tr>`;
+      } else {
+        tbody.innerHTML = manualOrderLineItems.map((item, index) => `
+          <tr>
+            <td>${escapeHtml(item.displayService || item.service)}</td>
+            <td>${item.quantity}</td>
+            <td>${item.hours}</td>
+            <td>${formatMoney(item.rate)}</td>
+            <td><strong>${formatMoney(item.total)}</strong></td>
+            <td>${escapeHtml(item.date || "-")}</td>
+            <td>${escapeHtml(item.startTime || "-")}</td>
+            <td>${escapeHtml(item.endTime || "-")}</td>
+            <td><button type="button" class="btn btn-danger" onclick="removeManualOrderLine(${index})">Remove</button></td>
+          </tr>
+        `).join("");
+      }
+
+      const subtotal = Number(manualOrderLineItems.reduce((sum, item) => sum + Number(item.total || 0), 0).toFixed(2));
+      const vatAmount = Number((subtotal * MANUAL_ORDER_VAT_RATE).toFixed(2));
+      const totalAmount = Number((subtotal + vatAmount).toFixed(2));
+      const depositAmount = Number((totalAmount * 0.33).toFixed(2));
+
+      document.getElementById("manualEventSubtotal").textContent = formatMoney(subtotal);
+      document.getElementById("manualEventVat").textContent = formatMoney(vatAmount);
+      document.getElementById("manualEventTotal").textContent = formatMoney(totalAmount);
+      document.getElementById("manualEventDeposit").textContent = formatMoney(depositAmount);
+    }
+
+    function addManualOrderLine() {
+      const service = document.getElementById("manualEventServiceType").value;
+      const quantity = Number(document.getElementById("manualEventQuantity").value);
+      const hours = Number(document.getElementById("manualEventHours").value);
+      const date = document.getElementById("manualEventDate").value;
+      const startTime = document.getElementById("manualEventStartTime").value;
+
+      if (!service || !quantity || !hours || !date || !startTime) {
+        showMessage("Please fill all manual event line fields before adding.", "error");
+        return;
+      }
+
+      const serviceDefinition = getManualServiceDefinition(service);
+      const lineTotal = Number((quantity * hours * Number(serviceDefinition.rate || 0)).toFixed(2));
+
+      manualOrderLineItems.push({
+        service,
+        displayService: serviceDefinition.label,
+        quantity,
+        days: 1,
+        hours,
+        originalHours: hours,
+        rate: Number(serviceDefinition.rate || 0),
+        pricingUnit: "hour",
+        total: lineTotal,
+        date,
+        startTime,
+        endTime: calculateEndTime(startTime, hours)
+      });
+
+      updateManualOrderTable();
+      ["manualEventServiceType", "manualEventQuantity", "manualEventHours", "manualEventDate", "manualEventStartTime"].forEach((id) => {
+        document.getElementById(id).value = "";
+      });
+    }
+
+    window.removeManualOrderLine = (index) => {
+      manualOrderLineItems.splice(index, 1);
+      updateManualOrderTable();
+    };
+
+    async function loadAllStaff() {
+      const response = await authFetch("/admin/staff");
+      const staff = await response.json();
+      allStaffCache = Array.isArray(staff) ? staff : [];
+    }
+
+    async function createManualCustomerRecord(payload) {
+      const response = await authFetch("/admin/manual-customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || "Manual customer could not be created.");
+      }
+      return data;
+    }
+
+    async function createManualEventRecord(payload) {
+      const response = await authFetch("/admin/manual-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok || data.success === false) {
+        throw new Error(data.message || "Manual event could not be created.");
+      }
+      return data;
+    }
+
+    async function submitManualCustomerForm() {
+      const payload = {
+        companyName: document.getElementById("manualCustomerCompanyName").value.trim(),
+        companyAddress: document.getElementById("manualCustomerCompanyAddress").value.trim(),
+        city: document.getElementById("manualCustomerCity").value.trim(),
+        postcode: document.getElementById("manualCustomerPostcode").value.trim(),
+        firstName: document.getElementById("manualCustomerFirstName").value.trim(),
+        lastName: document.getElementById("manualCustomerLastName").value.trim(),
+        mobilePhone: document.getElementById("manualCustomerPhone").value.trim(),
+        email: document.getElementById("manualCustomerEmail").value.trim(),
+        website: document.getElementById("manualCustomerWebsite").value.trim(),
+        vatNumber: document.getElementById("manualCustomerVatNumber").value.trim(),
+        companyHouseNumber: document.getElementById("manualCustomerCompanyHouseNumber").value.trim(),
+        utrNumber: document.getElementById("manualCustomerUtrNumber").value.trim(),
+        heardAboutUs: document.getElementById("manualCustomerHeardAboutUs").value.trim(),
+        adminNotes: document.getElementById("manualCustomerAdminNotes").value.trim()
+      };
+
+      const button = document.getElementById("manualCustomerSubmitButton");
+      setActionButtonState(button, true, "Creating...");
+      try {
+        const data = await createManualCustomerRecord(payload);
+        activeManualCustomerForOrderId = String(data.customer?._id || "");
+        await refreshAll();
+        renderManualResult({
+          title: "Manual customer created",
+          message: "The customer is approved and ready for manual event creation.",
+          details: [
+            { label: "Company", value: data.customer?.companyName || "-" },
+            { label: "Contact", value: `${data.customer?.firstName || ""} ${data.customer?.lastName || ""}`.trim() || "-" },
+            { label: "Email", value: data.customer?.email || "-" }
+          ]
+        });
+      } finally {
+        setActionButtonState(button, false);
+      }
+    }
+
+    async function submitManualEventForm() {
+      const customerId = document.getElementById("manualEventCustomerId").value;
+      if (!customerId) {
+        throw new Error("Please select a customer.");
+      }
+      if (!manualOrderLineItems.length) {
+        throw new Error("Please add at least one line item.");
+      }
+
+      const assignedStaff = Array.from(document.getElementById("manualEventAssignedStaff").selectedOptions || [])
+        .map((item) => item.value)
+        .filter(Boolean);
+
+      const subtotal = Number(manualOrderLineItems.reduce((sum, item) => sum + Number(item.total || 0), 0).toFixed(2));
+      const vatAmount = Number((subtotal * MANUAL_ORDER_VAT_RATE).toFixed(2));
+      const totalAmount = Number((subtotal + vatAmount).toFixed(2));
+      const minimumPaymentAmount = Number((totalAmount * 0.33).toFixed(2));
+
+      const payload = {
+        customerId,
+        eventName: document.getElementById("manualEventName").value.trim(),
+        location: document.getElementById("manualEventLocation").value.trim(),
+        staff: manualOrderLineItems,
+        assignedStaff,
+        notes: document.getElementById("manualEventOrderNotes").value.trim(),
+        subtotalAmount: subtotal,
+        vatRate: MANUAL_ORDER_VAT_RATE,
+        vatAmount,
+        totalAmount,
+        totalWithVat: totalAmount,
+        minimumPaymentAmount,
+        paymentStatus: "Awaiting Deposit",
+        orderStatus: "Draft - Awaiting Payment"
+      };
+
+      const button = document.getElementById("manualEventSubmitButton");
+      setActionButtonState(button, true, "Creating...");
+      try {
+        const data = await createManualEventRecord(payload);
+        await refreshAll();
+        manualOrderLineItems = [];
+        updateManualOrderTable();
+        renderManualResult({
+          title: "Manual event created",
+          message: "The manual booking has been saved as a normal order and event.",
+          details: [
+            { label: "Order ID", value: data.order?.orderId || "-" },
+            { label: "Customer", value: data.order?.companyName || data.order?.customerName || "-" },
+            { label: "Event", value: data.order?.eventName || "-" },
+            { label: "Staff Count", value: String(data.order?.staffCount || 0) },
+            { label: "Total", value: formatMoney(data.order?.totalAmount || 0) }
+          ]
+        });
+      } finally {
+        setActionButtonState(button, false);
+      }
+    }
+
     function getSupportMessageById(messageId) {
       return supportMessagesCache.find((item) => item.id === messageId) || null;
     }
@@ -944,6 +1527,8 @@
         : "Secure admin workspace";
 
       if ((data.role || "").toLowerCase() === "superadmin") {
+        manualOperationsSection.classList.remove("hidden");
+        manualOpsNavButton.classList.remove("hidden");
         adminManagementSection.classList.remove("hidden");
         adminNavButton.classList.remove("hidden");
         supportMessagesSection.classList.remove("hidden");
@@ -1555,6 +2140,9 @@
       await loadDashboardSummary();
       await loadPendingCustomers();
       await loadCustomers();
+      await loadAllStaff();
+      populateManualEventCustomerSelect();
+      populateManualOrderStaffSelect();
       await runStaffReport();
       if ((currentAdmin?.role || "").toLowerCase() === "superadmin") {
         await loadSupportMessages();
@@ -1572,8 +2160,14 @@
     });
 
     document.getElementById("logoutButton").addEventListener("click", logout);
+    closeManualAdminModalButton.addEventListener("click", closeManualAdminModal);
     closeSupportMessageModalButton.addEventListener("click", closeSupportMessageModal);
     closeStaffDetailsModalButton.addEventListener("click", closeStaffDetailsModal);
+    manualAdminModal.addEventListener("click", (event) => {
+      if (event.target === manualAdminModal) {
+        closeManualAdminModal();
+      }
+    });
     supportMessageModal.addEventListener("click", (event) => {
       if (event.target === supportMessageModal) {
         closeSupportMessageModal();
@@ -1583,11 +2177,43 @@
       if (event.target === staffDetailsModal) closeStaffDetailsModal();
     });
     document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !manualAdminModal.classList.contains("hidden")) {
+        closeManualAdminModal();
+      }
       if (event.key === "Escape" && !supportMessageModal.classList.contains("hidden")) {
         closeSupportMessageModal();
       }
       if (event.key === "Escape" && !staffDetailsModal.classList.contains("hidden")) {
         closeStaffDetailsModal();
+      }
+    });
+    document.getElementById("openManualCustomerButton").addEventListener("click", () => {
+      openManualAdminModal("customer");
+    });
+    document.getElementById("openManualEventButton").addEventListener("click", () => {
+      openManualAdminModal("event");
+    });
+    document.getElementById("manualEventCreateCustomerButton").addEventListener("click", () => {
+      openManualAdminModal("customer");
+    });
+    document.getElementById("manualEventCustomerId").addEventListener("change", () => {
+      fillManualOrderCustomerDetails(document.getElementById("manualEventCustomerId").value);
+    });
+    document.getElementById("manualEventAddLineButton").addEventListener("click", addManualOrderLine);
+    manualCustomerForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        await submitManualCustomerForm();
+      } catch (error) {
+        showMessage(error.message || "Manual customer could not be created.", "error");
+      }
+    });
+    manualEventForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        await submitManualEventForm();
+      } catch (error) {
+        showMessage(error.message || "Manual event could not be created.", "error");
       }
     });
     document.getElementById("runReportButton").addEventListener("click", async () => {
@@ -1700,6 +2326,8 @@
 
     (async function init() {
       try {
+        populateManualServiceOptions();
+        updateManualOrderTable();
         await loadCurrentAdmin();
         await refreshAll();
       } catch (error) {
