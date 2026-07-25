@@ -20,7 +20,11 @@ const AdminUser = require("./models/adminUser");
 const Event = require("./models/event");
 const EventApplication = require("./models/eventApplication");
 const EventAssignment = require("./models/eventAssignment");
+const SalesAgentRun = require("./models/salesAgentRun");
+const SalesAgentOpportunityResult = require("./models/salesAgentOpportunityResult");
+const SalesAgentSettings = require("./models/salesAgentSettings");
 const staffEvents = require("./routes/staffEvents");
+const { createSalesAgentRouter } = require("./routes/salesAgentRoutes");
 const {
   normalizeEmail,
   getBaseUrl,
@@ -767,6 +771,16 @@ app.use(serveHtmlWithSupportWidget);
 app.use(express.static(publicDir));
 app.use(cors());
 app.use("/api/staff-events", staffEvents);
+app.use(
+  "/api",
+  createSalesAgentRouter({
+    requireAdminAuth,
+    requireSuperAdmin,
+    SalesAgentRun,
+    SalesAgentOpportunityResult,
+    SalesAgentSettings,
+  })
+);
 
 app.get("/delete-account.html", (req, res) => {
   res.status(200).type("html").send(`<!doctype html>

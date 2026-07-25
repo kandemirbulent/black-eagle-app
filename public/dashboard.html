@@ -466,6 +466,7 @@
       <button type="button" data-target="customersSection">Customers</button>
       <button type="button" data-target="ordersSection">Orders</button>
       <button type="button" data-target="staffReportsSection">Staff Reports</button>
+      <button type="button" data-target="salesAgentSection">Sales Agent</button>
       <button type="button" id="manualOpsNavButton" class="hidden" data-target="manualOperationsSection">Manual Operations</button>
       <button type="button" id="supportMessagesNavButton" class="hidden" data-target="supportMessagesSection">Support Messages</button>
       <button type="button" id="adminNavButton" class="hidden" data-target="adminManagementSection">Admin Management</button>
@@ -732,6 +733,49 @@
         </div>
       </section>
 
+      <section id="salesAgentSection" class="section">
+        <h2>Sales Agent</h2>
+        <p class="subtle" style="margin-bottom:14px;">Monitor Sales Agent activity and opportunity outcomes.</p>
+
+        <div class="stats-grid">
+          <div class="stat-card"><span>Current Status</span><strong id="salesAgentCurrentStatus">IDLE</strong></div>
+          <div class="stat-card"><span>Last Run</span><strong id="salesAgentLastRun">Never</strong></div>
+          <div class="stat-card"><span>Found Opportunities</span><strong id="salesAgentOpportunitiesFound">0</strong></div>
+          <div class="stat-card"><span>Quotes Submitted</span><strong id="salesAgentQuotesSubmitted">0</strong></div>
+          <div class="stat-card"><span>Manual Review</span><strong id="salesAgentManualReview">0</strong></div>
+          <div class="stat-card"><span>Skipped</span><strong id="salesAgentSkipped">0</strong></div>
+          <div class="stat-card"><span>Failed</span><strong id="salesAgentFailed">0</strong></div>
+          <div class="stat-card"><span>OpenAI Calls</span><strong id="salesAgentOpenAiCalls">0</strong></div>
+          <div class="stat-card"><span>Platform Actions</span><strong id="salesAgentPlatformActions">0</strong></div>
+        </div>
+
+        <div class="btn-row" style="margin:16px 0;">
+          <button type="button" class="btn btn-primary" id="runSalesAgentButton">Run Sales Agent</button>
+          <button type="button" class="btn hidden" id="retrySalesAgentButton">Retry</button>
+        </div>
+
+        <h3>Opportunity Results</h3>
+        <div class="table-wrap" style="margin-top:12px;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Opportunity ID</th>
+                <th>Platform</th>
+                <th>Status</th>
+                <th>Staff</th>
+                <th>Final Price</th>
+                <th>Quote UUID</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+            <tbody id="salesAgentResultsTable">
+              <tr><td colspan="8">No opportunity results yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section id="supportMessagesSection" class="section hidden">
         <h2>Support Messages</h2>
         <div class="table-wrap">
@@ -959,6 +1003,7 @@
     </main>
   </div>
 
+  <script src="/js/sales-agent-dashboard.js"></script>
   <script>
     const token = localStorage.getItem("adminToken");
     const pageMessage = document.getElementById("pageMessage");
@@ -994,6 +1039,7 @@
     let manualOrderLineItems = [];
     let activeManualMode = "customer";
     let activeManualCustomerForOrderId = "";
+    let salesAgentDashboard = null;
 
     const MANUAL_ORDER_VAT_RATE = 0.2;
     const MANUAL_SERVICE_DEFINITIONS = {
@@ -2160,6 +2206,12 @@
     });
 
     document.getElementById("logoutButton").addEventListener("click", logout);
+    document.getElementById("runSalesAgentButton").addEventListener("click", async () => {
+      await salesAgentDashboard?.startRun();
+    });
+    document.getElementById("retrySalesAgentButton").addEventListener("click", async () => {
+      await salesAgentDashboard?.refresh();
+    });
     closeManualAdminModalButton.addEventListener("click", closeManualAdminModal);
     closeSupportMessageModalButton.addEventListener("click", closeSupportMessageModal);
     closeStaffDetailsModalButton.addEventListener("click", closeStaffDetailsModal);
@@ -2329,6 +2381,12 @@
         populateManualServiceOptions();
         updateManualOrderTable();
         await loadCurrentAdmin();
+        salesAgentDashboard = window.SalesAgentDashboard.createController({
+          authFetch,
+          showMessage,
+          documentRef: document
+        });
+        await salesAgentDashboard.init();
         await refreshAll();
       } catch (error) {
         showMessage(error.message || "Failed to load dashboard.", "error");
