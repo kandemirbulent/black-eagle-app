@@ -8,6 +8,70 @@ const SETTINGS_FIELDS = new Set([
   "maxOpenAiCallsPerDay",
 ]);
 
+const RESULT_STATUS_PRECEDENCE = Object.freeze({
+  FAILED: 0,
+  SKIPPED: 1,
+  MANUAL_REVIEW: 2,
+  QUOTE_READY: 3,
+  SUBMITTED: 4,
+  PENDING: 4,
+  ACCEPTED: 5,
+  CONFIRMED: 5,
+  BOOKED: 5,
+});
+
+function canonicalStatus(result = {}) {
+  const platformState = String(result.platformState || "").trim().toUpperCase();
+  const resultStatus = String(result.resultStatus || result.analysisStatus || "").trim().toUpperCase();
+  const status = platformState || resultStatus;
+  return status === "SENT" ? "SUBMITTED" : status;
+}
+
+function verifiedCanonicalCandidate(result = {}) {
+  const status = canonicalStatus(result);
+  if (!["SUBMITTED", "PENDING", "ACCEPTED", "CONFIRMED", "BOOKED"].includes(status)) return true;
+  return result.quoteSubmitted === true || Boolean(String(result.quoteUuid || "").trim());
+}
+
+function overlayCanonicalLatest(baseResults = [], allResults = []) {
+  const grouped = new Map();
+  for (const result of allResults) {
+    const key = `${String(result.platform || "").toLowerCase()}:${String(result.opportunityId || "")}`;
+    if (!key.endsWith(":") && verifiedCanonicalCandidate(result)) {
+      const current = grouped.get(key);
+      const rank = RESULT_STATUS_PRECEDENCE[canonicalStatus(result)] ?? -1;
+      const currentRank = current ? RESULT_STATUS_PRECEDENCE[canonicalStatus(current)] ?? -1 : -1;
+      const timestamp = new Date(result.updatedAt || result.createdAt || 0).getTime();
+      const currentTimestamp = current
+        ? new Date(current.updatedAt || current.createdAt || 0).getTime()
+        : -1;
+      if (!current || rank > currentRank || (rank === currentRank && timestamp > currentTimestamp)) {
+        grouped.set(key, result);
+      }
+    }
+  }
+  return baseResults.map((base) => {
+    const key = `${String(base.platform || "").toLowerCase()}:${String(base.opportunityId || "")}`;
+    const latest = grouped.get(key);
+    if (!latest) return base;
+    const baseRank = RESULT_STATUS_PRECEDENCE[canonicalStatus(base)] ?? -1;
+    const latestStatus = canonicalStatus(latest);
+    const latestRank = RESULT_STATUS_PRECEDENCE[latestStatus] ?? -1;
+    if (latestRank <= baseRank) return base;
+    const submittedOrBetter = latestRank >= RESULT_STATUS_PRECEDENCE.SUBMITTED;
+    return {
+      ...base,
+      resultStatus: latestStatus,
+      analysisStatus: latest.analysisStatus || base.analysisStatus,
+      quoteSubmitted: submittedOrBetter ? true : latest.quoteSubmitted,
+      quoteUuid: latest.quoteUuid || base.quoteUuid,
+      platformState: latest.platformState || latestStatus.toLowerCase(),
+      blockingReasons: submittedOrBetter ? [] : (latest.blockingReasons || base.blockingReasons),
+      updatedAt: latest.updatedAt || base.updatedAt,
+    };
+  });
+}
+
 function serializeSettings(settings) {
   return settings || {
     key: "global",
@@ -96,7 +160,16 @@ function createSalesAgentRouter({
     if (!run) return res.status(404).json({ success: false, code: "SALES_AGENT_RUN_NOT_FOUND" });
     const results = await SalesAgentOpportunityResult.find({ runId: req.params.runId })
       .sort({ createdAt: 1 }).lean();
-    return res.json({ success: true, results });
+    if (req.query.canonicalLatest !== "true" || !results.length) {
+      return res.json({ success: true, results });
+    }
+    const keys = results.map((result) => ({
+      platform: result.platform,
+      opportunityId: result.opportunityId,
+    }));
+    const allResults = await SalesAgentOpportunityResult.find({ $or: keys })
+      .sort({ updatedAt: -1 }).lean();
+    return res.json({ success: true, results: overlayCanonicalLatest(results, allResults) });
   });
 
   router.get("/admin/sales-agent/status", requireAdminAuth, async (req, res) => {
@@ -139,4 +212,8 @@ function createSalesAgentRouter({
   return router;
 }
 
-module.exports = { createSalesAgentRouter, validateSettingsUpdate };
+module.exports = {
+  createSalesAgentRouter,
+  overlayCanonicalLatest,
+  validateSettingsUpdate,
+};

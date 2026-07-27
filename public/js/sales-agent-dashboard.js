@@ -77,7 +77,9 @@
   function reviewReason(result) {
     const status = text(result?.resultStatus || result?.analysisStatus, "").toUpperCase();
     const reasons = listValues(result?.blockingReasons);
-    if (status === "SENT" || status === "SUBMITTED") return "Quote submitted";
+    if (["SENT", "SUBMITTED", "PENDING", "ACCEPTED", "CONFIRMED", "BOOKED"].includes(status)) {
+      return "Quote submitted";
+    }
     if (status === "MANUAL_REVIEW") {
       if (!reasons.length) return "Manual review required; no reason was recorded.";
       const suffix = reasons.length > 1 ? ` (+${reasons.length - 1} more)` : "";
@@ -230,7 +232,7 @@
       } else if (status === "FAILED") {
         bannerText = "Processing failed. Review the reasons below.";
         bannerClass = "failed";
-      } else if (status === "SENT" || status === "SUBMITTED") {
+      } else if (["SENT", "SUBMITTED", "PENDING", "ACCEPTED", "CONFIRMED", "BOOKED"].includes(status)) {
         bannerText = "Quote submitted successfully.";
         bannerClass = "success";
       }
@@ -386,7 +388,7 @@
       return { response, payload };
     }
 
-    async function loadRunRecord(id) {
+    async function loadRunRecord(id, canonicalLatest = false) {
       if (!id) return null;
       const detail = await requestJson(`/api/admin/sales-agent/runs/${encodeURIComponent(id)}`);
       if (!detail.response.ok || detail.payload.success === false || !detail.payload.run) {
@@ -395,7 +397,7 @@
       const run = detail.payload.run;
       const resolvedId = getRunId(run) || String(id);
       const resultResponse = await requestJson(
-        `/api/admin/sales-agent/runs/${encodeURIComponent(resolvedId)}/results`
+        `/api/admin/sales-agent/runs/${encodeURIComponent(resolvedId)}/results${canonicalLatest ? "?canonicalLatest=true" : ""}`
       );
       if (!resultResponse.response.ok || resultResponse.payload.success === false) {
         throw new Error("Opportunity results could not be loaded.");
@@ -432,7 +434,7 @@
         );
       });
       for (const candidate of candidates) {
-        const record = await loadRunRecord(getRunId(candidate));
+        const record = await loadRunRecord(getRunId(candidate), true);
         if (record?.results.length) {
           displayedResultsRunId = getRunId(record.run);
           renderResults(record.results);
@@ -448,7 +450,7 @@
     }
 
     async function loadCurrentRun(id) {
-      const record = await loadRunRecord(id);
+      const record = await loadRunRecord(id, true);
       if (!record) return null;
       currentRun = record.run;
       currentRunId = getRunId(record.run) || String(id);

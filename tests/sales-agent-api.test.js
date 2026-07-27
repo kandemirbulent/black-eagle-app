@@ -2,7 +2,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
 
-const { createSalesAgentRouter } = require("../routes/salesAgentRoutes");
+const {
+  createSalesAgentRouter,
+  overlayCanonicalLatest,
+} = require("../routes/salesAgentRoutes");
 
 const ADMIN_ID = "64b000000000000000000001";
 const SUPERADMIN_ID = "64b000000000000000000002";
@@ -47,6 +50,11 @@ function createHarness() {
   };
   const SalesAgentOpportunityResult = {
     find(filter) {
+      if (Array.isArray(filter?.$or)) {
+        return query(state.results.filter((result) => filter.$or.some((key) =>
+          result.platform === key.platform && result.opportunityId === key.opportunityId
+        )));
+      }
       return query(state.results.filter((result) => result.runId === filter.runId));
     },
   };
@@ -202,3 +210,42 @@ test("Super Admin can update whitelisted settings", () => withServer(async ({ re
   assert.equal(response.status, 200);
   assert.equal(body.settings.maxOpenAiCallsPerDay, 10);
 }));
+
+test("canonical latest overlay promotes submitted state without altering historical input", () => {
+  const historical = [{
+    platform: "togather",
+    opportunityId: "RUYN9WR7",
+    resultStatus: "MANUAL_REVIEW",
+    blockingReasons: ["Timings missing"],
+    quoteSubmitted: false,
+    quoteUuid: "",
+    updatedAt: "2026-07-26T10:00:00.000Z",
+  }];
+  const latest = {
+    ...historical[0],
+    resultStatus: "SUBMITTED",
+    platformState: "pending",
+    quoteSubmitted: true,
+    quoteUuid: "1677448a-d2ba-4512-8f13-dacdfaafdbec",
+    blockingReasons: [],
+    updatedAt: "2026-07-27T10:00:00.000Z",
+  };
+  const result = overlayCanonicalLatest(historical, [historical[0], latest]);
+  assert.equal(result[0].resultStatus, "PENDING");
+  assert.equal(result[0].quoteUuid, latest.quoteUuid);
+  assert.deepEqual(result[0].blockingReasons, []);
+  assert.equal(historical[0].resultStatus, "MANUAL_REVIEW");
+});
+
+test("canonical precedence keeps accepted above pending and pending above older failed", () => {
+  const base = [{ platform: "togather", opportunityId: "TEST", resultStatus: "FAILED" }];
+  const pending = {
+    platform: "togather", opportunityId: "TEST", resultStatus: "SUBMITTED",
+    platformState: "pending", quoteSubmitted: true, quoteUuid: "quote-1",
+  };
+  const accepted = {
+    ...pending, resultStatus: "ACCEPTED", platformState: "accepted", quoteUuid: "quote-1",
+  };
+  assert.equal(overlayCanonicalLatest(base, [pending, accepted])[0].resultStatus, "ACCEPTED");
+  assert.equal(overlayCanonicalLatest(base, [pending, { ...base[0], updatedAt: new Date().toISOString() }])[0].resultStatus, "PENDING");
+});

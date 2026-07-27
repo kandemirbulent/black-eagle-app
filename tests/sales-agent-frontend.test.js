@@ -152,6 +152,7 @@ test("409 active-run response loads existing active run without a second POST", 
   assert.equal(context.calls.filter((call) => call.options.method === "POST").length, 1);
   assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "RUNNING");
   assert.match(context.messages[0].message, /already active/i);
+  assert.match(context.calls[3].url, /canonicalLatest=true$/);
 });
 
 test("polling stops when run becomes COMPLETED or FAILED", async () => {
@@ -420,6 +421,7 @@ test("review summaries handle long, missing, sent, failed and skipped results sa
     { resultStatus: "MANUAL_REVIEW", blockingReasons: [longReason, "Second reason"] },
     { resultStatus: "MANUAL_REVIEW" },
     { resultStatus: "SENT" },
+    { resultStatus: "PENDING", quoteUuid: "verified-quote" },
     { resultStatus: "FAILED", error: "Error: request failed\n at worker (secret.js:1:2)" },
     { resultStatus: "SKIPPED", blockingReasons: ["Opportunity was already quoted."] }
   ]);
@@ -428,8 +430,10 @@ test("review summaries handle long, missing, sent, failed and skipped results sa
   assert.match(rows[0].children[4].textContent, /\(\+1 more\)$/);
   assert.equal(rows[1].children[4].textContent, "Manual review required; no reason was recorded.");
   assert.equal(rows[2].children[4].textContent, "Quote submitted");
-  assert.equal(rows[3].children[4].textContent, "Sensitive or technical error details were withheld.");
-  assert.equal(rows[4].children[4].textContent, "Opportunity was already quoted.");
+  assert.equal(rows[3].children[4].textContent, "Quote submitted");
+  assert.equal(rows[3].children[7].textContent, "verified-quote");
+  assert.equal(rows[4].children[4].textContent, "Sensitive or technical error details were withheld.");
+  assert.equal(rows[5].children[4].textContent, "Opportunity was already quoted.");
 });
 
 test("details use safe text, fallbacks, Close and Escape", async () => {

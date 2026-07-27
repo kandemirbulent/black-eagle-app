@@ -34,6 +34,7 @@ const salesAgentOpportunityResultSchema = new mongoose.Schema(
     finalPrice: { type: Number, min: 0, default: 0 },
     assumptions: { type: [String], default: [] },
     blockingReasons: { type: [String], default: [] },
+    reviewCodes: { type: [String], default: [] },
     quoteSubmitted: { type: Boolean, default: false },
     quoteUuid: { type: String, default: "", trim: true },
     platformState: { type: String, default: "", trim: true },
