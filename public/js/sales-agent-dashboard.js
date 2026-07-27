@@ -41,6 +41,59 @@
     return normalized || fallback;
   }
 
+  function safeOperationalText(value) {
+    const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
+    if (!normalized) return "";
+    if (
+      /(?:mongodb(?:\+srv)?:\/\/|api[_ -]?key|password|credential|cookie|session|private key|bearer\s+[a-z0-9._-]+)/i.test(
+        normalized
+      ) ||
+      /(?:^|\s)at\s+\S+\s+\([^)]*:\d+:\d+\)/i.test(normalized)
+    ) {
+      return "Sensitive or technical error details were withheld.";
+    }
+    return normalized;
+  }
+
+  function wordSafeLimit(value, limit = 120) {
+    const normalized = safeOperationalText(value);
+    if (normalized.length <= limit) return normalized;
+    const candidate = normalized.slice(0, limit + 1);
+    const boundary = candidate.lastIndexOf(" ");
+    return `${candidate.slice(0, boundary > 40 ? boundary : limit).trim()}…`;
+  }
+
+  function listValues(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) =>
+        safeOperationalText(
+          typeof item === "string" ? item : item?.reason || item?.message || item?.text
+        )
+      )
+      .filter(Boolean);
+  }
+
+  function reviewReason(result) {
+    const status = text(result?.resultStatus || result?.analysisStatus, "").toUpperCase();
+    const reasons = listValues(result?.blockingReasons);
+    if (status === "SENT" || status === "SUBMITTED") return "Quote submitted";
+    if (status === "MANUAL_REVIEW") {
+      if (!reasons.length) return "Manual review required; no reason was recorded.";
+      const suffix = reasons.length > 1 ? ` (+${reasons.length - 1} more)` : "";
+      return `${wordSafeLimit(reasons[0], Math.max(40, 120 - suffix.length))}${suffix}`;
+    }
+    if (status === "FAILED") {
+      const safeError = safeOperationalText(result?.errorSummary || result?.error);
+      const reason = reasons[0] || safeError;
+      return reason
+        ? wordSafeLimit(reason)
+        : "Processing failed; no safe error summary was recorded.";
+    }
+    if (status === "SKIPPED") return reasons[0] ? wordSafeLimit(reasons[0]) : "—";
+    return reasons[0] ? wordSafeLimit(reasons[0]) : "—";
+  }
+
   async function readPayload(response) {
     try {
       return await response.json();
@@ -69,7 +122,11 @@
       platformActions: byId("salesAgentPlatformActions"),
       runButton: byId("runSalesAgentButton"),
       retryButton: byId("retrySalesAgentButton"),
-      resultsTable: byId("salesAgentResultsTable")
+      resultsTable: byId("salesAgentResultsTable"),
+      detailsModal: byId("salesAgentDetailsModal"),
+      detailsTitle: byId("salesAgentDetailsModalTitle"),
+      detailsContent: byId("salesAgentDetailsContent"),
+      closeDetailsButton: byId("closeSalesAgentDetailsModal")
     };
     let currentRunId = "";
     let pollingTimer = null;
@@ -112,12 +169,137 @@
       updateButton(status);
     }
 
+    function createElement(tag, content, className) {
+      const element = documentRef.createElement(tag);
+      if (className) element.className = className;
+      if (content !== undefined) element.textContent = text(content);
+      return element;
+    }
+
+    function detailCard(label, value) {
+      const card = createElement("div", undefined, "sales-agent-detail-card");
+      card.appendChild(createElement("strong", label));
+      card.appendChild(createElement("div", value));
+      return card;
+    }
+
+    function detailSection(title, entries) {
+      const section = createElement("section", undefined, "sales-agent-detail-section");
+      section.appendChild(createElement("h4", title));
+      const grid = createElement("div", undefined, "sales-agent-detail-grid");
+      for (const [label, value] of entries) grid.appendChild(detailCard(label, value));
+      section.appendChild(grid);
+      return section;
+    }
+
+    function listSection(title, values, fallback) {
+      const section = createElement("section", undefined, "sales-agent-detail-section");
+      section.appendChild(createElement("h4", title));
+      const list = createElement("ul", undefined, "sales-agent-detail-list");
+      const safeValues = listValues(values);
+      for (const value of safeValues.length ? safeValues : [fallback]) {
+        list.appendChild(createElement("li", value));
+      }
+      section.appendChild(list);
+      return section;
+    }
+
+    function closeDetails() {
+      elements.detailsModal?.classList.add("hidden");
+      elements.detailsContent?.replaceChildren();
+    }
+
+    function openDetails(result) {
+      if (!elements.detailsModal || !elements.detailsContent) return;
+      const status = text(result?.resultStatus || result?.analysisStatus, "UNKNOWN").toUpperCase();
+      elements.detailsContent.replaceChildren();
+      elements.detailsTitle.textContent = text(result?.eventName, "Opportunity Details");
+
+      let bannerText = "";
+      let bannerClass = "";
+      if (status === "MANUAL_REVIEW") {
+        bannerText = "Quote was not submitted because manual review is required.";
+        bannerClass = "manual";
+      } else if (status === "FAILED") {
+        bannerText = "Processing failed. Review the reasons below.";
+        bannerClass = "failed";
+      } else if (status === "SENT" || status === "SUBMITTED") {
+        bannerText = "Quote submitted successfully.";
+        bannerClass = "success";
+      }
+      if (bannerText) {
+        elements.detailsContent.appendChild(
+          createElement("div", bannerText, `sales-agent-detail-banner ${bannerClass}`)
+        );
+      }
+
+      elements.detailsContent.appendChild(
+        detailSection("Basic Information", [
+          ["Event name", result?.eventName],
+          ["Opportunity ID", result?.opportunityId],
+          ["Platform", text(result?.platform).toUpperCase()],
+          ["Event date", formatDateTime(result?.eventDate)],
+          ["Location", result?.location],
+          ["Analysis status", result?.analysisStatus],
+          ["Result status", result?.resultStatus],
+          ["Last updated", formatDateTime(result?.updatedAt || result?.createdAt)]
+        ])
+      );
+      elements.detailsContent.appendChild(
+        listSection(
+          "Why was the quote not submitted?",
+          result?.blockingReasons,
+          "No blocking reason was recorded."
+        )
+      );
+      elements.detailsContent.appendChild(
+        listSection("Agent Assumptions", result?.assumptions, "No assumptions were recorded.")
+      );
+
+      const staffing = Array.isArray(result?.staffBreakdown)
+        ? result.staffBreakdown
+            .map((item) => {
+              const role = safeOperationalText(item?.role);
+              const quantity = safeNumber(item?.quantity);
+              return role && quantity > 0 ? `${role}: ${quantity}` : "";
+            })
+            .filter(Boolean)
+            .join(", ")
+        : "";
+      elements.detailsContent.appendChild(
+        detailSection("Staffing Calculation", [
+          ["Roles and staff", staffing || "—"],
+          ["Working hours", safeNumber(result?.workingHours)],
+          ["Travel hours", safeNumber(result?.travelHours)]
+        ])
+      );
+      elements.detailsContent.appendChild(
+        detailSection("Price Breakdown", [
+          ["Labour subtotal", formatPrice(result?.labourSubtotal)],
+          ["Travel labour", formatPrice(result?.travelLabour)],
+          ["Vehicle cost", formatPrice(result?.vehicleCost)],
+          ["Parking cost", formatPrice(result?.parkingCost)],
+          ["Accommodation cost", formatPrice(result?.accommodationCost)],
+          ["Final price", formatPrice(result?.finalPrice)]
+        ])
+      );
+      elements.detailsContent.appendChild(
+        detailSection("Quote Status", [
+          ["Quote submitted", result?.quoteSubmitted ? "Yes" : "No"],
+          ["Quote UUID", result?.quoteUuid],
+          ["Platform state", result?.platformState],
+          ["AI call used", result?.aiCallUsed ? "Yes" : "No"]
+        ])
+      );
+      elements.detailsModal.classList.remove("hidden");
+    }
+
     function renderResults(results) {
       elements.resultsTable.replaceChildren();
       if (!Array.isArray(results) || !results.length) {
         const row = documentRef.createElement("tr");
         const cell = documentRef.createElement("td");
-        cell.colSpan = 8;
+        cell.colSpan = 10;
         cell.textContent = "No opportunity results yet.";
         row.appendChild(cell);
         elements.resultsTable.appendChild(row);
@@ -130,6 +312,7 @@
           text(result?.opportunityId),
           text(result?.platform).toUpperCase(),
           text(result?.resultStatus || result?.analysisStatus),
+          reviewReason(result),
           staffText(result?.staffBreakdown),
           formatPrice(result?.finalPrice),
           text(result?.quoteUuid),
@@ -140,6 +323,12 @@
           cell.textContent = value;
           row.appendChild(cell);
         }
+        const actionCell = documentRef.createElement("td");
+        const detailsButton = createElement("button", "View Details", "button secondary sales-agent-action-button");
+        detailsButton.type = "button";
+        detailsButton.addEventListener("click", () => openDetails(result));
+        actionCell.appendChild(detailsButton);
+        row.appendChild(actionCell);
         elements.resultsTable.appendChild(row);
       }
     }
@@ -265,8 +454,16 @@
       refresh();
     }
 
+    function onKeyDown(event) {
+      if (event?.key === "Escape" && !elements.detailsModal?.classList.contains("hidden")) {
+        closeDetails();
+      }
+    }
+
     async function init() {
       documentRef.addEventListener("visibilitychange", onVisibilityChange);
+      documentRef.addEventListener("keydown", onKeyDown);
+      elements.closeDetailsButton?.addEventListener("click", closeDetails);
       return refresh();
     }
 
@@ -277,6 +474,8 @@
       pollStatus,
       renderRun,
       renderResults,
+      openDetails,
+      closeDetails,
       startPolling,
       stopPolling,
       getCurrentRunId: () => currentRunId,
@@ -287,6 +486,8 @@
   return {
     createController,
     formatPrice,
-    staffText
+    staffText,
+    reviewReason,
+    wordSafeLimit
   };
 });

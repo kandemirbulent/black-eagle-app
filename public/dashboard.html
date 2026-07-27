@@ -455,6 +455,38 @@
         align-items: center;
       }
     }
+    .sales-agent-details-panel { width: min(900px, 100%); }
+    .sales-agent-detail-banner {
+      border-radius: 10px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      padding: 12px 14px;
+    }
+    .sales-agent-detail-banner.manual { background: #fff7d6; color: #7a5700; }
+    .sales-agent-detail-banner.failed { background: #ffe8e8; color: #8a1f1f; }
+    .sales-agent-detail-banner.success { background: #e4f7ec; color: #176b3a; }
+    .sales-agent-detail-section { margin-top: 18px; }
+    .sales-agent-detail-section h4 { margin: 0 0 10px; }
+    .sales-agent-detail-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    }
+    .sales-agent-detail-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+      padding: 10px;
+    }
+    .sales-agent-detail-list {
+      margin: 0;
+      overflow-wrap: anywhere;
+      padding-left: 22px;
+      white-space: normal;
+    }
+    .sales-agent-action-button { white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -763,14 +795,16 @@
                 <th>Opportunity ID</th>
                 <th>Platform</th>
                 <th>Status</th>
+                <th>Review Reason</th>
                 <th>Staff</th>
                 <th>Final Price</th>
                 <th>Quote UUID</th>
                 <th>Updated</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="salesAgentResultsTable">
-              <tr><td colspan="8">No opportunity results yet.</td></tr>
+              <tr><td colspan="10">No opportunity results yet.</td></tr>
             </tbody>
           </table>
         </div>
@@ -948,6 +982,19 @@
             <button type="button" class="icon-button" id="closeStaffDetailsModal" aria-label="Close staff details">&times;</button>
           </div>
           <div id="staffDetailsContent"></div>
+        </div>
+      </div>
+
+      <div id="salesAgentDetailsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="salesAgentDetailsModalTitle">
+        <div class="modal-panel sales-agent-details-panel">
+          <div class="modal-header">
+            <div>
+              <h3 id="salesAgentDetailsModalTitle" class="modal-title">Opportunity Details</h3>
+              <p class="subtle">Sales Agent decision and quotation details</p>
+            </div>
+            <button type="button" class="icon-button" id="closeSalesAgentDetailsModal" aria-label="Close opportunity details">&times;</button>
+          </div>
+          <div id="salesAgentDetailsContent"></div>
         </div>
       </div>
 

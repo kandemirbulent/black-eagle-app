@@ -3,11 +3,13 @@ const test = require("node:test");
 const { createController } = require("../public/js/sales-agent-dashboard.js");
 
 class FakeElement {
-  constructor() {
+  constructor(tagName = "div") {
+    this.tagName = tagName.toUpperCase();
     this.textContent = "";
     this.disabled = false;
     this.children = [];
     this.colSpan = 1;
+    this.listeners = {};
     const classes = new Set(["hidden"]);
     this.classList = {
       add: (value) => classes.add(value),
@@ -23,6 +25,14 @@ class FakeElement {
 
   replaceChildren(...children) {
     this.children = children;
+  }
+
+  addEventListener(name, listener) {
+    this.listeners[name] = listener;
+  }
+
+  click() {
+    this.listeners.click?.({ target: this });
   }
 }
 
@@ -40,6 +50,10 @@ function fakeDocument() {
     "runSalesAgentButton",
     "retrySalesAgentButton",
     "salesAgentResultsTable",
+    "salesAgentDetailsModal",
+    "salesAgentDetailsModalTitle",
+    "salesAgentDetailsContent",
+    "closeSalesAgentDetailsModal",
   ];
   const elements = Object.fromEntries(ids.map((id) => [id, new FakeElement()]));
   const listeners = {};
@@ -48,11 +62,15 @@ function fakeDocument() {
     elements,
     listeners,
     getElementById: (id) => elements[id],
-    createElement: () => new FakeElement(),
+    createElement: (tagName) => new FakeElement(tagName),
     addEventListener: (name, listener) => {
       listeners[name] = listener;
     },
   };
+}
+
+function flattenText(element) {
+  return [element.textContent, ...element.children.flatMap(flattenText)].filter(Boolean).join(" ");
 }
 
 function response(status, payload) {
@@ -203,9 +221,11 @@ test("results render staff, GBP price and identifiers", () => {
   const cells = context.documentRef.elements.salesAgentResultsTable.children[0].children;
   assert.equal(cells[0].textContent, "Wedding");
   assert.equal(cells[1].textContent, "ABC123");
-  assert.equal(cells[4].textContent, "2 Waiter, 1 Bartender");
-  assert.match(cells[5].textContent, /£300\.00/);
-  assert.equal(cells[6].textContent, "quote-1");
+  assert.equal(cells[4].textContent, "Quote submitted");
+  assert.equal(cells[5].textContent, "2 Waiter, 1 Bartender");
+  assert.match(cells[6].textContent, /£300\.00/);
+  assert.equal(cells[7].textContent, "quote-1");
+  assert.equal(cells[9].children[0].textContent, "View Details");
 });
 
 test("empty results show the empty state", () => {
@@ -213,7 +233,89 @@ test("empty results show the empty state", () => {
   context.instance.renderResults([]);
   const row = context.documentRef.elements.salesAgentResultsTable.children[0];
   assert.equal(row.children[0].textContent, "No opportunity results yet.");
-  assert.equal(row.children[0].colSpan, 8);
+  assert.equal(row.children[0].colSpan, 10);
+});
+
+test("manual review summary and details show reasons, assumptions, staffing and prices", () => {
+  const context = controller();
+  const result = {
+    eventName: "Wedding",
+    opportunityId: "RSAEWYMM",
+    platform: "togather",
+    analysisStatus: "MANUAL_REVIEW",
+    resultStatus: "MANUAL_REVIEW",
+    blockingReasons: ["Travel cannot be priced safely.", "Start time needs confirmation."],
+    assumptions: ["One vehicle is assumed."],
+    staffBreakdown: [{ role: "Waiter", quantity: 3 }],
+    workingHours: 8,
+    travelHours: 2,
+    labourSubtotal: 480,
+    travelLabour: 120,
+    vehicleCost: 50,
+    parkingCost: 10,
+    accommodationCost: 0,
+    finalPrice: 660,
+    quoteSubmitted: false,
+    aiCallUsed: false
+  };
+  context.instance.renderResults([result]);
+  const row = context.documentRef.elements.salesAgentResultsTable.children[0];
+  assert.equal(row.children[4].textContent, "Travel cannot be priced safely. (+1 more)");
+  row.children[9].children[0].click();
+  const detailText = flattenText(context.documentRef.elements.salesAgentDetailsContent);
+  assert.match(detailText, /manual review is required/i);
+  assert.match(detailText, /Travel cannot be priced safely/);
+  assert.match(detailText, /One vehicle is assumed/);
+  assert.match(detailText, /Waiter: 3/);
+  assert.match(detailText, /£660\.00/);
+});
+
+test("review summaries handle long, missing, sent, failed and skipped results safely", () => {
+  const context = controller();
+  const longReason = "Travel or accommodation cost could not be priced safely because the available route information is incomplete and requires operational review before submission.";
+  context.instance.renderResults([
+    { resultStatus: "MANUAL_REVIEW", blockingReasons: [longReason, "Second reason"] },
+    { resultStatus: "MANUAL_REVIEW" },
+    { resultStatus: "SENT" },
+    { resultStatus: "FAILED", error: "Error: request failed\n at worker (secret.js:1:2)" },
+    { resultStatus: "SKIPPED", blockingReasons: ["Opportunity was already quoted."] }
+  ]);
+  const rows = context.documentRef.elements.salesAgentResultsTable.children;
+  assert.ok(rows[0].children[4].textContent.length <= 120);
+  assert.match(rows[0].children[4].textContent, /\(\+1 more\)$/);
+  assert.equal(rows[1].children[4].textContent, "Manual review required; no reason was recorded.");
+  assert.equal(rows[2].children[4].textContent, "Quote submitted");
+  assert.equal(rows[3].children[4].textContent, "Sensitive or technical error details were withheld.");
+  assert.equal(rows[4].children[4].textContent, "Opportunity was already quoted.");
+});
+
+test("details use safe text, fallbacks, Close and Escape", async () => {
+  const context = controller({ responses: [new Error("offline")] });
+  await context.instance.init();
+  const unsafe = '<img src=x onerror="globalThis.compromised=true">';
+  context.instance.openDetails({
+    eventName: unsafe,
+    resultStatus: "FAILED",
+    staffBreakdown: []
+  });
+  const content = context.documentRef.elements.salesAgentDetailsContent;
+  assert.match(flattenText(content), /No blocking reason was recorded/);
+  assert.match(flattenText(content), /No assumptions were recorded/);
+  assert.equal(context.documentRef.elements.salesAgentDetailsModalTitle.textContent, unsafe);
+  assert.equal(context.documentRef.elements.salesAgentDetailsModal.children.length, 0);
+
+  context.documentRef.elements.closeSalesAgentDetailsModal.click();
+  assert.equal(
+    context.documentRef.elements.salesAgentDetailsModal.classList.contains("hidden"),
+    true
+  );
+
+  context.instance.openDetails({ resultStatus: "MANUAL_REVIEW" });
+  context.documentRef.listeners.keydown({ key: "Escape" });
+  assert.equal(
+    context.documentRef.elements.salesAgentDetailsModal.classList.contains("hidden"),
+    true
+  );
 });
 
 test("network and malformed responses do not crash the page", async () => {
