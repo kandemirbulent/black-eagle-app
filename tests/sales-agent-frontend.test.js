@@ -9,12 +9,19 @@ class FakeElement {
     this.disabled = false;
     this.children = [];
     this.colSpan = 1;
+    this.value = "";
     this.listeners = {};
     const classes = new Set(["hidden"]);
     this.classList = {
       add: (value) => classes.add(value),
       remove: (value) => classes.delete(value),
       contains: (value) => classes.has(value),
+      toggle: (value, force) => {
+        if (force === true) classes.add(value);
+        else if (force === false) classes.delete(value);
+        else if (classes.has(value)) classes.delete(value);
+        else classes.add(value);
+      },
     };
   }
 
@@ -54,6 +61,8 @@ function fakeDocument() {
     "salesAgentDetailsModalTitle",
     "salesAgentDetailsContent",
     "closeSalesAgentDetailsModal",
+    "salesAgentRunSelector",
+    "salesAgentResultsNotice",
   ];
   const elements = Object.fromEntries(ids.map((id) => [id, new FakeElement()]));
   const listeners = {};
@@ -234,6 +243,140 @@ test("empty results show the empty state", () => {
   const row = context.documentRef.elements.salesAgentResultsTable.children[0];
   assert.equal(row.children[0].textContent, "No opportunity results yet.");
   assert.equal(row.children[0].colSpan, 10);
+});
+
+test("a new queued run preserves previous results and shows a notice", async () => {
+  const context = controller({
+    responses: [response(201, { success: true, run: run({ _id: "run-new" }) })],
+    setIntervalFn: () => 1
+  });
+  context.instance.renderResults([
+    { eventName: "Previous Wedding", resultStatus: "MANUAL_REVIEW" }
+  ]);
+  await context.instance.startRun();
+  const row = context.documentRef.elements.salesAgentResultsTable.children[0];
+  assert.equal(row.children[0].textContent, "Previous Wedding");
+  assert.match(
+    context.documentRef.elements.salesAgentResultsNotice.textContent,
+    /Current run is QUEUED.*previous completed run/
+  );
+});
+
+test("current run results replace preserved results when they arrive", async () => {
+  const context = controller({
+    responses: [
+      response(201, { success: true, run: run({ _id: "run-new", status: "RUNNING" }) }),
+      response(200, {
+        success: true,
+        status: "RUNNING",
+        run: run({ _id: "run-new", status: "RUNNING" })
+      }),
+      response(200, { success: true, run: run({ _id: "run-new", status: "RUNNING" }) }),
+      response(200, {
+        success: true,
+        results: [{ eventName: "Current Event", resultStatus: "SENT" }]
+      })
+    ],
+    setIntervalFn: () => 1
+  });
+  context.instance.renderResults([
+    { eventName: "Previous Event", resultStatus: "MANUAL_REVIEW" }
+  ]);
+  await context.instance.startRun();
+  await context.instance.pollStatus();
+  const row = context.documentRef.elements.salesAgentResultsTable.children[0];
+  assert.equal(row.children[0].textContent, "Current Event");
+  assert.equal(
+    context.documentRef.elements.salesAgentResultsNotice.classList.contains("hidden"),
+    true
+  );
+});
+
+test("run history lists at most 20 safe summary options", () => {
+  const context = controller();
+  const runs = Array.from({ length: 22 }, (_, index) =>
+    run({
+      _id: `run-${index}`,
+      status: "COMPLETED",
+      totals: { opportunitiesFound: 2, quotesSubmitted: 1, manualReview: 1 }
+    })
+  );
+  context.instance.renderRunHistory(runs);
+  const options = context.documentRef.elements.salesAgentRunSelector.children;
+  assert.equal(options.length, 21);
+  assert.equal(options[0].textContent, "Latest Run");
+  assert.match(options[1].textContent, /COMPLETED.*2 found.*1 submitted.*1 review/);
+});
+
+test("selecting an older run loads its cards and results", async () => {
+  const context = controller({
+    responses: [
+      response(200, {
+        success: true,
+        run: run({
+          _id: "old-run",
+          status: "COMPLETED",
+          totals: { opportunitiesFound: 1, manualReview: 1 }
+        })
+      }),
+      response(200, {
+        success: true,
+        results: [{ eventName: "Old Event", resultStatus: "MANUAL_REVIEW" }]
+      })
+    ]
+  });
+  await context.instance.loadSelectedRun("old-run");
+  assert.equal(context.calls[0].url, "/api/admin/sales-agent/runs/old-run");
+  assert.equal(context.calls[1].url, "/api/admin/sales-agent/runs/old-run/results");
+  assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "COMPLETED");
+  assert.equal(
+    context.documentRef.elements.salesAgentResultsTable.children[0].children[0].textContent,
+    "Old Event"
+  );
+});
+
+test("Latest Run selection returns to automatic current-run behavior without delete calls", async () => {
+  const context = controller({
+    responses: [
+      response(200, {
+        success: true,
+        runs: [run({ _id: "latest-run", status: "COMPLETED" })]
+      }),
+      response(200, { success: true, status: "IDLE", run: null }),
+      response(200, {
+        success: true,
+        run: run({ _id: "latest-run", status: "COMPLETED" })
+      }),
+      response(200, {
+        success: true,
+        results: [{ eventName: "Latest Event", resultStatus: "SENT" }]
+      }),
+      response(200, {
+        success: true,
+        runs: [run({ _id: "latest-run", status: "COMPLETED" })]
+      }),
+      response(200, { success: true, status: "IDLE", run: null }),
+      response(200, {
+        success: true,
+        run: run({ _id: "latest-run", status: "COMPLETED" })
+      }),
+      response(200, {
+        success: true,
+        results: [{ eventName: "Latest Event", resultStatus: "SENT" }]
+      })
+    ]
+  });
+  await context.instance.init();
+  context.documentRef.elements.salesAgentRunSelector.value = "";
+  await context.documentRef.elements.salesAgentRunSelector.listeners.change();
+  assert.equal(
+    context.documentRef.elements.salesAgentResultsTable.children[0].children[0].textContent,
+    "Latest Event"
+  );
+  assert.equal(
+    context.calls.some((call) => String(call.options.method || "GET").toUpperCase() === "DELETE"),
+    false
+  );
 });
 
 test("manual review summary and details show reasons, assumptions, staffing and prices", () => {

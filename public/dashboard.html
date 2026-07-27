@@ -786,7 +786,16 @@
           <button type="button" class="btn hidden" id="retrySalesAgentButton">Retry</button>
         </div>
 
-        <h3>Opportunity Results</h3>
+        <div class="btn-row" style="justify-content:space-between;align-items:end;">
+          <h3 style="margin:0;">Opportunity Results</h3>
+          <label for="salesAgentRunSelector">
+            Select Run
+            <select id="salesAgentRunSelector">
+              <option value="">Latest Run</option>
+            </select>
+          </label>
+        </div>
+        <p id="salesAgentResultsNotice" class="subtle hidden" style="margin:10px 0 0;"></p>
         <div class="table-wrap" style="margin-top:12px;">
           <table class="table">
             <thead>

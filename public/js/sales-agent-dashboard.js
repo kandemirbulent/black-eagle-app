@@ -126,9 +126,16 @@
       detailsModal: byId("salesAgentDetailsModal"),
       detailsTitle: byId("salesAgentDetailsModalTitle"),
       detailsContent: byId("salesAgentDetailsContent"),
-      closeDetailsButton: byId("closeSalesAgentDetailsModal")
+      closeDetailsButton: byId("closeSalesAgentDetailsModal"),
+      runSelector: byId("salesAgentRunSelector"),
+      resultsNotice: byId("salesAgentResultsNotice")
     };
     let currentRunId = "";
+    let currentRun = null;
+    let displayedResultsRunId = "";
+    let displayedResultsCount = 0;
+    let automaticLatestRun = true;
+    let runsCache = [];
     let pollingTimer = null;
 
     function showRetryError(message) {
@@ -296,6 +303,7 @@
 
     function renderResults(results) {
       elements.resultsTable.replaceChildren();
+      displayedResultsCount = Array.isArray(results) ? results.length : 0;
       if (!Array.isArray(results) || !results.length) {
         const row = documentRef.createElement("tr");
         const cell = documentRef.createElement("td");
@@ -333,6 +341,42 @@
       }
     }
 
+    function setResultsNotice(message) {
+      if (!elements.resultsNotice) return;
+      elements.resultsNotice.textContent = text(message, "");
+      elements.resultsNotice.classList.toggle("hidden", !message);
+    }
+
+    function getRunId(run) {
+      return String(run?._id || run?.id || "");
+    }
+
+    function runOptionText(run) {
+      const totals = run?.totals && typeof run.totals === "object" ? run.totals : {};
+      const date = formatDateTime(run?.completedAt || run?.startedAt || run?.createdAt);
+      const status = text(run?.status, "UNKNOWN").toUpperCase();
+      return `${date} — ${status} — ${safeNumber(totals.opportunitiesFound)} found / ${safeNumber(totals.quotesSubmitted)} submitted / ${safeNumber(totals.manualReview)} review`;
+    }
+
+    function renderRunHistory(runs) {
+      runsCache = Array.isArray(runs) ? runs.slice(0, 20) : [];
+      if (!elements.runSelector) return;
+      const latestOption = documentRef.createElement("option");
+      latestOption.value = "";
+      latestOption.textContent = "Latest Run";
+      const options = [latestOption];
+      for (const run of runsCache) {
+        const id = getRunId(run);
+        if (!id) continue;
+        const option = documentRef.createElement("option");
+        option.value = id;
+        option.textContent = runOptionText(run);
+        options.push(option);
+      }
+      elements.runSelector.replaceChildren(...options);
+      elements.runSelector.value = automaticLatestRun ? "" : displayedResultsRunId;
+    }
+
     async function requestJson(url, options) {
       const response = await authFetch(url, options);
       const payload = await readPayload(response);
@@ -342,37 +386,110 @@
       return { response, payload };
     }
 
-    async function loadRun(runId) {
-      if (!runId) return null;
-      const detail = await requestJson(`/api/admin/sales-agent/runs/${encodeURIComponent(runId)}`);
+    async function loadRunRecord(id) {
+      if (!id) return null;
+      const detail = await requestJson(`/api/admin/sales-agent/runs/${encodeURIComponent(id)}`);
       if (!detail.response.ok || detail.payload.success === false || !detail.payload.run) {
         throw new Error("Sales Agent run could not be loaded.");
       }
       const run = detail.payload.run;
-      currentRunId = String(run._id || run.id || runId);
-      renderRun(run);
-
+      const resolvedId = getRunId(run) || String(id);
       const resultResponse = await requestJson(
-        `/api/admin/sales-agent/runs/${encodeURIComponent(currentRunId)}/results`
+        `/api/admin/sales-agent/runs/${encodeURIComponent(resolvedId)}/results`
       );
       if (!resultResponse.response.ok || resultResponse.payload.success === false) {
         throw new Error("Opportunity results could not be loaded.");
       }
-      renderResults(resultResponse.payload.results);
-      if (TERMINAL_STATUSES.has(String(run.status || "").toUpperCase())) stopPolling();
-      return run;
+      return {
+        run,
+        results: Array.isArray(resultResponse.payload.results)
+          ? resultResponse.payload.results
+          : []
+      };
     }
 
-    async function latestRun() {
+    async function loadRunHistory() {
       const list = await requestJson("/api/admin/sales-agent/runs");
       if (!list.response.ok || list.payload.success === false) {
         throw new Error("Sales Agent runs could not be loaded.");
       }
-      const run = Array.isArray(list.payload.runs) ? list.payload.runs[0] : null;
-      if (run?._id || run?.id) return loadRun(run._id || run.id);
+      renderRunHistory(Array.isArray(list.payload.runs) ? list.payload.runs : []);
+      return runsCache;
+    }
+
+    async function showPreviousResults(status) {
+      if (displayedResultsRunId && displayedResultsRunId !== currentRunId && displayedResultsCount) {
+        setResultsNotice(
+          `Current run is ${status}. Showing results from the previous completed run.`
+        );
+        return;
+      }
+      const candidates = runsCache.filter((run) => {
+        const candidateStatus = text(run?.status, "").toUpperCase();
+        return (
+          getRunId(run) !== currentRunId &&
+          TERMINAL_STATUSES.has(candidateStatus)
+        );
+      });
+      for (const candidate of candidates) {
+        const record = await loadRunRecord(getRunId(candidate));
+        if (record?.results.length) {
+          displayedResultsRunId = getRunId(record.run);
+          renderResults(record.results);
+          setResultsNotice(
+            `Current run is ${status}. Showing results from the previous completed run.`
+          );
+          return;
+        }
+      }
+      displayedResultsRunId = currentRunId;
+      renderResults([]);
+      setResultsNotice("");
+    }
+
+    async function loadCurrentRun(id) {
+      const record = await loadRunRecord(id);
+      if (!record) return null;
+      currentRun = record.run;
+      currentRunId = getRunId(record.run) || String(id);
+      const status = text(record.run?.status, "IDLE").toUpperCase();
+      if (automaticLatestRun) renderRun(record.run);
+      if (automaticLatestRun && record.results.length) {
+        displayedResultsRunId = currentRunId;
+        renderResults(record.results);
+        setResultsNotice("");
+      } else if (automaticLatestRun && ACTIVE_STATUSES.has(status)) {
+        await showPreviousResults(status);
+      } else if (automaticLatestRun) {
+        displayedResultsRunId = currentRunId;
+        renderResults(record.results);
+        setResultsNotice("");
+      }
+      if (!automaticLatestRun) updateButton(status);
+      if (TERMINAL_STATUSES.has(status)) stopPolling();
+      return record.run;
+    }
+
+    async function loadSelectedRun(id) {
+      const record = await loadRunRecord(id);
+      if (!record) return null;
+      displayedResultsRunId = getRunId(record.run) || String(id);
+      renderRun(record.run);
+      renderResults(record.results);
+      setResultsNotice("");
+      updateButton(currentRun?.status);
+      return record.run;
+    }
+
+    async function latestRun() {
+      if (!runsCache.length) await loadRunHistory();
+      const run = runsCache[0] || null;
+      if (getRunId(run)) return loadCurrentRun(getRunId(run));
       currentRunId = "";
+      currentRun = null;
       renderRun(null);
       renderResults([]);
+      setResultsNotice("");
       return null;
     }
 
@@ -383,10 +500,10 @@
         throw new Error("Sales Agent status could not be loaded.");
       }
       const activeRun = statusResponse.payload.run;
-      if (activeRun?._id || activeRun?.id) {
-        return loadRun(activeRun._id || activeRun.id);
+      if (getRunId(activeRun)) {
+        return loadCurrentRun(getRunId(activeRun));
       }
-      if (currentRunId) return loadRun(currentRunId);
+      if (currentRunId) return loadCurrentRun(currentRunId);
       return latestRun();
     }
 
@@ -410,6 +527,7 @@
     async function refresh() {
       clearRetry();
       try {
+        await loadRunHistory();
         const run = await pollStatus();
         if (ACTIVE_STATUSES.has(String(run?.status || "").toUpperCase())) startPolling();
         return run;
@@ -437,9 +555,19 @@
           throw new Error("Sales Agent run could not be started.");
         }
         const run = created.payload.run;
-        currentRunId = String(run._id || run.id || "");
+        currentRun = run;
+        currentRunId = getRunId(run);
+        automaticLatestRun = true;
+        renderRunHistory([
+          run,
+          ...runsCache.filter((cachedRun) => getRunId(cachedRun) !== currentRunId)
+        ]);
         renderRun(run);
-        renderResults([]);
+        if (displayedResultsCount && displayedResultsRunId !== currentRunId) {
+          setResultsNotice(
+            `Current run is ${text(run?.status, "QUEUED").toUpperCase()}. Showing results from the previous completed run.`
+          );
+        }
         startPolling();
         return run;
       } catch (_error) {
@@ -460,10 +588,26 @@
       }
     }
 
+    async function onRunSelectionChange() {
+      const selectedRunId = String(elements.runSelector?.value || "");
+      if (!selectedRunId) {
+        automaticLatestRun = true;
+        await refresh();
+        return;
+      }
+      automaticLatestRun = false;
+      try {
+        await loadSelectedRun(selectedRunId);
+      } catch (_error) {
+        showRetryError("The selected Sales Agent run could not be loaded. Please retry.");
+      }
+    }
+
     async function init() {
       documentRef.addEventListener("visibilitychange", onVisibilityChange);
       documentRef.addEventListener("keydown", onKeyDown);
       elements.closeDetailsButton?.addEventListener("click", closeDetails);
+      elements.runSelector?.addEventListener("change", onRunSelectionChange);
       return refresh();
     }
 
@@ -474,11 +618,14 @@
       pollStatus,
       renderRun,
       renderResults,
+      renderRunHistory,
+      loadSelectedRun,
       openDetails,
       closeDetails,
       startPolling,
       stopPolling,
       getCurrentRunId: () => currentRunId,
+      getDisplayedResultsRunId: () => displayedResultsRunId,
       isPolling: () => pollingTimer !== null
     };
   }
