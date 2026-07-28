@@ -237,6 +237,26 @@ test("canonical latest overlay promotes submitted state without altering histori
   assert.equal(historical[0].resultStatus, "MANUAL_REVIEW");
 });
 
+test("verified canonical fields overlay the same historical result without rewriting history", () => {
+  const historical = [{
+    platform: "togather",
+    opportunityId: "RUYN9WR7",
+    resultStatus: "MANUAL_REVIEW",
+    blockingReasons: ["Old historical review reason"],
+    quoteSubmitted: false,
+    quoteUuid: "",
+    verifiedStatus: "PENDING",
+    verifiedPlatformState: "pending",
+    verifiedQuoteUuid: "1677448a-d2ba-4512-8f13-dacdfaafdbec",
+  }];
+  const latest = overlayCanonicalLatest(historical, historical);
+  assert.equal(latest[0].resultStatus, "PENDING");
+  assert.equal(latest[0].quoteUuid, historical[0].verifiedQuoteUuid);
+  assert.deepEqual(latest[0].blockingReasons, []);
+  assert.equal(historical[0].resultStatus, "MANUAL_REVIEW");
+  assert.deepEqual(historical[0].blockingReasons, ["Old historical review reason"]);
+});
+
 test("canonical precedence keeps accepted above pending and pending above older failed", () => {
   const base = [{ platform: "togather", opportunityId: "TEST", resultStatus: "FAILED" }];
   const pending = {

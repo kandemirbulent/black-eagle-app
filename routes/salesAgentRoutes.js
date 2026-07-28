@@ -20,9 +20,13 @@ const RESULT_STATUS_PRECEDENCE = Object.freeze({
   BOOKED: 5,
 });
 
-function canonicalStatus(result = {}) {
-  const platformState = String(result.platformState || "").trim().toUpperCase();
-  const resultStatus = String(result.resultStatus || result.analysisStatus || "").trim().toUpperCase();
+function canonicalStatus(result = {}, includeVerified = true) {
+  const platformState = String(
+    (includeVerified && result.verifiedPlatformState) || result.platformState || ""
+  ).trim().toUpperCase();
+  const resultStatus = String(
+    (includeVerified && result.verifiedStatus) || result.resultStatus || result.analysisStatus || ""
+  ).trim().toUpperCase();
   const status = platformState || resultStatus;
   return status === "SENT" ? "SUBMITTED" : status;
 }
@@ -30,7 +34,8 @@ function canonicalStatus(result = {}) {
 function verifiedCanonicalCandidate(result = {}) {
   const status = canonicalStatus(result);
   if (!["SUBMITTED", "PENDING", "ACCEPTED", "CONFIRMED", "BOOKED"].includes(status)) return true;
-  return result.quoteSubmitted === true || Boolean(String(result.quoteUuid || "").trim());
+  return result.quoteSubmitted === true
+    || Boolean(String(result.verifiedQuoteUuid || result.quoteUuid || "").trim());
 }
 
 function overlayCanonicalLatest(baseResults = [], allResults = []) {
@@ -54,7 +59,7 @@ function overlayCanonicalLatest(baseResults = [], allResults = []) {
     const key = `${String(base.platform || "").toLowerCase()}:${String(base.opportunityId || "")}`;
     const latest = grouped.get(key);
     if (!latest) return base;
-    const baseRank = RESULT_STATUS_PRECEDENCE[canonicalStatus(base)] ?? -1;
+    const baseRank = RESULT_STATUS_PRECEDENCE[canonicalStatus(base, false)] ?? -1;
     const latestStatus = canonicalStatus(latest);
     const latestRank = RESULT_STATUS_PRECEDENCE[latestStatus] ?? -1;
     if (latestRank <= baseRank) return base;
@@ -64,8 +69,8 @@ function overlayCanonicalLatest(baseResults = [], allResults = []) {
       resultStatus: latestStatus,
       analysisStatus: latest.analysisStatus || base.analysisStatus,
       quoteSubmitted: submittedOrBetter ? true : latest.quoteSubmitted,
-      quoteUuid: latest.quoteUuid || base.quoteUuid,
-      platformState: latest.platformState || latestStatus.toLowerCase(),
+      quoteUuid: latest.verifiedQuoteUuid || latest.quoteUuid || base.quoteUuid,
+      platformState: latest.verifiedPlatformState || latest.platformState || latestStatus.toLowerCase(),
       blockingReasons: submittedOrBetter ? [] : (latest.blockingReasons || base.blockingReasons),
       updatedAt: latest.updatedAt || base.updatedAt,
     };

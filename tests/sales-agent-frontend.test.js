@@ -263,6 +263,26 @@ test("a new queued run preserves previous results and shows a notice", async () 
   );
 });
 
+test("queued cards remain current while canonical pending previous result is displayed", async () => {
+  const context = controller({
+    responses: [response(201, { success: true, run: run({ _id: "run-new", status: "QUEUED" }) })],
+    setIntervalFn: () => 1
+  });
+  context.instance.renderResults([{
+    eventName: "Lexie's Wedding",
+    opportunityId: "RUYN9WR7",
+    resultStatus: "PENDING",
+    quoteUuid: "1677448a-d2ba-4512-8f13-dacdfaafdbec",
+    blockingReasons: []
+  }]);
+  await context.instance.startRun();
+  const row = context.documentRef.elements.salesAgentResultsTable.children[0];
+  assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "QUEUED");
+  assert.equal(row.children[3].textContent, "PENDING");
+  assert.equal(row.children[4].textContent, "Quote submitted");
+  assert.equal(row.children[7].textContent, "1677448a-d2ba-4512-8f13-dacdfaafdbec");
+});
+
 test("current run results replace preserved results when they arrive", async () => {
   const context = controller({
     responses: [

@@ -38,6 +38,10 @@ const salesAgentOpportunityResultSchema = new mongoose.Schema(
     quoteSubmitted: { type: Boolean, default: false },
     quoteUuid: { type: String, default: "", trim: true },
     platformState: { type: String, default: "", trim: true },
+    verifiedStatus: { type: String, default: "", trim: true },
+    verifiedQuoteUuid: { type: String, default: "", trim: true },
+    verifiedPlatformState: { type: String, default: "", trim: true },
+    verifiedAt: { type: Date, default: null },
     aiCallUsed: { type: Boolean, default: false },
   },
   { timestamps: true }
