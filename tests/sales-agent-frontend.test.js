@@ -135,6 +135,23 @@ test("Run button sends POST and renders queued run", async () => {
   assert.equal(context.documentRef.elements.runSalesAgentButton.textContent, "Queued...");
 });
 
+test("worker trigger failure re-enables the run button with a safe message", async () => {
+  const context = controller({
+    responses: [response(503, {
+      success: false,
+      code: "WORKER_TRIGGER_FAILED",
+      message: "Sales Agent worker could not be started.",
+      run: run({ status: "FAILED", failureCode: "WORKER_TRIGGER_FAILED" })
+    })],
+  });
+  await context.instance.startRun();
+  assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "FAILED");
+  assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+  assert.equal(context.documentRef.elements.runSalesAgentButton.textContent, "Run Sales Agent");
+  assert.match(context.messages[0].message, /worker could not be started/i);
+  assert.doesNotMatch(JSON.stringify(context.messages), /token|secret|authorization/i);
+});
+
 test("409 active-run response loads existing active run without a second POST", async () => {
   const context = controller({
     responses: [
@@ -244,6 +261,39 @@ test("empty results show the empty state", () => {
   const row = context.documentRef.elements.salesAgentResultsTable.children[0];
   assert.equal(row.children[0].textContent, "No opportunity results yet.");
   assert.equal(row.children[0].colSpan, 10);
+});
+
+test("stale worker failure stops polling and re-enables the run button safely", async () => {
+  let tick;
+  const context = controller({
+    responses: [
+      response(201, { success: true, run: run({ status: "QUEUED" }) }),
+      response(200, { success: true, status: "IDLE", run: null }),
+      response(200, {
+        success: true,
+        run: run({
+          status: "FAILED",
+          failureCode: "WORKER_NOT_AVAILABLE",
+          errorSummary: "backend-only detail",
+        }),
+      }),
+      response(200, { success: true, results: [] }),
+    ],
+    setIntervalFn: (callback) => {
+      tick = callback;
+      return 9;
+    },
+  });
+  await context.instance.startRun();
+  await tick();
+  assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "FAILED");
+  assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+  assert.equal(context.documentRef.elements.runSalesAgentButton.textContent, "Run Sales Agent");
+  assert.equal(
+    context.messages.at(-1).message,
+    "Previous run expired because no worker was available. You can start a new run."
+  );
+  assert.doesNotMatch(JSON.stringify(context.messages), /backend-only|credential|authorization/i);
 });
 
 test("a new queued run preserves previous results and shows a notice", async () => {

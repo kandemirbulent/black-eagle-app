@@ -452,6 +452,7 @@
     async function loadCurrentRun(id) {
       const record = await loadRunRecord(id, true);
       if (!record) return null;
+      const previousStatus = text(currentRun?.status, "IDLE").toUpperCase();
       currentRun = record.run;
       currentRunId = getRunId(record.run) || String(id);
       const status = text(record.run?.status, "IDLE").toUpperCase();
@@ -468,7 +469,19 @@
         setResultsNotice("");
       }
       if (!automaticLatestRun) updateButton(status);
-      if (TERMINAL_STATUSES.has(status)) stopPolling();
+      if (TERMINAL_STATUSES.has(status)) {
+        stopPolling();
+        if (
+          status === "FAILED" &&
+          record.run?.failureCode === "WORKER_NOT_AVAILABLE" &&
+          ACTIVE_STATUSES.has(previousStatus)
+        ) {
+          showMessage(
+            "Previous run expired because no worker was available. You can start a new run.",
+            "error"
+          );
+        }
+      }
       return record.run;
     }
 
@@ -552,6 +565,11 @@
           const active = await pollStatus();
           if (ACTIVE_STATUSES.has(String(active?.status || "").toUpperCase())) startPolling();
           return active;
+        }
+        if (created.payload.code === "WORKER_TRIGGER_FAILED") {
+          if (created.payload.run) renderRun(created.payload.run);
+          showRetryError("Sales Agent worker could not be started. Please retry.");
+          return created.payload.run || null;
         }
         if (!created.response.ok || created.payload.success === false || !created.payload.run) {
           throw new Error("Sales Agent run could not be started.");

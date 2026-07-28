@@ -32,6 +32,13 @@ const salesAgentRunSchema = new mongoose.Schema(
     attempt: { type: Number, min: 0, default: 0 },
     failureCode: { type: String, default: "", trim: true },
     errorSummary: { type: String, default: "", trim: true },
+    triggerStatus: {
+      type: String,
+      enum: ["TRIGGERING", "TRIGGERED", "FAILED"],
+      default: "TRIGGERING",
+    },
+    triggerJobId: { type: String, default: "", trim: true },
+    triggeredAt: { type: Date, default: null },
     totals: {
       opportunitiesFound: { type: Number, min: 0, default: 0 },
       quotesSubmitted: { type: Number, min: 0, default: 0 },

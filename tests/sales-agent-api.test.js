@@ -5,6 +5,7 @@ const express = require("express");
 const {
   createSalesAgentRouter,
   overlayCanonicalLatest,
+  queuedTimeoutMs,
 } = require("../routes/salesAgentRoutes");
 
 const ADMIN_ID = "64b000000000000000000001";
@@ -19,8 +20,23 @@ function query(value) {
   };
 }
 
-function createHarness() {
-  const state = { runs: [], results: [], settings: null, sequence: 1 };
+function createHarness({
+  triggerSalesAgentRun,
+  initialRuns = [],
+  env = {},
+  now = () => new Date(),
+} = {}) {
+  const state = {
+    runs: structuredClone(initialRuns),
+    results: [],
+    settings: null,
+    sequence: initialRuns.length + 1,
+    triggerCalls: [],
+  };
+  const trigger = triggerSalesAgentRun || (async (input) => {
+    state.triggerCalls.push(input);
+    return { jobId: `job-${state.triggerCalls.length}` };
+  });
   const SalesAgentRun = {
     async create(input) {
       if (state.runs.some((run) => ["QUEUED", "RUNNING"].includes(run.status))) {
@@ -35,14 +51,31 @@ function createHarness() {
           opportunitiesFound: 0, quotesSubmitted: 0, manualReview: 0, skipped: 0,
           failed: 0, openAiCalls: 0, platformActions: 0,
         },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: now().toISOString(),
+        updatedAt: now().toISOString(),
       };
       state.runs.push(run);
       return structuredClone(run);
     },
     find() { return query(state.runs.slice().reverse()); },
     findById(id) { return query(state.runs.find((run) => run._id === id) || null); },
+    async findByIdAndUpdate(id, update) {
+      const run = state.runs.find((item) => item._id === id);
+      if (!run) return null;
+      Object.assign(run, structuredClone(update.$set || {}), { updatedAt: new Date().toISOString() });
+      return structuredClone(run);
+    },
+    async findOneAndUpdate(filter, update) {
+      const cutoff = filter?.$or?.[0]?.updatedAt?.$lt;
+      const run = state.runs.find((item) => {
+        if (item.status !== filter.status) return false;
+        const timestamp = item.updatedAt || item.createdAt;
+        return cutoff instanceof Date && new Date(timestamp) < cutoff;
+      });
+      if (!run) return null;
+      Object.assign(run, structuredClone(update.$set || {}));
+      return structuredClone(run);
+    },
     findOne(filter) {
       const statuses = filter?.status?.$in || [];
       return query(state.runs.find((run) => statuses.includes(run.status)) || null);
@@ -97,12 +130,15 @@ function createHarness() {
     SalesAgentRun,
     SalesAgentOpportunityResult,
     SalesAgentSettings,
+    triggerSalesAgentRun: trigger,
+    env,
+    now,
   }));
   return { app, state };
 }
 
-async function withServer(run) {
-  const { app, state } = createHarness();
+async function withServer(run, options) {
+  const { app, state } = createHarness(options);
   const server = await new Promise((resolve) => {
     const instance = app.listen(0, "127.0.0.1", () => resolve(instance));
   });
@@ -129,7 +165,96 @@ test("Admin can create a queued Sales Agent run", () => withServer(async ({ requ
   assert.equal(response.status, 201);
   assert.equal(body.run.status, "QUEUED");
   assert.equal(body.run.triggeredByRole, "admin");
+  assert.equal(body.run.triggerStatus, "TRIGGERED");
 }));
+
+test("run creation triggers one one-off job and duplicate request does not trigger twice", () => withServer(async ({ request, state }) => {
+  const first = await request("/api/admin/sales-agent/runs", jsonOptions("admin", "POST", {}));
+  const second = await request("/api/admin/sales-agent/runs", jsonOptions("admin", "POST", {}));
+  assert.equal(first.status, 201);
+  assert.equal(second.status, 409);
+  assert.equal(state.triggerCalls.length, 1);
+}));
+
+test("worker trigger failure marks the queued run FAILED", () => withServer(async ({ request, state }) => {
+  const response = await request("/api/admin/sales-agent/runs", jsonOptions("admin", "POST", {}));
+  const body = await response.json();
+  assert.equal(response.status, 503);
+  assert.equal(body.code, "WORKER_TRIGGER_FAILED");
+  assert.equal(state.runs[0].status, "FAILED");
+  assert.equal(state.runs[0].failureCode, "WORKER_TRIGGER_FAILED");
+  assert.equal(state.runs[0].triggerStatus, "FAILED");
+}, {
+  triggerSalesAgentRun: async () => {
+    throw new Error("secret backend details");
+  },
+}));
+
+test("queued timeout defaults safely to ten minutes", () => {
+  assert.equal(queuedTimeoutMs({}), 600000);
+  assert.equal(queuedTimeoutMs({ SALES_AGENT_QUEUED_TIMEOUT_MS: "invalid" }), 600000);
+});
+
+test("stale queued run fails atomically and a new run can start", () => {
+  const currentTime = new Date("2026-07-28T12:00:00.000Z");
+  const staleRun = {
+    _id: "64c000000000000000000099",
+    status: "QUEUED",
+    triggerStatus: "TRIGGERED",
+    activeLock: "global",
+    createdAt: "2026-07-28T11:40:00.000Z",
+    updatedAt: "2026-07-28T11:40:00.000Z",
+  };
+  return withServer(async ({ request, state }) => {
+    const response = await request(
+      "/api/admin/sales-agent/runs",
+      jsonOptions("admin", "POST", {})
+    );
+    assert.equal(response.status, 201);
+    assert.equal(state.runs.length, 2);
+    assert.equal(state.runs[0].status, "FAILED");
+    assert.equal(state.runs[0].failureCode, "WORKER_NOT_AVAILABLE");
+    assert.equal(state.runs[0].triggerStatus, "FAILED");
+    assert.equal(
+      state.runs[0].errorSummary,
+      "No worker claimed this run within the allowed time."
+    );
+    assert.equal(new Date(state.runs[0].completedAt).toISOString(), currentTime.toISOString());
+    assert.equal(state.runs[1].status, "QUEUED");
+  }, {
+    initialRuns: [staleRun],
+    env: { SALES_AGENT_QUEUED_TIMEOUT_MS: "600000" },
+    now: () => new Date(currentTime),
+  });
+});
+
+test("fresh queued run is preserved and a second POST returns 409", () => {
+  const currentTime = new Date("2026-07-28T12:00:00.000Z");
+  const freshRun = {
+    _id: "64c000000000000000000098",
+    status: "QUEUED",
+    triggerStatus: "TRIGGERED",
+    activeLock: "global",
+    createdAt: "2026-07-28T11:55:00.000Z",
+    updatedAt: "2026-07-28T11:55:00.000Z",
+  };
+  return withServer(async ({ request, state }) => {
+    const response = await request(
+      "/api/admin/sales-agent/runs",
+      jsonOptions("admin", "POST", {})
+    );
+    const body = await response.json();
+    assert.equal(response.status, 409);
+    assert.equal(body.code, "SALES_AGENT_RUN_ALREADY_ACTIVE");
+    assert.equal(state.runs.length, 1);
+    assert.equal(state.runs[0].status, "QUEUED");
+    assert.equal(state.runs[0].failureCode, undefined);
+  }, {
+    initialRuns: [freshRun],
+    env: { SALES_AGENT_QUEUED_TIMEOUT_MS: "600000" },
+    now: () => new Date(currentTime),
+  });
+});
 
 test("Super Admin can create a queued Sales Agent run", () => withServer(async ({ request }) => {
   const response = await request("/api/admin/sales-agent/runs", jsonOptions("superadmin", "POST", {}));

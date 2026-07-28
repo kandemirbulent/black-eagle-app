@@ -1,5 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const { createRenderSalesAgentTrigger } = require("../services/salesAgentJobTrigger");
 
 const SETTINGS_FIELDS = new Set([
   "autoRunEnabled",
@@ -19,6 +20,38 @@ const RESULT_STATUS_PRECEDENCE = Object.freeze({
   CONFIRMED: 5,
   BOOKED: 5,
 });
+const DEFAULT_QUEUED_TIMEOUT_MS = 600000;
+
+function queuedTimeoutMs(env = process.env) {
+  const configured = Number(env.SALES_AGENT_QUEUED_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_QUEUED_TIMEOUT_MS;
+}
+
+async function recoverStaleQueuedRun(SalesAgentRun, { env = process.env, now = new Date() } = {}) {
+  const cutoff = new Date(now.getTime() - queuedTimeoutMs(env));
+  return SalesAgentRun.findOneAndUpdate(
+    {
+      status: "QUEUED",
+      $or: [
+        { updatedAt: { $lt: cutoff } },
+        { updatedAt: { $exists: false }, createdAt: { $lt: cutoff } },
+      ],
+    },
+    {
+      $set: {
+        status: "FAILED",
+        failureCode: "WORKER_NOT_AVAILABLE",
+        triggerStatus: "FAILED",
+        errorSummary: "No worker claimed this run within the allowed time.",
+        completedAt: now,
+        updatedAt: now,
+      },
+    },
+    { new: true, runValidators: true }
+  );
+}
 
 function canonicalStatus(result = {}, includeVerified = true) {
   const platformState = String(
@@ -119,18 +152,57 @@ function createSalesAgentRouter({
   SalesAgentRun,
   SalesAgentOpportunityResult,
   SalesAgentSettings,
+  triggerSalesAgentRun = createRenderSalesAgentTrigger(),
+  env = process.env,
+  now = () => new Date(),
 }) {
   const router = express.Router();
 
   router.post("/admin/sales-agent/runs", requireAdminAuth, async (req, res) => {
     try {
+      await recoverStaleQueuedRun(SalesAgentRun, { env, now: now() });
       const run = await SalesAgentRun.create({
         status: "QUEUED",
         activeLock: "global",
         triggeredBy: req.adminUser._id,
         triggeredByRole: req.adminUser.role,
+        triggerStatus: "TRIGGERING",
       });
-      return res.status(201).json({ success: true, run });
+      try {
+        const trigger = await triggerSalesAgentRun({ runId: String(run._id) });
+        const triggeredRun = await SalesAgentRun.findByIdAndUpdate(
+          run._id,
+          {
+            $set: {
+              triggerStatus: "TRIGGERED",
+              triggerJobId: trigger.jobId,
+              triggeredAt: new Date(),
+            },
+          },
+          { new: true, runValidators: true }
+        );
+        return res.status(201).json({ success: true, run: triggeredRun || run });
+      } catch (_triggerError) {
+        const failedRun = await SalesAgentRun.findByIdAndUpdate(
+          run._id,
+          {
+            $set: {
+              status: "FAILED",
+              triggerStatus: "FAILED",
+              failureCode: "WORKER_TRIGGER_FAILED",
+              errorSummary: "Sales Agent worker could not be started.",
+              completedAt: new Date(),
+            },
+          },
+          { new: true, runValidators: true }
+        );
+        return res.status(503).json({
+          success: false,
+          code: "WORKER_TRIGGER_FAILED",
+          message: "Sales Agent worker could not be started.",
+          run: failedRun || run,
+        });
+      }
     } catch (error) {
       if (error?.code === 11000) {
         return res.status(409).json({
@@ -218,7 +290,10 @@ function createSalesAgentRouter({
 }
 
 module.exports = {
+  DEFAULT_QUEUED_TIMEOUT_MS,
   createSalesAgentRouter,
   overlayCanonicalLatest,
+  queuedTimeoutMs,
+  recoverStaleQueuedRun,
   validateSettingsUpdate,
 };
