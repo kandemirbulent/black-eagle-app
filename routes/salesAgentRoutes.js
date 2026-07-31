@@ -22,6 +22,12 @@ const RESULT_STATUS_PRECEDENCE = Object.freeze({
 });
 const DEFAULT_QUEUED_TIMEOUT_MS = 600000;
 
+function redactFailureLog(value) {
+  return String(value || "")
+    .replace(/Bearer\s+\S+/gi, "Bearer [REDACTED]")
+    .replace(/(password|secret|api.?key|token|cookie|authorization)\s*[:=]\s*\S+/gi, "$1=[REDACTED]");
+}
+
 function queuedTimeoutMs(env = process.env) {
   const configured = Number(env.SALES_AGENT_QUEUED_TIMEOUT_MS);
   return Number.isFinite(configured) && configured > 0
@@ -45,6 +51,10 @@ async function recoverStaleQueuedRun(SalesAgentRun, { env = process.env, now = n
         failureCode: "WORKER_NOT_AVAILABLE",
         triggerStatus: "FAILED",
         errorSummary: "Queued run expired before being claimed by a worker.",
+        failedStage: "WORKER_START",
+        failureReason: "The worker did not claim the queued run before the timeout.",
+        errorMessage: "Queued run expired before being claimed by a worker.",
+        failureAt: now,
         completedAt: now,
         updatedAt: now,
       },
@@ -155,6 +165,7 @@ function createSalesAgentRouter({
   triggerSalesAgentRun = createRenderSalesAgentTrigger(),
   env = process.env,
   now = () => new Date(),
+  logger = console,
 }) {
   const router = express.Router();
 
@@ -182,7 +193,9 @@ function createSalesAgentRouter({
           { new: true, runValidators: true }
         );
         return res.status(201).json({ success: true, run: triggeredRun || run });
-      } catch (_triggerError) {
+      } catch (triggerError) {
+        logger.error("Sales Agent failure at RENDER_TRIGGER", redactFailureLog(triggerError?.stack || triggerError));
+        const failedAt = now();
         const failedRun = await SalesAgentRun.findByIdAndUpdate(
           run._id,
           {
@@ -191,7 +204,11 @@ function createSalesAgentRouter({
               triggerStatus: "FAILED",
               failureCode: "WORKER_TRIGGER_FAILED",
               errorSummary: "Sales Agent worker could not be started.",
-              completedAt: new Date(),
+              failedStage: "RENDER_TRIGGER",
+              failureReason: "Render could not create the Sales Agent job.",
+              errorMessage: "Sales Agent worker could not be started.",
+              failureAt: failedAt,
+              completedAt: failedAt,
             },
           },
           { new: true, runValidators: true }
@@ -211,6 +228,7 @@ function createSalesAgentRouter({
           message: "A Sales Agent run is already queued or running.",
         });
       }
+      logger.error("Sales Agent run creation failed", redactFailureLog(error?.stack || error));
       return res.status(500).json({ success: false, message: "Could not create Sales Agent run." });
     }
   });
@@ -295,6 +313,7 @@ module.exports = {
   createSalesAgentRouter,
   overlayCanonicalLatest,
   queuedTimeoutMs,
+  redactFailureLog,
   recoverStaleQueuedRun,
   validateSettingsUpdate,
 };

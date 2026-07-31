@@ -6,6 +6,7 @@ const {
   createSalesAgentRouter,
   overlayCanonicalLatest,
   queuedTimeoutMs,
+  redactFailureLog,
 } = require("../routes/salesAgentRoutes");
 
 const ADMIN_ID = "64b000000000000000000001";
@@ -133,6 +134,7 @@ function createHarness({
     triggerSalesAgentRun: trigger,
     env,
     now,
+    logger: { error() {} },
   }));
   return { app, state };
 }
@@ -184,6 +186,10 @@ test("worker trigger failure marks the queued run FAILED", () => withServer(asyn
   assert.equal(state.runs[0].status, "FAILED");
   assert.equal(state.runs[0].failureCode, "WORKER_TRIGGER_FAILED");
   assert.equal(state.runs[0].triggerStatus, "FAILED");
+  assert.equal(state.runs[0].failedStage, "RENDER_TRIGGER");
+  assert.equal(state.runs[0].failureReason, "Render could not create the Sales Agent job.");
+  assert.equal(state.runs[0].errorMessage, "Sales Agent worker could not be started.");
+  assert.ok(state.runs[0].failureAt);
 }, {
   triggerSalesAgentRun: async () => {
     throw new Error("secret backend details");
@@ -193,6 +199,17 @@ test("worker trigger failure marks the queued run FAILED", () => withServer(asyn
 test("queued timeout defaults safely to ten minutes", () => {
   assert.equal(queuedTimeoutMs({}), 600000);
   assert.equal(queuedTimeoutMs({ SALES_AGENT_QUEUED_TIMEOUT_MS: "invalid" }), 600000);
+});
+
+test("failure stages are supported by the run schema and server logs redact secrets", () => {
+  const SalesAgentRun = require("../models/salesAgentRun");
+  assert.deepEqual(
+    SalesAgentRun.schema.path("failedStage").enumValues,
+    ["", "RENDER_TRIGGER", "WORKER_START", "TOGATHER_LOGIN", "DISCOVERY", "OPENAI", "SUBMISSION"]
+  );
+  const safeLog = redactFailureLog("Error: failed authorization: Bearer token-value api_key=secret-value");
+  assert.doesNotMatch(safeLog, /token-value|secret-value/);
+  assert.match(safeLog, /\[REDACTED\]/);
 });
 
 test("stale queued run fails atomically and a new run can start", () => {
@@ -215,6 +232,10 @@ test("stale queued run fails atomically and a new run can start", () => {
     assert.equal(state.runs[0].status, "FAILED");
     assert.equal(state.runs[0].failureCode, "WORKER_NOT_AVAILABLE");
     assert.equal(state.runs[0].triggerStatus, "FAILED");
+    assert.equal(state.runs[0].failedStage, "WORKER_START");
+    assert.equal(state.runs[0].failureReason, "The worker did not claim the queued run before the timeout.");
+    assert.equal(state.runs[0].errorMessage, "Queued run expired before being claimed by a worker.");
+    assert.equal(new Date(state.runs[0].failureAt).toISOString(), currentTime.toISOString());
     assert.equal(
       state.runs[0].errorSummary,
       "Queued run expired before being claimed by a worker."
@@ -289,6 +310,10 @@ test("status atomically recovers stale QUEUED run and reports IDLE", () => {
     assert.equal(state.runs[0].status, "FAILED");
     assert.equal(state.runs[0].failureCode, "WORKER_NOT_AVAILABLE");
     assert.equal(state.runs[0].errorSummary, "Queued run expired before being claimed by a worker.");
+    assert.equal(state.runs[0].failedStage, "WORKER_START");
+    assert.equal(state.runs[0].failureReason, "The worker did not claim the queued run before the timeout.");
+    assert.equal(state.runs[0].errorMessage, "Queued run expired before being claimed by a worker.");
+    assert.equal(new Date(state.runs[0].failureAt).toISOString(), currentTime.toISOString());
   }, {
     initialRuns: [{
       _id: "64c000000000000000000083",

@@ -54,6 +54,9 @@ function fakeDocument() {
     "salesAgentFailed",
     "salesAgentOpenAiCalls",
     "salesAgentPlatformActions",
+    "salesAgentFailedStage",
+    "salesAgentFailureReason",
+    "salesAgentErrorMessage",
     "runSalesAgentButton",
     "retrySalesAgentButton",
     "salesAgentResultsTable",
@@ -146,6 +149,28 @@ test("run button is disabled only for fresh active statuses", () => {
     assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
     assert.equal(context.documentRef.elements.runSalesAgentButton.textContent, "Run Sales Agent");
   }
+});
+
+test("failed run renders safe stage, reason and error diagnostics", () => {
+  const context = controller();
+  context.instance.renderRun(run({
+    status: "FAILED",
+    failedStage: "OPENAI",
+    failureReason: "OpenAI analysis could not be completed.",
+    errorMessage: "The upstream request timed out.",
+  }));
+  assert.equal(context.documentRef.elements.salesAgentFailedStage.textContent, "OPENAI");
+  assert.equal(context.documentRef.elements.salesAgentFailureReason.textContent, "OpenAI analysis could not be completed.");
+  assert.equal(context.documentRef.elements.salesAgentErrorMessage.textContent, "The upstream request timed out.");
+
+  context.instance.renderRun(run({
+    status: "FAILED",
+    failedStage: "RENDER_TRIGGER",
+    failureReason: "Authorization: Bearer secret-token",
+    errorMessage: "api_key=secret-value",
+  }));
+  assert.equal(context.documentRef.elements.salesAgentFailureReason.textContent, "Sensitive or technical error details were withheld.");
+  assert.equal(context.documentRef.elements.salesAgentErrorMessage.textContent, "Sensitive or technical error details were withheld.");
 });
 
 test("worker trigger failure re-enables the run button with a safe message", async () => {

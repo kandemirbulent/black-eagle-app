@@ -112,6 +112,23 @@
     clearIntervalFn = clearInterval
   }) {
     const byId = (id) => documentRef.getElementById(id);
+    function diagnosticElement(id, label) {
+      const existing = byId(id);
+      if (existing) return existing;
+      const grid = byId("salesAgentCurrentStatus")?.closest?.(".stats-grid");
+      if (!grid) return null;
+      const card = documentRef.createElement("div");
+      card.className = "stat-card";
+      const heading = documentRef.createElement("span");
+      heading.textContent = label;
+      const value = documentRef.createElement("strong");
+      value.id = id;
+      value.textContent = "—";
+      card.appendChild(heading);
+      card.appendChild(value);
+      grid.appendChild(card);
+      return value;
+    }
     const elements = {
       status: byId("salesAgentCurrentStatus"),
       lastRun: byId("salesAgentLastRun"),
@@ -122,6 +139,9 @@
       failed: byId("salesAgentFailed"),
       openAiCalls: byId("salesAgentOpenAiCalls"),
       platformActions: byId("salesAgentPlatformActions"),
+      failedStage: diagnosticElement("salesAgentFailedStage", "Failed Stage"),
+      failureReason: diagnosticElement("salesAgentFailureReason", "Failure Reason"),
+      errorMessage: diagnosticElement("salesAgentErrorMessage", "Error Message"),
       runButton: byId("runSalesAgentButton"),
       retryButton: byId("retrySalesAgentButton"),
       resultsTable: byId("salesAgentResultsTable"),
@@ -175,6 +195,9 @@
       elements.failed.textContent = String(safeNumber(totals.failed));
       elements.openAiCalls.textContent = String(safeNumber(totals.openAiCalls));
       elements.platformActions.textContent = String(safeNumber(totals.platformActions));
+      if (elements.failedStage) elements.failedStage.textContent = safeOperationalText(run?.failedStage) || "—";
+      if (elements.failureReason) elements.failureReason.textContent = wordSafeLimit(run?.failureReason, 180) || "—";
+      if (elements.errorMessage) elements.errorMessage.textContent = wordSafeLimit(run?.errorMessage || run?.errorSummary, 180) || "—";
       updateButton(status);
     }
 
