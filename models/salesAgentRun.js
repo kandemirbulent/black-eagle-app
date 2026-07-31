@@ -41,6 +41,11 @@ const salesAgentRunSchema = new mongoose.Schema(
     failureReason: { type: String, default: "", trim: true },
     errorMessage: { type: String, default: "", trim: true },
     failureAt: { type: Date, default: null },
+    failureHttpStatus: { type: Number, min: 100, max: 599, default: null },
+    failureHttpStatusText: { type: String, default: "", trim: true },
+    upstreamErrorCode: { type: String, default: "", trim: true },
+    upstreamResponseBody: { type: String, default: "", trim: true },
+    failureRequestAt: { type: Date, default: null },
     triggerStatus: {
       type: String,
       enum: ["TRIGGERING", "TRIGGERED", "FAILED"],

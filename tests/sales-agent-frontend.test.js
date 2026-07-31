@@ -190,6 +190,28 @@ test("worker trigger failure re-enables the run button with a safe message", asy
   assert.doesNotMatch(JSON.stringify(context.messages), /token|secret|authorization/i);
 });
 
+test("Render trigger failure displays the exact safe HTTP diagnostic", async () => {
+  const safeMessage = "Render API returned 403 Forbidden: API key lacks permission";
+  const context = controller({
+    responses: [response(503, {
+      success: false,
+      code: "WORKER_TRIGGER_FAILED",
+      message: safeMessage,
+      run: run({
+        status: "FAILED",
+        failedStage: "RENDER_TRIGGER",
+        failureReason: "Render could not create the Sales Agent job.",
+        errorMessage: safeMessage,
+      }),
+    })],
+  });
+  await context.instance.startRun();
+  assert.equal(context.documentRef.elements.salesAgentFailedStage.textContent, "RENDER_TRIGGER");
+  assert.equal(context.documentRef.elements.salesAgentErrorMessage.textContent, safeMessage);
+  assert.equal(context.messages[0].message, safeMessage);
+  assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+});
+
 test("409 active-run response loads existing active run without a second POST", async () => {
   const context = controller({
     responses: [

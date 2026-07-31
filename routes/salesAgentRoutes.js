@@ -196,18 +196,25 @@ function createSalesAgentRouter({
       } catch (triggerError) {
         logger.error("Sales Agent failure at RENDER_TRIGGER", redactFailureLog(triggerError?.stack || triggerError));
         const failedAt = now();
+        const diagnostic = triggerError?.diagnostic || {};
+        const safeRenderMessage = diagnostic.safeMessage || "Sales Agent worker could not be started.";
         const failedRun = await SalesAgentRun.findByIdAndUpdate(
           run._id,
           {
             $set: {
               status: "FAILED",
               triggerStatus: "FAILED",
-              failureCode: "WORKER_TRIGGER_FAILED",
+              failureCode: diagnostic.errorCode || "WORKER_TRIGGER_FAILED",
               errorSummary: "Sales Agent worker could not be started.",
               failedStage: "RENDER_TRIGGER",
               failureReason: "Render could not create the Sales Agent job.",
-              errorMessage: "Sales Agent worker could not be started.",
+              errorMessage: safeRenderMessage,
               failureAt: failedAt,
+              failureHttpStatus: diagnostic.httpStatus || null,
+              failureHttpStatusText: diagnostic.httpStatusText || "",
+              upstreamErrorCode: diagnostic.renderErrorCode || diagnostic.errorCode || "",
+              upstreamResponseBody: diagnostic.responseBody || "",
+              failureRequestAt: diagnostic.requestTimestamp ? new Date(diagnostic.requestTimestamp) : failedAt,
               completedAt: failedAt,
             },
           },
@@ -216,7 +223,7 @@ function createSalesAgentRouter({
         return res.status(503).json({
           success: false,
           code: "WORKER_TRIGGER_FAILED",
-          message: "Sales Agent worker could not be started.",
+          message: safeRenderMessage,
           run: failedRun || run,
         });
       }

@@ -45,7 +45,7 @@
     const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
     if (!normalized) return "";
     if (
-      /(?:mongodb(?:\+srv)?:\/\/|api[_ -]?key|password|credential|cookie|session|private key|bearer\s+[a-z0-9._-]+)/i.test(
+      /(?:mongodb(?:\+srv)?:\/\/|bearer\s+[a-z0-9._-]+|(?:api[_ -]?key|password|credential|cookie|session|private key)\s*[:=]\s*\S+)/i.test(
         normalized
       ) ||
       /(?:^|\s)at\s+\S+\s+\([^)]*:\d+:\d+\)/i.test(normalized)
@@ -591,7 +591,8 @@
         }
         if (created.payload.code === "WORKER_TRIGGER_FAILED") {
           if (created.payload.run) renderRun(created.payload.run);
-          showRetryError("Sales Agent worker could not be started. Please retry.");
+          const renderError = wordSafeLimit(created.payload.message, 180);
+          showRetryError(renderError || "Sales Agent worker could not be started. Please retry.");
           return created.payload.run || null;
         }
         if (!created.response.ok || created.payload.success === false || !created.payload.run) {

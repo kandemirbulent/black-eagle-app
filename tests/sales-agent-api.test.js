@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
+const { RenderTriggerError } = require("../services/salesAgentJobTrigger");
 
 const {
   createSalesAgentRouter,
@@ -193,6 +194,34 @@ test("worker trigger failure marks the queued run FAILED", () => withServer(asyn
 }, {
   triggerSalesAgentRun: async () => {
     throw new Error("secret backend details");
+  },
+}));
+
+test("Render HTTP failure stores redacted upstream diagnostics on the run", () => withServer(async ({ request, state }) => {
+  const response = await request("/api/admin/sales-agent/runs", jsonOptions("admin", "POST", {}));
+  const body = await response.json();
+  assert.equal(response.status, 503);
+  assert.equal(body.code, "WORKER_TRIGGER_FAILED");
+  assert.equal(body.message, "Render API returned 401 Unauthorized: authentication failed");
+  assert.equal(state.runs[0].failedStage, "RENDER_TRIGGER");
+  assert.equal(state.runs[0].failureCode, "invalid_auth");
+  assert.equal(state.runs[0].errorMessage, body.message);
+  assert.equal(state.runs[0].failureHttpStatus, 401);
+  assert.equal(state.runs[0].failureHttpStatusText, "Unauthorized");
+  assert.equal(state.runs[0].upstreamErrorCode, "invalid_auth");
+  assert.equal(state.runs[0].upstreamResponseBody, '{"code":"invalid_auth","message":"authentication failed"}');
+  assert.equal(new Date(state.runs[0].failureRequestAt).toISOString(), "2026-07-31T12:00:00.000Z");
+}, {
+  triggerSalesAgentRun: async () => {
+    throw new RenderTriggerError("Render API returned 401 Unauthorized: authentication failed", {
+      errorCode: "invalid_auth",
+      requestTimestamp: "2026-07-31T12:00:00.000Z",
+      httpStatus: 401,
+      httpStatusText: "Unauthorized",
+      responseBody: '{"code":"invalid_auth","message":"authentication failed"}',
+      renderErrorCode: "invalid_auth",
+      renderErrorMessage: "authentication failed",
+    });
   },
 }));
 
