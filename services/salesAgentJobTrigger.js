@@ -83,7 +83,6 @@ function createRenderSalesAgentTrigger({
         requestTimestamp,
       });
     }
-    const apiBaseUrl = String(env.RENDER_API_BASE_URL || DEFAULT_RENDER_API_BASE_URL).trim().replace(/\/+$/, "");
     const serviceId = required(env.RENDER_SALES_AGENT_SERVICE_ID, "Render Sales Agent service ID", "RENDER_SERVICE_ID_MISSING", requestTimestamp);
     const apiKey = required(env.RENDER_API_KEY, "Render API key", "RENDER_API_KEY_MISSING", requestTimestamp);
     const controller = new AbortController();
@@ -95,7 +94,7 @@ function createRenderSalesAgentTrigger({
       let response;
       try {
         response = await fetchFn(
-          `${apiBaseUrl}/services/${encodeURIComponent(serviceId)}/jobs`,
+          `${DEFAULT_RENDER_API_BASE_URL}/services/${encodeURIComponent(serviceId)}/jobs`,
           {
             method: "POST",
             headers: {

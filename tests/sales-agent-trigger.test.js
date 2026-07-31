@@ -43,6 +43,25 @@ test("successful One-Off Job creation uses the official endpoint and supported p
   });
 });
 
+test("a deploy-hook RENDER_API_BASE_URL cannot redirect the trigger into a deployment", async () => {
+  const calls = [];
+  const trigger = createRenderSalesAgentTrigger({
+    env: {
+      ...baseEnv,
+      RENDER_API_BASE_URL: "https://api.render.com/deploy/srv_wrong?key=deploy-hook-secret",
+    },
+    now: fixedNow,
+    fetchFn: async (url, options) => {
+      calls.push({ url, options });
+      return response(201, "Created", { id: "job-456" });
+    },
+  });
+  assert.deepEqual(await trigger(), { jobId: "job-456" });
+  assert.equal(calls[0].url, `${DEFAULT_RENDER_API_BASE_URL}/services/srv_test_sales_agent/jobs`);
+  assert.doesNotMatch(calls[0].url, /\/deploy\//);
+  assert.deepEqual(JSON.parse(calls[0].options.body), { startCommand: WORKER_COMMAND });
+});
+
 test("missing RENDER_API_KEY fails before a request", async () => {
   let called = false;
   const trigger = createRenderSalesAgentTrigger({
