@@ -135,6 +135,19 @@ test("Run button sends POST and renders queued run", async () => {
   assert.equal(context.documentRef.elements.runSalesAgentButton.textContent, "Queued...");
 });
 
+test("run button is disabled only for fresh active statuses", () => {
+  const context = controller();
+  for (const status of ["QUEUED", "RUNNING"]) {
+    context.instance.renderRun(run({ status }));
+    assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, true);
+  }
+  for (const status of ["COMPLETED", "FAILED"]) {
+    context.instance.renderRun(run({ status }));
+    assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+    assert.equal(context.documentRef.elements.runSalesAgentButton.textContent, "Run Sales Agent");
+  }
+});
+
 test("worker trigger failure re-enables the run button with a safe message", async () => {
   const context = controller({
     responses: [response(503, {

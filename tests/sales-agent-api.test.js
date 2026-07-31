@@ -217,7 +217,7 @@ test("stale queued run fails atomically and a new run can start", () => {
     assert.equal(state.runs[0].triggerStatus, "FAILED");
     assert.equal(
       state.runs[0].errorSummary,
-      "No worker claimed this run within the allowed time."
+      "Queued run expired before being claimed by a worker."
     );
     assert.equal(new Date(state.runs[0].completedAt).toISOString(), currentTime.toISOString());
     assert.equal(state.runs[1].status, "QUEUED");
@@ -251,6 +251,95 @@ test("fresh queued run is preserved and a second POST returns 409", () => {
     assert.equal(state.runs[0].failureCode, undefined);
   }, {
     initialRuns: [freshRun],
+    env: { SALES_AGENT_QUEUED_TIMEOUT_MS: "600000" },
+    now: () => new Date(currentTime),
+  });
+});
+
+test("status keeps fresh QUEUED and RUNNING runs active", async () => {
+  const currentTime = new Date("2026-07-28T12:00:00.000Z");
+  for (const status of ["QUEUED", "RUNNING"]) {
+    await withServer(async ({ request, state }) => {
+      const response = await request("/api/admin/sales-agent/status", jsonOptions("admin"));
+      const body = await response.json();
+      assert.equal(body.status, status);
+      assert.equal(body.run.status, status);
+      assert.equal(state.runs[0].status, status);
+    }, {
+      initialRuns: [{
+        _id: `64c0000000000000000000${status === "QUEUED" ? "81" : "82"}`,
+        status,
+        activeLock: "global",
+        createdAt: "2026-07-28T11:55:00.000Z",
+        updatedAt: "2026-07-28T11:55:00.000Z",
+      }],
+      env: { SALES_AGENT_QUEUED_TIMEOUT_MS: "600000" },
+      now: () => new Date(currentTime),
+    });
+  }
+});
+
+test("status atomically recovers stale QUEUED run and reports IDLE", () => {
+  const currentTime = new Date("2026-07-28T12:00:00.000Z");
+  return withServer(async ({ request, state }) => {
+    const response = await request("/api/admin/sales-agent/status", jsonOptions("admin"));
+    const body = await response.json();
+    assert.equal(body.status, "IDLE");
+    assert.equal(body.run, null);
+    assert.equal(state.runs[0].status, "FAILED");
+    assert.equal(state.runs[0].failureCode, "WORKER_NOT_AVAILABLE");
+    assert.equal(state.runs[0].errorSummary, "Queued run expired before being claimed by a worker.");
+  }, {
+    initialRuns: [{
+      _id: "64c000000000000000000083",
+      status: "QUEUED",
+      activeLock: "global",
+      createdAt: "2026-07-28T11:40:00.000Z",
+      updatedAt: "2026-07-28T11:40:00.000Z",
+    }],
+    env: { SALES_AGENT_QUEUED_TIMEOUT_MS: "600000" },
+    now: () => new Date(currentTime),
+  });
+});
+
+test("completed and failed runs report IDLE and allow a new run", async () => {
+  for (const status of ["COMPLETED", "FAILED"]) {
+    await withServer(async ({ request, state }) => {
+      const statusResponse = await request("/api/admin/sales-agent/status", jsonOptions("admin"));
+      assert.equal((await statusResponse.json()).status, "IDLE");
+      const createResponse = await request("/api/admin/sales-agent/runs", jsonOptions("admin", "POST", {}));
+      assert.equal(createResponse.status, 201);
+      assert.equal(state.runs.filter((run) => ["QUEUED", "RUNNING"].includes(run.status)).length, 1);
+    }, {
+      initialRuns: [{
+        _id: `64c0000000000000000000${status === "COMPLETED" ? "84" : "85"}`,
+        status,
+        activeLock: "global",
+        createdAt: "2026-07-28T11:00:00.000Z",
+        updatedAt: "2026-07-28T11:00:00.000Z",
+      }],
+    });
+  }
+});
+
+test("concurrent creates after stale recovery produce only one active run", () => {
+  const currentTime = new Date("2026-07-28T12:00:00.000Z");
+  return withServer(async ({ request, state }) => {
+    const responses = await Promise.all([
+      request("/api/admin/sales-agent/runs", jsonOptions("admin", "POST", {})),
+      request("/api/admin/sales-agent/runs", jsonOptions("admin", "POST", {})),
+    ]);
+    assert.deepEqual(responses.map((response) => response.status).sort(), [201, 409]);
+    assert.equal(state.runs[0].status, "FAILED");
+    assert.equal(state.runs.filter((run) => ["QUEUED", "RUNNING"].includes(run.status)).length, 1);
+  }, {
+    initialRuns: [{
+      _id: "64c000000000000000000086",
+      status: "QUEUED",
+      activeLock: "global",
+      createdAt: "2026-07-28T11:40:00.000Z",
+      updatedAt: "2026-07-28T11:40:00.000Z",
+    }],
     env: { SALES_AGENT_QUEUED_TIMEOUT_MS: "600000" },
     now: () => new Date(currentTime),
   });

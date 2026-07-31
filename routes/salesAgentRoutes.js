@@ -44,7 +44,7 @@ async function recoverStaleQueuedRun(SalesAgentRun, { env = process.env, now = n
         status: "FAILED",
         failureCode: "WORKER_NOT_AVAILABLE",
         triggerStatus: "FAILED",
-        errorSummary: "No worker claimed this run within the allowed time.",
+        errorSummary: "Queued run expired before being claimed by a worker.",
         completedAt: now,
         updatedAt: now,
       },
@@ -250,6 +250,7 @@ function createSalesAgentRouter({
   });
 
   router.get("/admin/sales-agent/status", requireAdminAuth, async (req, res) => {
+    await recoverStaleQueuedRun(SalesAgentRun, { env, now: now() });
     const run = await SalesAgentRun.findOne({ status: { $in: ["QUEUED", "RUNNING"] } })
       .sort({ createdAt: -1 }).lean();
     return res.json({ success: true, status: run?.status || "IDLE", run: run || null });
