@@ -109,7 +109,8 @@
     showMessage,
     documentRef,
     setIntervalFn = setInterval,
-    clearIntervalFn = clearInterval
+    clearIntervalFn = clearInterval,
+    confirmFn = (message) => globalThis.confirm?.(message) !== false
   }) {
     const byId = (id) => documentRef.getElementById(id);
     function diagnosticElement(id, label) {
@@ -143,6 +144,15 @@
       failureReason: diagnosticElement("salesAgentFailureReason", "Failure Reason"),
       errorMessage: diagnosticElement("salesAgentErrorMessage", "Error Message"),
       runButton: byId("runSalesAgentButton"),
+      manualReviewButton: byId("submitManualReviewsButton"),
+      manualSelectedRun: byId("manualReviewSelectedRun"),
+      manualCount: byId("manualReviewSelectedCount"),
+      manualStatus: byId("manualReviewSubmissionStatus"),
+      manualProcessed: byId("manualReviewProcessed"),
+      manualSubmitted: byId("manualReviewSubmitted"),
+      manualAlreadyQuoted: byId("manualReviewAlreadyQuoted"),
+      manualRemaining: byId("manualReviewRemaining"),
+      manualFailed: byId("manualReviewFailedItems"),
       retryButton: byId("retrySalesAgentButton"),
       resultsTable: byId("salesAgentResultsTable"),
       detailsModal: byId("salesAgentDetailsModal"),
@@ -156,9 +166,11 @@
     let currentRun = null;
     let displayedResultsRunId = "";
     let displayedResultsCount = 0;
+    let displayedManualReviewCount = 0;
     let automaticLatestRun = true;
     let runsCache = [];
     let pollingTimer = null;
+    let manualPollingTimer = null;
 
     function showRetryError(message) {
       showMessage(message, "error");
@@ -329,6 +341,14 @@
     function renderResults(results) {
       elements.resultsTable.replaceChildren();
       displayedResultsCount = Array.isArray(results) ? results.length : 0;
+      displayedManualReviewCount = Array.isArray(results)
+        ? results.filter((result) => String(result?.resultStatus || "").toUpperCase() === "MANUAL_REVIEW").length
+        : 0;
+      if (elements.manualSelectedRun) elements.manualSelectedRun.textContent = displayedResultsRunId || "—";
+      if (elements.manualCount) elements.manualCount.textContent = String(displayedManualReviewCount);
+      if (elements.manualReviewButton && !ACTIVE_STATUSES.has(String(elements.manualStatus?.textContent || "").toUpperCase())) {
+        elements.manualReviewButton.disabled = !displayedResultsRunId || displayedManualReviewCount === 0;
+      }
       if (!Array.isArray(results) || !results.length) {
         const row = documentRef.createElement("tr");
         const cell = documentRef.createElement("td");
@@ -626,6 +646,96 @@
       refresh();
     }
 
+    function renderManualReviewRun(run) {
+      const status = text(run?.status, "IDLE").toUpperCase();
+      const totals = run?.manualReviewResume && typeof run.manualReviewResume === "object"
+        ? run.manualReviewResume
+        : {};
+      if (elements.manualStatus) elements.manualStatus.textContent = status;
+      if (elements.manualProcessed) elements.manualProcessed.textContent = String(safeNumber(totals.processed));
+      if (elements.manualSubmitted) elements.manualSubmitted.textContent = String(safeNumber(totals.submitted));
+      if (elements.manualAlreadyQuoted) elements.manualAlreadyQuoted.textContent = String(safeNumber(totals.alreadyQuoted));
+      if (elements.manualRemaining) elements.manualRemaining.textContent = String(safeNumber(totals.remainingManualReview));
+      if (elements.manualFailed) elements.manualFailed.textContent = String(safeNumber(totals.failedItems));
+      if (elements.manualReviewButton) {
+        elements.manualReviewButton.disabled = ACTIVE_STATUSES.has(status)
+          || !displayedResultsRunId
+          || displayedManualReviewCount === 0;
+        elements.manualReviewButton.textContent = status === "QUEUED"
+          ? "Manual Reviews Queued..."
+          : status === "RUNNING"
+            ? "Submitting Manual Reviews..."
+            : "Submit Manual Reviews";
+      }
+    }
+
+    async function pollManualReviewStatus() {
+      if (!displayedResultsRunId || documentRef.hidden) return null;
+      const result = await requestJson(
+        `/api/admin/sales-agent/manual-review-runs/status?sourceRunId=${encodeURIComponent(displayedResultsRunId)}`
+      );
+      if (!result.response.ok || result.payload.success === false) return null;
+      renderManualReviewRun(result.payload.run);
+      if (!ACTIVE_STATUSES.has(String(result.payload.run?.status || "").toUpperCase())) stopManualPolling();
+      return result.payload.run || null;
+    }
+
+    function stopManualPolling() {
+      if (manualPollingTimer !== null) clearIntervalFn(manualPollingTimer);
+      manualPollingTimer = null;
+    }
+
+    function startManualPolling() {
+      if (manualPollingTimer !== null) return;
+      manualPollingTimer = setIntervalFn(async () => {
+        try {
+          await pollManualReviewStatus();
+        } catch (_error) {
+          stopManualPolling();
+          showMessage("Manual review submission status could not be refreshed.", "error");
+        }
+      }, 5000);
+    }
+
+    async function submitManualReviews() {
+      const sourceRunId = displayedResultsRunId;
+      if (!sourceRunId || displayedManualReviewCount === 0) {
+        showMessage("Select a run containing MANUAL_REVIEW records.", "error");
+        return null;
+      }
+      const confirmation = [
+        `Selected Run: ${sourceRunId}`,
+        `Manual Review count: ${displayedManualReviewCount}`,
+        "Discovery WILL NOT run",
+        "OpenAI WILL NOT run",
+        "Eligible quotations WILL be submitted",
+      ].join("\n");
+      if (!confirmFn(confirmation)) return null;
+      elements.manualReviewButton.disabled = true;
+      try {
+        const created = await requestJson("/api/admin/sales-agent/manual-review-runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceRunId }),
+        });
+        if (!created.response.ok || created.payload.success === false || !created.payload.run) {
+          const message = created.payload.code === "MANUAL_REVIEW_RESUME_ALREADY_ACTIVE"
+            ? "A manual review submission is already active for this run."
+            : "Manual review submission could not be started.";
+          showMessage(message, "error");
+          renderManualReviewRun(created.payload.run);
+          return created.payload.run || null;
+        }
+        renderManualReviewRun(created.payload.run);
+        startManualPolling();
+        return created.payload.run;
+      } catch (_error) {
+        renderManualReviewRun(null);
+        showMessage("Manual review submission could not be started.", "error");
+        return null;
+      }
+    }
+
     function onKeyDown(event) {
       if (event?.key === "Escape" && !elements.detailsModal?.classList.contains("hidden")) {
         closeDetails();
@@ -642,6 +752,7 @@
       automaticLatestRun = false;
       try {
         await loadSelectedRun(selectedRunId);
+        await pollManualReviewStatus();
       } catch (_error) {
         showRetryError("The selected Sales Agent run could not be loaded. Please retry.");
       }
@@ -652,6 +763,7 @@
       documentRef.addEventListener("keydown", onKeyDown);
       elements.closeDetailsButton?.addEventListener("click", closeDetails);
       elements.runSelector?.addEventListener("change", onRunSelectionChange);
+      elements.manualReviewButton?.addEventListener("click", submitManualReviews);
       return refresh();
     }
 
@@ -659,6 +771,9 @@
       init,
       refresh,
       startRun,
+      submitManualReviews,
+      renderManualReviewRun,
+      pollManualReviewStatus,
       pollStatus,
       renderRun,
       renderResults,

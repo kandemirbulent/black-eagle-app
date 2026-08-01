@@ -1,4 +1,6 @@
 const WORKER_COMMAND = "npm run worker:once";
+const MANUAL_REVIEW_WORKER_COMMAND = "npm run worker:submit-manual-review";
+const ALLOWED_WORKER_COMMANDS = new Set([WORKER_COMMAND, MANUAL_REVIEW_WORKER_COMMAND]);
 const DEFAULT_RENDER_API_BASE_URL = "https://api.render.com/v1";
 const RENDER_TRIGGER_STAGE = "RENDER_TRIGGER";
 
@@ -75,7 +77,7 @@ function createRenderSalesAgentTrigger({
   timeoutMs = 15000,
   now = () => new Date(),
 } = {}) {
-  return async function triggerSalesAgentRun() {
+  return async function triggerSalesAgentRun({ startCommand = WORKER_COMMAND } = {}) {
     const requestTimestamp = now().toISOString();
     if (typeof fetchFn !== "function") {
       throw new RenderTriggerError("Render job trigger is unavailable.", {
@@ -88,7 +90,13 @@ function createRenderSalesAgentTrigger({
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const body = { startCommand: WORKER_COMMAND };
+      if (!ALLOWED_WORKER_COMMANDS.has(startCommand)) {
+        throw new RenderTriggerError("Unsupported Sales Agent worker command.", {
+          errorCode: "RENDER_START_COMMAND_INVALID",
+          requestTimestamp,
+        });
+      }
+      const body = { startCommand };
       const planId = String(env.RENDER_SALES_AGENT_JOB_PLAN_ID || "").trim();
       if (planId) body.planId = planId;
       let response;
@@ -154,6 +162,7 @@ module.exports = {
   DEFAULT_RENDER_API_BASE_URL,
   RENDER_TRIGGER_STAGE,
   RenderTriggerError,
+  MANUAL_REVIEW_WORKER_COMMAND,
   WORKER_COMMAND,
   createRenderSalesAgentTrigger,
   redactRenderDiagnostic,

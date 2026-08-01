@@ -783,7 +783,20 @@
 
         <div class="btn-row" style="margin:16px 0;">
           <button type="button" class="btn btn-primary" id="runSalesAgentButton">Run Sales Agent</button>
+          <button type="button" class="btn btn-secondary" id="submitManualReviewsButton" disabled>Submit Manual Reviews</button>
           <button type="button" class="btn hidden" id="retrySalesAgentButton">Retry</button>
+        </div>
+
+        <h3>Manual Review Submission</h3>
+        <div class="stats-grid">
+          <div class="stat-card"><span>Selected Run</span><strong id="manualReviewSelectedRun">—</strong></div>
+          <div class="stat-card"><span>Manual Review Count</span><strong id="manualReviewSelectedCount">0</strong></div>
+          <div class="stat-card"><span>Status</span><strong id="manualReviewSubmissionStatus">IDLE</strong></div>
+          <div class="stat-card"><span>Processed</span><strong id="manualReviewProcessed">0</strong></div>
+          <div class="stat-card"><span>Submitted</span><strong id="manualReviewSubmitted">0</strong></div>
+          <div class="stat-card"><span>Already Quoted</span><strong id="manualReviewAlreadyQuoted">0</strong></div>
+          <div class="stat-card"><span>Remaining Manual Review</span><strong id="manualReviewRemaining">0</strong></div>
+          <div class="stat-card"><span>Failed Items</span><strong id="manualReviewFailedItems">0</strong></div>
         </div>
 
         <div class="btn-row" style="justify-content:space-between;align-items:end;">

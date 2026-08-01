@@ -41,7 +41,7 @@ function createHarness({
   });
   const SalesAgentRun = {
     async create(input) {
-      if (state.runs.some((run) => ["QUEUED", "RUNNING"].includes(run.status))) {
+      if (state.runs.some((run) => ["QUEUED", "RUNNING"].includes(run.status) && run.activeLock === input.activeLock)) {
         const error = new Error("duplicate");
         error.code = 11000;
         throw error;
@@ -79,11 +79,21 @@ function createHarness({
       return structuredClone(run);
     },
     findOne(filter) {
+      if (filter?.runType === "MANUAL_REVIEW_RESUME") {
+        return query(state.runs.slice().reverse().find((run) =>
+          run.runType === filter.runType && String(run.sourceRunId) === String(filter.sourceRunId)
+        ) || null);
+      }
       const statuses = filter?.status?.$in || [];
-      return query(state.runs.find((run) => statuses.includes(run.status)) || null);
+      return query(state.runs.find((run) => statuses.includes(run.status) && run.runType !== "MANUAL_REVIEW_RESUME") || null);
     },
   };
   const SalesAgentOpportunityResult = {
+    async countDocuments(filter) {
+      return state.results.filter((result) =>
+        String(result.runId) === String(filter.runId) && result.resultStatus === filter.resultStatus
+      ).length;
+    },
     find(filter) {
       if (Array.isArray(filter?.$or)) {
         return query(state.results.filter((result) => filter.$or.some((key) =>
@@ -169,6 +179,43 @@ test("Admin can create a queued Sales Agent run", () => withServer(async ({ requ
   assert.equal(body.run.status, "QUEUED");
   assert.equal(body.run.triggeredByRole, "admin");
   assert.equal(body.run.triggerStatus, "TRIGGERED");
+}));
+
+test("manual review resume requires an explicit valid source run with review records", () => withServer(async ({ request, state }) => {
+  const missing = await request("/api/admin/sales-agent/manual-review-runs", jsonOptions("admin", "POST", {}));
+  assert.equal(missing.status, 400);
+  assert.equal((await missing.json()).code, "SOURCE_RUN_ID_REQUIRED");
+
+  const invalid = await request("/api/admin/sales-agent/manual-review-runs", jsonOptions("admin", "POST", { sourceRunId: "bad" }));
+  assert.equal(invalid.status, 400);
+  assert.equal((await invalid.json()).code, "INVALID_SOURCE_RUN_ID");
+
+  const sourceRunId = "64d000000000000000000001";
+  state.runs.push({ _id: sourceRunId, status: "COMPLETED", activeLock: "global" });
+  const empty = await request("/api/admin/sales-agent/manual-review-runs", jsonOptions("admin", "POST", { sourceRunId }));
+  assert.equal(empty.status, 409);
+  assert.equal((await empty.json()).code, "NO_MANUAL_REVIEW_RECORDS");
+}));
+
+test("manual review resume creates a separate queued trigger with the selected source run", () => withServer(async ({ request, state }) => {
+  const sourceRunId = "64d000000000000000000002";
+  state.runs.push({ _id: sourceRunId, status: "COMPLETED", activeLock: "global" });
+  state.results.push(
+    { runId: sourceRunId, resultStatus: "MANUAL_REVIEW" },
+    { runId: sourceRunId, resultStatus: "MANUAL_REVIEW" }
+  );
+  const response = await request("/api/admin/sales-agent/manual-review-runs", jsonOptions("admin", "POST", { sourceRunId }));
+  const body = await response.json();
+  assert.equal(response.status, 201);
+  assert.equal(body.sourceRunId, sourceRunId);
+  assert.equal(body.manualReviewCount, 2);
+  assert.equal(body.run.runType, "MANUAL_REVIEW_RESUME");
+  assert.equal(body.run.sourceRunId, sourceRunId);
+  assert.equal(state.triggerCalls.at(-1).startCommand, "npm run worker:submit-manual-review");
+
+  const duplicate = await request("/api/admin/sales-agent/manual-review-runs", jsonOptions("admin", "POST", { sourceRunId }));
+  assert.equal(duplicate.status, 409);
+  assert.equal((await duplicate.json()).code, "MANUAL_REVIEW_RESUME_ALREADY_ACTIVE");
 }));
 
 test("run creation triggers one one-off job and duplicate request does not trigger twice", () => withServer(async ({ request, state }) => {

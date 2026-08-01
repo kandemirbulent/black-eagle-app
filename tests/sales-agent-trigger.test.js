@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
   DEFAULT_RENDER_API_BASE_URL,
+  MANUAL_REVIEW_WORKER_COMMAND,
   WORKER_COMMAND,
   createRenderSalesAgentTrigger,
   redactRenderDiagnostic,
@@ -40,6 +41,22 @@ test("successful One-Off Job creation uses the official endpoint and supported p
   assert.deepEqual(JSON.parse(calls[0].options.body), {
     startCommand: WORKER_COMMAND,
     planId: "plan-srv-006",
+  });
+});
+
+test("manual review trigger uses the dedicated resume command", async () => {
+  const calls = [];
+  const trigger = createRenderSalesAgentTrigger({
+    env: baseEnv,
+    now: fixedNow,
+    fetchFn: async (url, options) => {
+      calls.push({ url, options });
+      return response(201, "Created", { id: "job-manual-review" });
+    },
+  });
+  await trigger({ startCommand: MANUAL_REVIEW_WORKER_COMMAND });
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    startCommand: "npm run worker:submit-manual-review",
   });
 });
 

@@ -1,6 +1,24 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const fs = require("node:fs");
+const path = require("node:path");
 const { createController } = require("../public/js/sales-agent-dashboard.js");
+
+test("dashboard contains the separate manual review submission controls", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../public/dashboard.html"), "utf8");
+  assert.match(html, /id="runSalesAgentButton">Run Sales Agent</);
+  assert.match(html, /id="submitManualReviewsButton"[^>]*>Submit Manual Reviews</);
+  for (const id of [
+    "manualReviewSelectedRun",
+    "manualReviewSelectedCount",
+    "manualReviewSubmissionStatus",
+    "manualReviewProcessed",
+    "manualReviewSubmitted",
+    "manualReviewAlreadyQuoted",
+    "manualReviewRemaining",
+    "manualReviewFailedItems",
+  ]) assert.match(html, new RegExp(`id="${id}"`));
+});
 
 class FakeElement {
   constructor(tagName = "div") {
@@ -58,6 +76,15 @@ function fakeDocument() {
     "salesAgentFailureReason",
     "salesAgentErrorMessage",
     "runSalesAgentButton",
+    "submitManualReviewsButton",
+    "manualReviewSelectedRun",
+    "manualReviewSelectedCount",
+    "manualReviewSubmissionStatus",
+    "manualReviewProcessed",
+    "manualReviewSubmitted",
+    "manualReviewAlreadyQuoted",
+    "manualReviewRemaining",
+    "manualReviewFailedItems",
     "retrySalesAgentButton",
     "salesAgentResultsTable",
     "salesAgentDetailsModal",
@@ -107,14 +134,19 @@ function controller({ responses = [], setIntervalFn, clearIntervalFn } = {}) {
   const documentRef = fakeDocument();
   const calls = [];
   const messages = [];
+  const confirmations = [];
   const instance = createController({
     authFetch: queuedFetch(responses, calls),
     showMessage: (message, type) => messages.push({ message, type }),
     documentRef,
     setIntervalFn,
     clearIntervalFn,
+    confirmFn: (message) => {
+      confirmations.push(message);
+      return true;
+    },
   });
-  return { instance, documentRef, calls, messages };
+  return { instance, documentRef, calls, messages, confirmations };
 }
 
 const run = (overrides = {}) => ({
@@ -136,6 +168,59 @@ test("Run button sends POST and renders queued run", async () => {
   assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "QUEUED");
   assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, true);
   assert.equal(context.documentRef.elements.runSalesAgentButton.textContent, "Queued...");
+});
+
+test("manual review button submits the explicitly selected run with confirmation", async () => {
+  const context = controller({
+    responses: [
+      response(200, { success: true, run: run({ _id: "64d000000000000000000003", status: "COMPLETED" }) }),
+      response(200, { success: true, results: [
+        { opportunityId: "A", resultStatus: "MANUAL_REVIEW" },
+        { opportunityId: "B", resultStatus: "MANUAL_REVIEW" },
+      ] }),
+      response(201, { success: true, run: {
+        _id: "64e000000000000000000001",
+        runType: "MANUAL_REVIEW_RESUME",
+        sourceRunId: "64d000000000000000000003",
+        status: "QUEUED",
+        manualReviewResume: { selectedCount: 2, remainingManualReview: 2 },
+      } }),
+    ],
+    setIntervalFn: () => 2,
+  });
+  await context.instance.loadSelectedRun("64d000000000000000000003");
+  await context.instance.submitManualReviews();
+  assert.equal(context.calls[2].url, "/api/admin/sales-agent/manual-review-runs");
+  assert.deepEqual(JSON.parse(context.calls[2].options.body), {
+    sourceRunId: "64d000000000000000000003",
+  });
+  assert.match(context.confirmations[0], /Selected Run: 64d000000000000000000003/);
+  assert.match(context.confirmations[0], /Manual Review count: 2/);
+  assert.match(context.confirmations[0], /Discovery WILL NOT run/);
+  assert.match(context.confirmations[0], /OpenAI WILL NOT run/);
+  assert.match(context.confirmations[0], /Eligible quotations WILL be submitted/);
+  assert.equal(context.documentRef.elements.submitManualReviewsButton.textContent, "Manual Reviews Queued...");
+  assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+});
+
+test("manual review status is separate and terminal state re-enables only its button", () => {
+  const context = controller();
+  context.instance.renderResults([{ resultStatus: "MANUAL_REVIEW" }]);
+  context.instance.renderManualReviewRun({
+    status: "COMPLETED",
+    manualReviewResume: {
+      processed: 3,
+      submitted: 2,
+      alreadyQuoted: 1,
+      remainingManualReview: 0,
+      failedItems: 0,
+    },
+  });
+  assert.equal(context.documentRef.elements.manualReviewSubmissionStatus.textContent, "COMPLETED");
+  assert.equal(context.documentRef.elements.manualReviewProcessed.textContent, "3");
+  assert.equal(context.documentRef.elements.manualReviewSubmitted.textContent, "2");
+  assert.equal(context.documentRef.elements.manualReviewAlreadyQuoted.textContent, "1");
+  assert.equal(context.documentRef.elements.submitManualReviewsButton.textContent, "Submit Manual Reviews");
 });
 
 test("run button is disabled only for fresh active statuses", () => {

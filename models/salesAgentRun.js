@@ -2,6 +2,19 @@ const mongoose = require("mongoose");
 
 const salesAgentRunSchema = new mongoose.Schema(
   {
+    runType: {
+      type: String,
+      enum: ["DISCOVERY", "MANUAL_REVIEW_RESUME"],
+      default: "DISCOVERY",
+      required: true,
+      index: true,
+    },
+    sourceRunId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SalesAgentRun",
+      default: null,
+      index: true,
+    },
     status: {
       type: String,
       enum: ["IDLE", "QUEUED", "RUNNING", "COMPLETED", "FAILED"],
@@ -62,6 +75,14 @@ const salesAgentRunSchema = new mongoose.Schema(
       openAiCalls: { type: Number, min: 0, default: 0 },
       platformActions: { type: Number, min: 0, default: 0 },
     },
+    manualReviewResume: {
+      selectedCount: { type: Number, min: 0, default: 0 },
+      processed: { type: Number, min: 0, default: 0 },
+      submitted: { type: Number, min: 0, default: 0 },
+      alreadyQuoted: { type: Number, min: 0, default: 0 },
+      remainingManualReview: { type: Number, min: 0, default: 0 },
+      failedItems: { type: Number, min: 0, default: 0 },
+    },
   },
   { timestamps: true }
 );
@@ -77,5 +98,6 @@ salesAgentRunSchema.index(
   }
 );
 salesAgentRunSchema.index({ createdAt: -1 });
+salesAgentRunSchema.index({ runType: 1, sourceRunId: 1, createdAt: -1 });
 
 module.exports = mongoose.model("SalesAgentRun", salesAgentRunSchema);

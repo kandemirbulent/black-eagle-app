@@ -1,6 +1,9 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const { createRenderSalesAgentTrigger } = require("../services/salesAgentJobTrigger");
+const {
+  createRenderSalesAgentTrigger,
+  MANUAL_REVIEW_WORKER_COMMAND,
+} = require("../services/salesAgentJobTrigger");
 
 const SETTINGS_FIELDS = new Set([
   "autoRunEnabled",
@@ -169,6 +172,36 @@ function createSalesAgentRouter({
 }) {
   const router = express.Router();
 
+  async function markRenderTriggerFailed(run, triggerError) {
+    logger.error("Sales Agent failure at RENDER_TRIGGER", redactFailureLog(triggerError?.stack || triggerError));
+    const failedAt = now();
+    const diagnostic = triggerError?.diagnostic || {};
+    const safeRenderMessage = diagnostic.safeMessage || "Sales Agent worker could not be started.";
+    const failedRun = await SalesAgentRun.findByIdAndUpdate(
+      run._id,
+      {
+        $set: {
+          status: "FAILED",
+          triggerStatus: "FAILED",
+          failureCode: diagnostic.errorCode || "WORKER_TRIGGER_FAILED",
+          errorSummary: "Sales Agent worker could not be started.",
+          failedStage: "RENDER_TRIGGER",
+          failureReason: "Render could not create the Sales Agent job.",
+          errorMessage: safeRenderMessage,
+          failureAt: failedAt,
+          failureHttpStatus: diagnostic.httpStatus || null,
+          failureHttpStatusText: diagnostic.httpStatusText || "",
+          upstreamErrorCode: diagnostic.renderErrorCode || diagnostic.errorCode || "",
+          upstreamResponseBody: diagnostic.responseBody || "",
+          failureRequestAt: diagnostic.requestTimestamp ? new Date(diagnostic.requestTimestamp) : failedAt,
+          completedAt: failedAt,
+        },
+      },
+      { new: true, runValidators: true }
+    );
+    return { failedRun: failedRun || run, safeRenderMessage };
+  }
+
   router.post("/admin/sales-agent/runs", requireAdminAuth, async (req, res) => {
     try {
       await recoverStaleQueuedRun(SalesAgentRun, { env, now: now() });
@@ -194,32 +227,7 @@ function createSalesAgentRouter({
         );
         return res.status(201).json({ success: true, run: triggeredRun || run });
       } catch (triggerError) {
-        logger.error("Sales Agent failure at RENDER_TRIGGER", redactFailureLog(triggerError?.stack || triggerError));
-        const failedAt = now();
-        const diagnostic = triggerError?.diagnostic || {};
-        const safeRenderMessage = diagnostic.safeMessage || "Sales Agent worker could not be started.";
-        const failedRun = await SalesAgentRun.findByIdAndUpdate(
-          run._id,
-          {
-            $set: {
-              status: "FAILED",
-              triggerStatus: "FAILED",
-              failureCode: diagnostic.errorCode || "WORKER_TRIGGER_FAILED",
-              errorSummary: "Sales Agent worker could not be started.",
-              failedStage: "RENDER_TRIGGER",
-              failureReason: "Render could not create the Sales Agent job.",
-              errorMessage: safeRenderMessage,
-              failureAt: failedAt,
-              failureHttpStatus: diagnostic.httpStatus || null,
-              failureHttpStatusText: diagnostic.httpStatusText || "",
-              upstreamErrorCode: diagnostic.renderErrorCode || diagnostic.errorCode || "",
-              upstreamResponseBody: diagnostic.responseBody || "",
-              failureRequestAt: diagnostic.requestTimestamp ? new Date(diagnostic.requestTimestamp) : failedAt,
-              completedAt: failedAt,
-            },
-          },
-          { new: true, runValidators: true }
-        );
+        const { failedRun, safeRenderMessage } = await markRenderTriggerFailed(run, triggerError);
         return res.status(503).json({
           success: false,
           code: "WORKER_TRIGGER_FAILED",
@@ -240,8 +248,92 @@ function createSalesAgentRouter({
     }
   });
 
+  router.post("/admin/sales-agent/manual-review-runs", requireAdminAuth, async (req, res) => {
+    const sourceRunId = String(req.body?.sourceRunId || "").trim();
+    if (!sourceRunId) {
+      return res.status(400).json({ success: false, code: "SOURCE_RUN_ID_REQUIRED" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(sourceRunId)) {
+      return res.status(400).json({ success: false, code: "INVALID_SOURCE_RUN_ID" });
+    }
+    try {
+      const sourceRun = await SalesAgentRun.findById(sourceRunId).select("_id").lean();
+      if (!sourceRun) {
+        return res.status(404).json({ success: false, code: "SOURCE_RUN_NOT_FOUND" });
+      }
+      const manualReviewCount = await SalesAgentOpportunityResult.countDocuments({
+        runId: sourceRunId,
+        resultStatus: "MANUAL_REVIEW",
+      });
+      if (!manualReviewCount) {
+        return res.status(409).json({ success: false, code: "NO_MANUAL_REVIEW_RECORDS" });
+      }
+      const run = await SalesAgentRun.create({
+        runType: "MANUAL_REVIEW_RESUME",
+        sourceRunId,
+        status: "QUEUED",
+        activeLock: `manual-review:${sourceRunId}`,
+        triggeredBy: req.adminUser._id,
+        triggeredByRole: req.adminUser.role,
+        triggerStatus: "TRIGGERING",
+        manualReviewResume: {
+          selectedCount: manualReviewCount,
+          remainingManualReview: manualReviewCount,
+        },
+      });
+      try {
+        const trigger = await triggerSalesAgentRun({
+          runId: String(run._id),
+          startCommand: MANUAL_REVIEW_WORKER_COMMAND,
+        });
+        const triggeredRun = await SalesAgentRun.findByIdAndUpdate(
+          run._id,
+          { $set: { triggerStatus: "TRIGGERED", triggerJobId: trigger.jobId, triggeredAt: now() } },
+          { new: true, runValidators: true }
+        );
+        return res.status(201).json({
+          success: true,
+          run: triggeredRun || run,
+          sourceRunId,
+          manualReviewCount,
+        });
+      } catch (triggerError) {
+        const { failedRun, safeRenderMessage } = await markRenderTriggerFailed(run, triggerError);
+        return res.status(503).json({
+          success: false,
+          code: "WORKER_TRIGGER_FAILED",
+          message: safeRenderMessage,
+          run: failedRun,
+        });
+      }
+    } catch (error) {
+      if (error?.code === 11000) {
+        return res.status(409).json({
+          success: false,
+          code: "MANUAL_REVIEW_RESUME_ALREADY_ACTIVE",
+          message: "A manual review submission is already active for this source run.",
+        });
+      }
+      logger.error("Manual review resume creation failed", redactFailureLog(error?.stack || error));
+      return res.status(500).json({ success: false, code: "MANUAL_REVIEW_RESUME_CREATE_FAILED" });
+    }
+  });
+
+  router.get("/admin/sales-agent/manual-review-runs/status", requireAdminAuth, async (req, res) => {
+    const sourceRunId = String(req.query.sourceRunId || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(sourceRunId)) {
+      return res.status(400).json({ success: false, code: "INVALID_SOURCE_RUN_ID" });
+    }
+    const run = await SalesAgentRun.findOne({
+      runType: "MANUAL_REVIEW_RESUME",
+      sourceRunId,
+    }).sort({ createdAt: -1 }).lean();
+    return res.json({ success: true, run: run || null });
+  });
+
   router.get("/admin/sales-agent/runs", requireAdminAuth, async (req, res) => {
-    const runs = await SalesAgentRun.find({}).sort({ createdAt: -1 }).limit(100).lean();
+    const runs = await SalesAgentRun.find({ runType: { $ne: "MANUAL_REVIEW_RESUME" } })
+      .sort({ createdAt: -1 }).limit(100).lean();
     return res.json({ success: true, runs });
   });
 
@@ -276,7 +368,10 @@ function createSalesAgentRouter({
 
   router.get("/admin/sales-agent/status", requireAdminAuth, async (req, res) => {
     await recoverStaleQueuedRun(SalesAgentRun, { env, now: now() });
-    const run = await SalesAgentRun.findOne({ status: { $in: ["QUEUED", "RUNNING"] } })
+    const run = await SalesAgentRun.findOne({
+      runType: { $ne: "MANUAL_REVIEW_RESUME" },
+      status: { $in: ["QUEUED", "RUNNING"] },
+    })
       .sort({ createdAt: -1 }).lean();
     return res.json({ success: true, status: run?.status || "IDLE", run: run || null });
   });
