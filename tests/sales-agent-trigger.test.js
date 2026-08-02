@@ -54,10 +54,29 @@ test("manual review trigger uses the dedicated resume command", async () => {
       return response(201, "Created", { id: "job-manual-review" });
     },
   });
-  await trigger({ startCommand: MANUAL_REVIEW_WORKER_COMMAND });
+  await trigger({
+    startCommand: MANUAL_REVIEW_WORKER_COMMAND,
+    sourceRunId: "64d000000000000000000003",
+    persistedSourceRunId: "64d000000000000000000003",
+  });
   assert.deepEqual(JSON.parse(calls[0].options.body), {
     startCommand: "npm run worker:submit-manual-review",
   });
+});
+
+test("manual review source-run mismatch stops before the Render request", async () => {
+  let called = false;
+  const trigger = createRenderSalesAgentTrigger({
+    env: baseEnv,
+    now: fixedNow,
+    fetchFn: async () => { called = true; },
+  });
+  await assert.rejects(trigger({
+    startCommand: MANUAL_REVIEW_WORKER_COMMAND,
+    sourceRunId: "64d000000000000000000003",
+    persistedSourceRunId: "64d000000000000000000004",
+  }), (error) => error.code === "MANUAL_REVIEW_SOURCE_RUN_MISMATCH");
+  assert.equal(called, false);
 });
 
 test("a deploy-hook RENDER_API_BASE_URL cannot redirect the trigger into a deployment", async () => {

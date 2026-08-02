@@ -130,7 +130,7 @@ function queuedFetch(entries, calls) {
   };
 }
 
-function controller({ responses = [], setIntervalFn, clearIntervalFn } = {}) {
+function controller({ responses = [], setIntervalFn, clearIntervalFn, onConfirm } = {}) {
   const documentRef = fakeDocument();
   const calls = [];
   const messages = [];
@@ -143,7 +143,7 @@ function controller({ responses = [], setIntervalFn, clearIntervalFn } = {}) {
     clearIntervalFn,
     confirmFn: (message) => {
       confirmations.push(message);
-      return true;
+      return onConfirm ? onConfirm(message, documentRef) : true;
     },
   });
   return { instance, documentRef, calls, messages, confirmations };
@@ -188,6 +188,11 @@ test("manual review button submits the explicitly selected run with confirmation
     ],
     setIntervalFn: () => 2,
   });
+  context.instance.renderRunHistory([run({
+    _id: "64d000000000000000000003",
+    status: "COMPLETED",
+    totals: { manualReview: 2 },
+  })]);
   await context.instance.loadSelectedRun("64d000000000000000000003");
   await context.instance.submitManualReviews();
   assert.equal(context.calls[2].url, "/api/admin/sales-agent/manual-review-runs");
@@ -201,6 +206,49 @@ test("manual review button submits the explicitly selected run with confirmation
   assert.match(context.confirmations[0], /Eligible quotations WILL be submitted/);
   assert.equal(context.documentRef.elements.submitManualReviewsButton.textContent, "Manual Reviews Queued...");
   assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+});
+
+test("manual review submission re-reads the dropdown and never uses a cached displayed run", async () => {
+  const context = controller({
+    responses: [
+      response(200, { success: true, run: run({ _id: "64d000000000000000000010", status: "COMPLETED" }) }),
+      response(200, { success: true, results: [{ opportunityId: "A", resultStatus: "MANUAL_REVIEW" }] }),
+    ],
+  });
+  context.instance.renderRunHistory([
+    run({ _id: "64d000000000000000000010", status: "COMPLETED", totals: { manualReview: 1 } }),
+    run({ _id: "64d000000000000000000011", status: "COMPLETED", totals: { manualReview: 9 } }),
+  ]);
+  await context.instance.loadSelectedRun("64d000000000000000000010");
+  context.documentRef.elements.salesAgentRunSelector.value = "64d000000000000000000011";
+  await context.instance.submitManualReviews();
+  assert.equal(context.calls.length, 2);
+  assert.equal(context.confirmations.length, 0);
+  assert.match(context.messages.at(-1).message, /Select a run/i);
+});
+
+test("manual review submission aborts if the dropdown changes during confirmation", async () => {
+  const selectedRunId = "64d000000000000000000020";
+  const context = controller({
+    responses: [
+      response(200, { success: true, run: run({ _id: selectedRunId, status: "COMPLETED" }) }),
+      response(200, { success: true, results: [
+        { resultStatus: "MANUAL_REVIEW" }, { resultStatus: "MANUAL_REVIEW" },
+      ] }),
+    ],
+    onConfirm: (_message, documentRef) => {
+      documentRef.elements.salesAgentRunSelector.value = "64d000000000000000000021";
+      return true;
+    },
+  });
+  context.instance.renderRunHistory([
+    run({ _id: selectedRunId, status: "COMPLETED", totals: { manualReview: 2 } }),
+    run({ _id: "64d000000000000000000021", status: "COMPLETED", totals: { manualReview: 3 } }),
+  ]);
+  await context.instance.loadSelectedRun(selectedRunId);
+  await context.instance.submitManualReviews();
+  assert.equal(context.calls.length, 2);
+  assert.match(context.messages.at(-1).message, /selected run changed/i);
 });
 
 test("manual review status is separate and terminal state re-enables only its button", () => {

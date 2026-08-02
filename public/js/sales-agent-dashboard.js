@@ -406,8 +406,9 @@
     function renderRunHistory(runs) {
       runsCache = Array.isArray(runs) ? runs.slice(0, 20) : [];
       if (!elements.runSelector) return;
+      const latestRunId = getRunId(runsCache[0]);
       const latestOption = documentRef.createElement("option");
-      latestOption.value = "";
+      latestOption.value = latestRunId;
       latestOption.textContent = "Latest Run";
       const options = [latestOption];
       for (const run of runsCache) {
@@ -419,7 +420,7 @@
         options.push(option);
       }
       elements.runSelector.replaceChildren(...options);
-      elements.runSelector.value = automaticLatestRun ? "" : displayedResultsRunId;
+      elements.runSelector.value = automaticLatestRun ? latestRunId : displayedResultsRunId;
     }
 
     async function requestJson(url, options) {
@@ -698,30 +699,42 @@
     }
 
     async function submitManualReviews() {
-      const sourceRunId = displayedResultsRunId;
-      if (!sourceRunId || displayedManualReviewCount === 0) {
+      const sourceRunId = String(elements.runSelector?.value || "").trim();
+      const selectedRun = runsCache.find((run) => getRunId(run) === sourceRunId);
+      const selectedManualReviewCount = safeNumber(selectedRun?.totals?.manualReview);
+      if (!sourceRunId || sourceRunId !== displayedResultsRunId || selectedManualReviewCount === 0) {
         showMessage("Select a run containing MANUAL_REVIEW records.", "error");
         return null;
       }
+      console.log(`MANUAL_REVIEW_SELECTED_RUN frontend=${sourceRunId}`);
       const confirmation = [
         `Selected Run: ${sourceRunId}`,
-        `Manual Review count: ${displayedManualReviewCount}`,
+        `Manual Review count: ${selectedManualReviewCount}`,
         "Discovery WILL NOT run",
         "OpenAI WILL NOT run",
         "Eligible quotations WILL be submitted",
       ].join("\n");
       if (!confirmFn(confirmation)) return null;
+      const confirmedRunId = String(elements.runSelector?.value || "").trim();
+      if (confirmedRunId !== sourceRunId) {
+        showMessage("The selected run changed. Please confirm the manual reviews again.", "error");
+        return null;
+      }
       elements.manualReviewButton.disabled = true;
       try {
         const created = await requestJson("/api/admin/sales-agent/manual-review-runs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sourceRunId }),
+          body: JSON.stringify({ sourceRunId: confirmedRunId }),
         });
         if (!created.response.ok || created.payload.success === false || !created.payload.run) {
           const message = created.payload.code === "MANUAL_REVIEW_RESUME_ALREADY_ACTIVE"
             ? "A manual review submission is already active for this run."
-            : "Manual review submission could not be started.";
+            : created.payload.code === "NO_MANUAL_REVIEW_RECORDS"
+              ? "The selected run has no remaining MANUAL_REVIEW records. No job was started."
+              : created.payload.code === "MANUAL_REVIEW_SOURCE_RUN_MISMATCH"
+                ? "The selected run did not match the worker handoff. No job was started."
+                : "Manual review submission could not be started.";
           showMessage(message, "error");
           renderManualReviewRun(created.payload.run);
           return created.payload.run || null;

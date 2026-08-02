@@ -27,6 +27,7 @@ function createHarness({
   initialRuns = [],
   env = {},
   now = () => new Date(),
+  persistedSourceRunOverride = "",
 } = {}) {
   const state = {
     runs: structuredClone(initialRuns),
@@ -60,7 +61,13 @@ function createHarness({
       return structuredClone(run);
     },
     find() { return query(state.runs.slice().reverse()); },
-    findById(id) { return query(state.runs.find((run) => run._id === id) || null); },
+    findById(id) {
+      const found = state.runs.find((run) => run._id === id) || null;
+      const value = found && persistedSourceRunOverride && found.runType === "MANUAL_REVIEW_RESUME"
+        ? { ...found, sourceRunId: persistedSourceRunOverride }
+        : found;
+      return query(value);
+    },
     async findByIdAndUpdate(id, update) {
       const run = state.runs.find((item) => item._id === id);
       if (!run) return null;
@@ -202,7 +209,8 @@ test("manual review resume creates a separate queued trigger with the selected s
   state.runs.push({ _id: sourceRunId, status: "COMPLETED", activeLock: "global" });
   state.results.push(
     { runId: sourceRunId, resultStatus: "MANUAL_REVIEW" },
-    { runId: sourceRunId, resultStatus: "MANUAL_REVIEW" }
+    { runId: sourceRunId, resultStatus: "MANUAL_REVIEW" },
+    { runId: "64d000000000000000000099", resultStatus: "MANUAL_REVIEW" }
   );
   const response = await request("/api/admin/sales-agent/manual-review-runs", jsonOptions("admin", "POST", { sourceRunId }));
   const body = await response.json();
@@ -212,11 +220,23 @@ test("manual review resume creates a separate queued trigger with the selected s
   assert.equal(body.run.runType, "MANUAL_REVIEW_RESUME");
   assert.equal(body.run.sourceRunId, sourceRunId);
   assert.equal(state.triggerCalls.at(-1).startCommand, "npm run worker:submit-manual-review");
+  assert.equal(state.triggerCalls.at(-1).sourceRunId, sourceRunId);
+  assert.equal(state.triggerCalls.at(-1).persistedSourceRunId, sourceRunId);
 
   const duplicate = await request("/api/admin/sales-agent/manual-review-runs", jsonOptions("admin", "POST", { sourceRunId }));
   assert.equal(duplicate.status, 409);
   assert.equal((await duplicate.json()).code, "MANUAL_REVIEW_RESUME_ALREADY_ACTIVE");
 }));
+
+test("manual review source-run mismatch is rejected before creating a Render job", () => withServer(async ({ request, state }) => {
+  const sourceRunId = "64d000000000000000000012";
+  state.runs.push({ _id: sourceRunId, status: "COMPLETED", activeLock: "global" });
+  state.results.push({ runId: sourceRunId, resultStatus: "MANUAL_REVIEW" });
+  const response = await request("/api/admin/sales-agent/manual-review-runs", jsonOptions("admin", "POST", { sourceRunId }));
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).code, "MANUAL_REVIEW_SOURCE_RUN_MISMATCH");
+  assert.equal(state.triggerCalls.length, 0);
+}, { persistedSourceRunOverride: "64d000000000000000000013" }));
 
 test("run creation triggers one one-off job and duplicate request does not trigger twice", () => withServer(async ({ request, state }) => {
   const first = await request("/api/admin/sales-agent/runs", jsonOptions("admin", "POST", {}));

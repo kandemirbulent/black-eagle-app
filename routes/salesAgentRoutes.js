@@ -250,6 +250,7 @@ function createSalesAgentRouter({
 
   router.post("/admin/sales-agent/manual-review-runs", requireAdminAuth, async (req, res) => {
     const sourceRunId = String(req.body?.sourceRunId || "").trim();
+    logger.info?.(`MANUAL_REVIEW_REQUEST sourceRunId=${sourceRunId}`);
     if (!sourceRunId) {
       return res.status(400).json({ success: false, code: "SOURCE_RUN_ID_REQUIRED" });
     }
@@ -282,9 +283,31 @@ function createSalesAgentRouter({
         },
       });
       try {
+        const persistedTrigger = await SalesAgentRun.findById(run._id).select("_id sourceRunId").lean();
+        const persistedSourceRunId = String(persistedTrigger?.sourceRunId || "");
+        logger.info?.(`MANUAL_REVIEW_TRIGGER sourceRunId=${persistedSourceRunId}`);
+        if (persistedSourceRunId !== sourceRunId) {
+          await SalesAgentRun.findByIdAndUpdate(run._id, {
+            $set: {
+              status: "FAILED",
+              activeLock: `released:${run._id}`,
+              triggerStatus: "FAILED",
+              failureCode: "MANUAL_REVIEW_SOURCE_RUN_MISMATCH",
+              failureReason: "The persisted manual-review source run did not match the selected run.",
+              errorMessage: "MANUAL_REVIEW_SOURCE_RUN_MISMATCH",
+              failedStage: "RENDER_TRIGGER",
+              failureAt: now(),
+              completedAt: now(),
+            },
+          });
+          return res.status(409).json({ success: false, code: "MANUAL_REVIEW_SOURCE_RUN_MISMATCH" });
+        }
+        logger.info?.(`MANUAL_REVIEW_WORKER_SOURCE_RUN sourceRunId=${persistedSourceRunId}`);
         const trigger = await triggerSalesAgentRun({
           runId: String(run._id),
           startCommand: MANUAL_REVIEW_WORKER_COMMAND,
+          sourceRunId,
+          persistedSourceRunId,
         });
         const triggeredRun = await SalesAgentRun.findByIdAndUpdate(
           run._id,

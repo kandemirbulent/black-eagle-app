@@ -77,7 +77,7 @@ function createRenderSalesAgentTrigger({
   timeoutMs = 15000,
   now = () => new Date(),
 } = {}) {
-  return async function triggerSalesAgentRun({ startCommand = WORKER_COMMAND } = {}) {
+  return async function triggerSalesAgentRun({ startCommand = WORKER_COMMAND, sourceRunId = "", persistedSourceRunId = "" } = {}) {
     const requestTimestamp = now().toISOString();
     if (typeof fetchFn !== "function") {
       throw new RenderTriggerError("Render job trigger is unavailable.", {
@@ -93,6 +93,14 @@ function createRenderSalesAgentTrigger({
       if (!ALLOWED_WORKER_COMMANDS.has(startCommand)) {
         throw new RenderTriggerError("Unsupported Sales Agent worker command.", {
           errorCode: "RENDER_START_COMMAND_INVALID",
+          requestTimestamp,
+        });
+      }
+      if (startCommand === MANUAL_REVIEW_WORKER_COMMAND && (
+        !sourceRunId || !persistedSourceRunId || String(sourceRunId) !== String(persistedSourceRunId)
+      )) {
+        throw new RenderTriggerError("Manual-review source run handoff did not match the selected run.", {
+          errorCode: "MANUAL_REVIEW_SOURCE_RUN_MISMATCH",
           requestTimestamp,
         });
       }
