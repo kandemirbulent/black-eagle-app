@@ -2,6 +2,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const {
   createRenderSalesAgentTrigger,
+  createRenderSalesAgentJobStatusClient,
+  createRenderSalesAgentJobCancelClient,
   MANUAL_REVIEW_WORKER_COMMAND,
 } = require("../services/salesAgentJobTrigger");
 
@@ -112,6 +114,10 @@ async function recoverStaleQueuedRun(SalesAgentRun, { env = process.env, now = n
   return SalesAgentRun.findOneAndUpdate(
     {
       status: "QUEUED",
+      $and: [
+        { $or: [{ renderJobId: { $exists: false } }, { renderJobId: "" }] },
+        { $or: [{ triggerJobId: { $exists: false } }, { triggerJobId: "" }] },
+      ],
       $or: [
         { updatedAt: { $lt: cutoff } },
         { updatedAt: { $exists: false }, createdAt: { $lt: cutoff } },
@@ -235,11 +241,95 @@ function createSalesAgentRouter({
   SalesAgentOpportunityResult,
   SalesAgentSettings,
   triggerSalesAgentRun = createRenderSalesAgentTrigger(),
+  getRenderJobStatus = createRenderSalesAgentJobStatusClient(),
+  cancelRenderJob = createRenderSalesAgentJobCancelClient(),
   env = process.env,
   now = () => new Date(),
   logger = console,
 }) {
   const router = express.Router();
+
+  async function withPersistedResultCount(run) {
+    if (!run) return null;
+    const value = typeof run.toObject === "function" ? run.toObject() : { ...run };
+    value.persistedResultCount = await SalesAgentOpportunityResult.countDocuments({ runId: value._id });
+    return value;
+  }
+
+  async function reconcileRun(run, renderOverride = null) {
+    if (!run || !["QUEUED", "RUNNING"].includes(String(run.status).toUpperCase())) return run;
+    const jobId = String(run.renderJobId || run.triggerJobId || "").trim();
+    const serviceId = String(run.renderServiceId || env.RENDER_SALES_AGENT_SERVICE_ID || "").trim();
+    if (!jobId) return run;
+    let render = renderOverride;
+    try {
+      if (!render) render = await getRenderJobStatus({ serviceId, jobId });
+    } catch (error) {
+      logger.error("Sales Agent Render reconciliation failed", redactFailureLog(error?.stack || error));
+      return run;
+    }
+    if (render?.timedOut) return run;
+    const checkedAt = render?.checkedAt ? new Date(render.checkedAt) : now();
+    const status = String(render?.status || "").toLowerCase();
+    const baseSet = {
+      renderServiceId: serviceId,
+      renderJobId: jobId,
+      renderJobStatus: render?.missing ? "missing" : status,
+      lastRenderStatusCheckAt: checkedAt,
+    };
+    if (render?.startedAt) baseSet.renderStartedAt = new Date(render.startedAt);
+    if (["pending", "running"].includes(status)) {
+      const updated = await SalesAgentRun.findOneAndUpdate(
+        { _id: run._id, status: { $in: ["QUEUED", "RUNNING"] } },
+        { $set: { ...baseSet, ...(status === "running" ? { status: "RUNNING" } : {}) } },
+        { new: true, runValidators: true }
+      );
+      return updated || run;
+    }
+    let terminalStatus = "";
+    let failureCode = "";
+    let failureReason = "";
+    if (status === "canceled") {
+      terminalStatus = "CANCELED";
+      failureCode = "RENDER_JOB_CANCELED";
+      failureReason = "RENDER_JOB_CANCELED";
+    } else if (status === "failed") {
+      terminalStatus = "FAILED";
+      failureCode = "RENDER_JOB_FAILED";
+      failureReason = "The Render One-Off Job failed before the workflow recorded completion.";
+    } else if (status === "succeeded") {
+      terminalStatus = "FAILED";
+      failureCode = "RECOVERY_REQUIRED";
+      failureReason = "Render succeeded but the Sales Agent workflow did not record completion.";
+    } else if (render?.missing) {
+      const reference = new Date(run.triggeredAt || run.updatedAt || run.createdAt || 0);
+      if (!Number.isFinite(reference.getTime()) || now().getTime() - reference.getTime() < queuedTimeoutMs(env)) return run;
+      terminalStatus = "FAILED";
+      failureCode = "RENDER_JOB_MISSING";
+      failureReason = "The Render job could not be found after the stale-run threshold.";
+    } else {
+      return run;
+    }
+    const finishedAt = render?.finishedAt ? new Date(render.finishedAt) : now();
+    const updated = await SalesAgentRun.findOneAndUpdate(
+      { _id: run._id, status: { $in: ["QUEUED", "RUNNING"] } },
+      { $set: {
+        ...baseSet,
+        status: terminalStatus,
+        activeLock: `released:${run._id}`,
+        failureCode,
+        failureReason,
+        errorSummary: failureReason,
+        errorMessage: failureReason,
+        failureAt: finishedAt,
+        completedAt: finishedAt,
+        finishedAt,
+        renderFinishedAt: finishedAt,
+      } },
+      { new: true, runValidators: true }
+    );
+    return updated || await SalesAgentRun.findById(run._id).lean() || run;
+  }
 
   async function markRenderTriggerFailed(run, triggerError) {
     logger.error("Sales Agent failure at RENDER_TRIGGER", redactFailureLog(triggerError?.stack || triggerError));
@@ -406,6 +496,9 @@ function createSalesAgentRouter({
             $set: {
               triggerStatus: "TRIGGERED",
               triggerJobId: trigger.jobId,
+              renderServiceId: String(env.RENDER_SALES_AGENT_SERVICE_ID || ""),
+              renderJobId: trigger.jobId,
+              renderJobStatus: "pending",
               triggeredAt: new Date(),
             },
           },
@@ -497,7 +590,10 @@ function createSalesAgentRouter({
         });
         const triggeredRun = await SalesAgentRun.findByIdAndUpdate(
           run._id,
-          { $set: { triggerStatus: "TRIGGERED", triggerJobId: trigger.jobId, triggeredAt: now() } },
+        { $set: {
+          triggerStatus: "TRIGGERED", triggerJobId: trigger.jobId, triggeredAt: now(),
+          renderServiceId: String(env.RENDER_SALES_AGENT_SERVICE_ID || ""), renderJobId: trigger.jobId, renderJobStatus: "pending",
+        } },
           { new: true, runValidators: true }
         );
         return res.status(201).json({
@@ -543,7 +639,59 @@ function createSalesAgentRouter({
   router.get("/admin/sales-agent/runs", requireAdminAuth, async (req, res) => {
     const runs = await SalesAgentRun.find({ runType: { $ne: "MANUAL_REVIEW_RESUME" } })
       .sort({ createdAt: -1 }).limit(100).lean();
-    return res.json({ success: true, runs });
+    return res.json({ success: true, runs: await Promise.all(runs.map(withPersistedResultCount)) });
+  });
+
+  router.post("/admin/sales-agent/runs/:runId/reconcile", requireAdminAuth, async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.runId)) {
+      return res.status(400).json({ success: false, code: "INVALID_RUN_ID" });
+    }
+    const run = await SalesAgentRun.findById(req.params.runId).lean();
+    if (!run) return res.status(404).json({ success: false, code: "SALES_AGENT_RUN_NOT_FOUND" });
+    const reconciled = await reconcileRun(run);
+    return res.json({ success: true, run: await withPersistedResultCount(reconciled) });
+  });
+
+  router.post("/admin/sales-agent/runs/:runId/cancel", requireAdminAuth, async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.runId)) {
+      return res.status(400).json({ success: false, code: "INVALID_RUN_ID" });
+    }
+    const run = await SalesAgentRun.findById(req.params.runId).lean();
+    if (!run) return res.status(404).json({ success: false, code: "SALES_AGENT_RUN_NOT_FOUND" });
+    const localStatus = String(run.status || "").toUpperCase();
+    if (localStatus === "CANCELED") {
+      return res.json({ success: true, run: await withPersistedResultCount(run), idempotent: true });
+    }
+    if (!["QUEUED", "RUNNING"].includes(localStatus)) {
+      return res.status(409).json({ success: false, code: "SALES_AGENT_RUN_NOT_ACTIVE", run: await withPersistedResultCount(run) });
+    }
+    const jobId = String(run.renderJobId || run.triggerJobId || "").trim();
+    const serviceId = String(run.renderServiceId || env.RENDER_SALES_AGENT_SERVICE_ID || "").trim();
+    if (!jobId || !serviceId) {
+      return res.status(409).json({ success: false, code: "RENDER_JOB_REFERENCE_MISSING" });
+    }
+    try {
+      const current = await getRenderJobStatus({ serviceId, jobId });
+      if (current?.timedOut) {
+        return res.status(503).json({ success: false, code: "RENDER_CANCEL_INCONCLUSIVE", message: "Render status check timed out. The run was not changed." });
+      }
+      if (["canceled", "failed", "succeeded"].includes(String(current?.status || "").toLowerCase())) {
+        const reconciled = await reconcileRun(run, current);
+        return res.json({ success: true, run: await withPersistedResultCount(reconciled), alreadyTerminal: true });
+      }
+      if (!["pending", "running"].includes(String(current?.status || "").toLowerCase())) {
+        return res.status(503).json({ success: false, code: "RENDER_CANCEL_INCONCLUSIVE", message: "Render did not return a cancellable job state. The run was not changed." });
+      }
+      const canceled = await cancelRenderJob({ serviceId, jobId });
+      if (canceled?.timedOut || String(canceled?.status || "").toLowerCase() !== "canceled") {
+        return res.status(503).json({ success: false, code: "RENDER_CANCEL_INCONCLUSIVE", message: "Render did not confirm cancellation. The run was not changed." });
+      }
+      const reconciled = await reconcileRun(run, canceled);
+      return res.json({ success: true, run: await withPersistedResultCount(reconciled) });
+    } catch (error) {
+      logger.error("Sales Agent Render cancellation failed", redactFailureLog(error?.stack || error));
+      return res.status(503).json({ success: false, code: "RENDER_CANCEL_FAILED", message: "Render could not confirm cancellation. The run was not changed." });
+    }
   });
 
   router.get("/admin/sales-agent/runs/:runId", requireAdminAuth, async (req, res) => {
@@ -552,7 +700,7 @@ function createSalesAgentRouter({
     }
     const run = await SalesAgentRun.findById(req.params.runId).lean();
     if (!run) return res.status(404).json({ success: false, code: "SALES_AGENT_RUN_NOT_FOUND" });
-    return res.json({ success: true, run });
+    return res.json({ success: true, run: await withPersistedResultCount(run) });
   });
 
   router.get("/admin/sales-agent/runs/:runId/results", requireAdminAuth, async (req, res) => {
@@ -577,12 +725,13 @@ function createSalesAgentRouter({
 
   router.get("/admin/sales-agent/status", requireAdminAuth, async (req, res) => {
     await recoverStaleQueuedRun(SalesAgentRun, { env, now: now() });
-    const run = await SalesAgentRun.findOne({
+    let run = await SalesAgentRun.findOne({
       runType: { $ne: "MANUAL_REVIEW_RESUME" },
       status: { $in: ["QUEUED", "RUNNING"] },
     })
       .sort({ createdAt: -1 }).lean();
-    return res.json({ success: true, status: run?.status || "IDLE", run: run || null });
+    if (run) run = await reconcileRun(run);
+    return res.json({ success: true, status: run?.status || "IDLE", run: await withPersistedResultCount(run) });
   });
 
   router.get(

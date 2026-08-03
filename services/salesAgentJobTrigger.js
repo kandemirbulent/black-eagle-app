@@ -166,6 +166,131 @@ function createRenderSalesAgentTrigger({
   };
 }
 
+function createRenderSalesAgentJobStatusClient({
+  fetchFn = globalThis.fetch,
+  env = process.env,
+  timeoutMs = 5000,
+  now = () => new Date(),
+} = {}) {
+  return async function getRenderSalesAgentJobStatus({ serviceId, jobId } = {}) {
+    const requestTimestamp = now().toISOString();
+    const resolvedServiceId = required(serviceId || env.RENDER_SALES_AGENT_SERVICE_ID, "Render Sales Agent service ID", "RENDER_SERVICE_ID_MISSING", requestTimestamp);
+    const resolvedJobId = required(jobId, "Render job ID", "RENDER_JOB_ID_MISSING", requestTimestamp);
+    const apiKey = required(env.RENDER_API_KEY, "Render API key", "RENDER_API_KEY_MISSING", requestTimestamp);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      let response;
+      try {
+        response = await fetchFn(
+          `${DEFAULT_RENDER_API_BASE_URL}/services/${encodeURIComponent(resolvedServiceId)}/jobs/${encodeURIComponent(resolvedJobId)}`,
+          {
+            method: "GET",
+            headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}` },
+            signal: controller.signal,
+          }
+        );
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          return { timedOut: true, checkedAt: requestTimestamp, serviceId: resolvedServiceId, jobId: resolvedJobId };
+        }
+        throw new RenderTriggerError("Render API network request failed.", {
+          errorCode: "RENDER_STATUS_NETWORK_ERROR",
+          requestTimestamp,
+        }, error);
+      }
+      const rawBody = await response.text().catch(() => "");
+      if (response.status === 404) {
+        return { missing: true, checkedAt: requestTimestamp, serviceId: resolvedServiceId, jobId: resolvedJobId };
+      }
+      const parsed = parseResponseBody(rawBody);
+      if (!response.ok) {
+        throw new RenderTriggerError(`Render job status returned ${response.status} ${response.statusText || "Error"}.`, {
+          errorCode: parsed.renderErrorCode || `RENDER_STATUS_HTTP_${response.status}`,
+          requestTimestamp,
+          httpStatus: response.status,
+          httpStatusText: response.statusText,
+          responseBody: rawBody,
+          renderErrorCode: parsed.renderErrorCode,
+          renderErrorMessage: parsed.renderErrorMessage,
+        });
+      }
+      const payload = parsed.payload || {};
+      const status = String(payload.status || payload.job?.status || "").trim().toLowerCase();
+      return {
+        status,
+        checkedAt: requestTimestamp,
+        serviceId: resolvedServiceId,
+        jobId: String(payload.id || payload.job?.id || resolvedJobId),
+        startedAt: payload.startedAt || payload.job?.startedAt || null,
+        finishedAt: payload.finishedAt || payload.job?.finishedAt || null,
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+}
+
+function createRenderSalesAgentJobCancelClient({
+  fetchFn = globalThis.fetch,
+  env = process.env,
+  timeoutMs = 5000,
+  now = () => new Date(),
+} = {}) {
+  return async function cancelRenderSalesAgentJob({ serviceId, jobId } = {}) {
+    const requestTimestamp = now().toISOString();
+    const resolvedServiceId = required(serviceId || env.RENDER_SALES_AGENT_SERVICE_ID, "Render Sales Agent service ID", "RENDER_SERVICE_ID_MISSING", requestTimestamp);
+    const resolvedJobId = required(jobId, "Render job ID", "RENDER_JOB_ID_MISSING", requestTimestamp);
+    const apiKey = required(env.RENDER_API_KEY, "Render API key", "RENDER_API_KEY_MISSING", requestTimestamp);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      let response;
+      try {
+        response = await fetchFn(
+          `${DEFAULT_RENDER_API_BASE_URL}/services/${encodeURIComponent(resolvedServiceId)}/jobs/${encodeURIComponent(resolvedJobId)}/cancel`,
+          {
+            method: "POST",
+            headers: { Accept: "application/json", Authorization: `Bearer ${apiKey}` },
+            signal: controller.signal,
+          }
+        );
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          return { timedOut: true, checkedAt: requestTimestamp, serviceId: resolvedServiceId, jobId: resolvedJobId };
+        }
+        throw new RenderTriggerError("Render cancel request failed.", {
+          errorCode: "RENDER_CANCEL_NETWORK_ERROR", requestTimestamp,
+        }, error);
+      }
+      const rawBody = await response.text().catch(() => "");
+      const parsed = parseResponseBody(rawBody);
+      if (!response.ok) {
+        throw new RenderTriggerError(`Render cancel request returned ${response.status} ${response.statusText || "Error"}.`, {
+          errorCode: parsed.renderErrorCode || `RENDER_CANCEL_HTTP_${response.status}`,
+          requestTimestamp,
+          httpStatus: response.status,
+          httpStatusText: response.statusText,
+          responseBody: rawBody,
+          renderErrorCode: parsed.renderErrorCode,
+          renderErrorMessage: parsed.renderErrorMessage,
+        });
+      }
+      const payload = parsed.payload || {};
+      return {
+        status: String(payload.status || payload.job?.status || "canceled").trim().toLowerCase(),
+        checkedAt: requestTimestamp,
+        serviceId: resolvedServiceId,
+        jobId: String(payload.id || payload.job?.id || resolvedJobId),
+        startedAt: payload.startedAt || payload.job?.startedAt || null,
+        finishedAt: payload.finishedAt || payload.job?.finishedAt || requestTimestamp,
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+}
+
 module.exports = {
   DEFAULT_RENDER_API_BASE_URL,
   RENDER_TRIGGER_STAGE,
@@ -173,5 +298,7 @@ module.exports = {
   MANUAL_REVIEW_WORKER_COMMAND,
   WORKER_COMMAND,
   createRenderSalesAgentTrigger,
+  createRenderSalesAgentJobStatusClient,
+  createRenderSalesAgentJobCancelClient,
   redactRenderDiagnostic,
 };

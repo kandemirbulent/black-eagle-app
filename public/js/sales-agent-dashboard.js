@@ -4,7 +4,7 @@
   if (root) root.SalesAgentDashboard = api;
 })(typeof window !== "undefined" ? window : globalThis, function salesAgentDashboardFactory() {
   const ACTIVE_STATUSES = new Set(["QUEUED", "RUNNING"]);
-  const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED"]);
+  const TERMINAL_STATUSES = new Set(["COMPLETED", "FAILED", "CANCELED"]);
 
   function safeNumber(value) {
     const parsed = Number(value);
@@ -145,6 +145,8 @@
       errorMessage: diagnosticElement("salesAgentErrorMessage", "Error Message"),
       runButton: byId("runSalesAgentButton"),
       manualReviewButton: byId("submitManualReviewsButton"),
+      viewCurrentPartialButton: byId("viewCurrentSalesAgentPartialResults"),
+      cancelRunButton: byId("cancelCurrentSalesAgentRun"),
       manualSelectedRun: byId("manualReviewSelectedRun"),
       manualCount: byId("manualReviewSelectedCount"),
       manualStatus: byId("manualReviewSubmissionStatus"),
@@ -181,6 +183,7 @@
     let pollingTimer = null;
     let manualPollingTimer = null;
     let currentResults = [];
+    let cancellationInProgress = false;
     const selectedOpportunities = new Map();
 
     function showRetryError(message) {
@@ -222,6 +225,14 @@
       if (elements.failureReason) elements.failureReason.textContent = wordSafeLimit(run?.failureReason, 180) || "—";
       if (elements.errorMessage) elements.errorMessage.textContent = wordSafeLimit(run?.errorMessage || run?.errorSummary, 180) || "—";
       updateButton(status);
+      if (elements.viewCurrentPartialButton) {
+        const hasPartial = ACTIVE_STATUSES.has(status) && safeNumber(run?.persistedResultCount) > 0;
+        elements.viewCurrentPartialButton.classList.toggle("hidden", !hasPartial);
+      }
+      if (elements.cancelRunButton) {
+        elements.cancelRunButton.classList.toggle("hidden", !ACTIVE_STATUSES.has(status));
+        elements.cancelRunButton.disabled = cancellationInProgress || !ACTIVE_STATUSES.has(status);
+      }
     }
 
     function createElement(tag, content, className) {
@@ -647,7 +658,7 @@
     }
 
     async function showPreviousResults(status) {
-      if (displayedResultsRunId && displayedResultsRunId !== currentRunId && displayedResultsCount) {
+      if (displayedResultsRunId !== currentRunId && displayedResultsCount) {
         setResultsNotice(
           `Current run is ${status}. Showing results from the previous completed run.`
         );
@@ -684,16 +695,18 @@
       currentRunId = getRunId(record.run) || String(id);
       const status = text(record.run?.status, "IDLE").toUpperCase();
       if (automaticLatestRun) renderRun(record.run);
-      if (automaticLatestRun && record.results.length) {
-        displayedResultsRunId = currentRunId;
-        renderResults(record.results);
-        setResultsNotice("");
-      } else if (automaticLatestRun && ACTIVE_STATUSES.has(status)) {
+      if (automaticLatestRun && ACTIVE_STATUSES.has(status)) {
         await showPreviousResults(status);
       } else if (automaticLatestRun) {
         displayedResultsRunId = currentRunId;
         renderResults(record.results);
-        setResultsNotice("");
+        if (status === "CANCELED") {
+          setResultsNotice(record.results.length
+            ? `This run was canceled. Showing results saved before cancellation. Recovered persisted results: ${record.results.length}`
+            : "This run was canceled. No persisted results were recovered.");
+        } else {
+          setResultsNotice("");
+        }
       }
       if (!automaticLatestRun) updateButton(status);
       if (TERMINAL_STATUSES.has(status)) {
@@ -718,9 +731,61 @@
       displayedResultsRunId = getRunId(record.run) || String(id);
       renderRun(record.run);
       renderResults(record.results);
-      setResultsNotice("");
+      const status = text(record.run?.status, "").toUpperCase();
+      setResultsNotice(status === "CANCELED"
+        ? (record.results.length
+          ? `This run was canceled. Showing results saved before cancellation. Recovered persisted results: ${record.results.length}`
+          : "This run was canceled. No persisted results were recovered.")
+        : "");
       updateButton(currentRun?.status);
       return record.run;
+    }
+
+    async function viewCurrentPartialResults() {
+      if (!currentRunId) return null;
+      const record = await loadRunRecord(currentRunId);
+      displayedResultsRunId = currentRunId;
+      renderResults(record?.results || []);
+      const count = record?.results?.length || 0;
+      setResultsNotice(count
+        ? `Showing current run partial results. Recovered persisted results: ${count}`
+        : "No persisted results were recovered.");
+      return record;
+    }
+
+    async function cancelCurrentRun() {
+      const runId = currentRunId;
+      const status = text(currentRun?.status, "").toUpperCase();
+      if (!runId || !ACTIVE_STATUSES.has(status) || cancellationInProgress) return null;
+      const confirmation = [
+        `Run ID: ${runId}`,
+        "Active processing will stop.",
+        "Already submitted quotations will not be reversed.",
+        "Already persisted results will be preserved.",
+        "Unprocessed opportunities will remain unprocessed.",
+      ].join("\n");
+      if (!confirmFn(confirmation)) return null;
+      cancellationInProgress = true;
+      if (elements.cancelRunButton) elements.cancelRunButton.disabled = true;
+      try {
+        const result = await requestJson(`/api/admin/sales-agent/runs/${encodeURIComponent(runId)}/cancel`, { method: "POST" });
+        if (!result.response.ok || result.payload.success === false || !result.payload.run) {
+          showMessage(result.payload.message || "The current Sales Agent run could not be canceled.", "error");
+          return null;
+        }
+        currentRun = result.payload.run;
+        renderRun(currentRun);
+        stopPolling();
+        if (safeNumber(currentRun.persistedResultCount) > 0) await loadCurrentRun(runId);
+        else setResultsNotice("This run was canceled. No persisted results were recovered.");
+        return currentRun;
+      } catch (_error) {
+        showMessage("The current Sales Agent run could not be canceled.", "error");
+        return null;
+      } finally {
+        cancellationInProgress = false;
+        if (elements.cancelRunButton) elements.cancelRunButton.disabled = !ACTIVE_STATUSES.has(text(currentRun?.status, "").toUpperCase());
+      }
     }
 
     async function latestRun() {
@@ -960,6 +1025,8 @@
       elements.closeDetailsButton?.addEventListener("click", closeDetails);
       elements.runSelector?.addEventListener("change", onRunSelectionChange);
       elements.manualReviewButton?.addEventListener("click", submitManualReviews);
+      elements.viewCurrentPartialButton?.addEventListener("click", viewCurrentPartialResults);
+      elements.cancelRunButton?.addEventListener("click", cancelCurrentRun);
       elements.platformFilter?.addEventListener("change", clearOpportunitySelection);
       elements.selectCurrentPage?.addEventListener("click", selectAllCurrentPage);
       elements.clearSelection?.addEventListener("click", clearOpportunitySelection);
@@ -983,6 +1050,8 @@
       renderResults,
       renderRunHistory,
       loadSelectedRun,
+      viewCurrentPartialResults,
+      cancelCurrentRun,
       openDetails,
       closeDetails,
       selectAllCurrentPage,

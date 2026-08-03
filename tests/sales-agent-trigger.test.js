@@ -6,6 +6,8 @@ const {
   MANUAL_REVIEW_WORKER_COMMAND,
   WORKER_COMMAND,
   createRenderSalesAgentTrigger,
+  createRenderSalesAgentJobStatusClient,
+  createRenderSalesAgentJobCancelClient,
   redactRenderDiagnostic,
 } = require("../services/salesAgentJobTrigger");
 
@@ -42,6 +44,67 @@ test("successful One-Off Job creation uses the official endpoint and supported p
     startCommand: WORKER_COMMAND,
     planId: "plan-srv-006",
   });
+});
+
+test("Render job status lookup uses the official read-only endpoint", async () => {
+  const calls = [];
+  const getStatus = createRenderSalesAgentJobStatusClient({
+    env: baseEnv,
+    now: fixedNow,
+    fetchFn: async (url, options) => {
+      calls.push({ url, options });
+      return response(200, "OK", {
+        id: "job-123", status: "canceled",
+        startedAt: "2026-07-31T11:00:00.000Z", finishedAt: "2026-07-31T11:30:00.000Z",
+      });
+    },
+  });
+  const result = await getStatus({ jobId: "job-123" });
+  assert.equal(result.status, "canceled");
+  assert.equal(calls[0].url, `${DEFAULT_RENDER_API_BASE_URL}/services/srv_test_sales_agent/jobs/job-123`);
+  assert.equal(calls[0].options.method, "GET");
+  assert.equal(calls[0].options.headers.Authorization, "Bearer test-render-api-key");
+});
+
+test("Render status timeout and missing job are non-destructive signals", async () => {
+  const timedOut = createRenderSalesAgentJobStatusClient({
+    env: baseEnv,
+    timeoutMs: 1,
+    fetchFn: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+    }),
+  });
+  assert.equal((await timedOut({ jobId: "job-timeout" })).timedOut, true);
+  const missing = createRenderSalesAgentJobStatusClient({
+    env: baseEnv,
+    fetchFn: async () => response(404, "Not Found", { message: "missing" }),
+  });
+  assert.equal((await missing({ jobId: "job-missing" })).missing, true);
+});
+
+test("Render job cancellation uses the official cancel endpoint and never exposes credentials", async () => {
+  const calls = [];
+  const cancel = createRenderSalesAgentJobCancelClient({
+    env: baseEnv, now: fixedNow,
+    fetchFn: async (url, options) => {
+      calls.push({ url, options });
+      return response(200, "OK", { id: "job-123", status: "canceled" });
+    },
+  });
+  assert.equal((await cancel({ jobId: "job-123" })).status, "canceled");
+  assert.equal(calls[0].url, `${DEFAULT_RENDER_API_BASE_URL}/services/srv_test_sales_agent/jobs/job-123/cancel`);
+  assert.equal(calls[0].options.method, "POST");
+  assert.equal(calls[0].options.headers.Authorization, "Bearer test-render-api-key");
+});
+
+test("Render cancel timeout is inconclusive", async () => {
+  const cancel = createRenderSalesAgentJobCancelClient({
+    env: baseEnv, timeoutMs: 1,
+    fetchFn: async (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+    }),
+  });
+  assert.equal((await cancel({ jobId: "job-timeout" })).timedOut, true);
 });
 
 test("manual review trigger uses the dedicated resume command", async () => {

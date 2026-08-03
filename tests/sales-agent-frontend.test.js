@@ -77,6 +77,8 @@ function fakeDocument() {
     "salesAgentErrorMessage",
     "runSalesAgentButton",
     "submitManualReviewsButton",
+    "viewCurrentSalesAgentPartialResults",
+    "cancelCurrentSalesAgentRun",
     "manualReviewSelectedRun",
     "manualReviewSelectedCount",
     "manualReviewSubmissionStatus",
@@ -177,6 +179,75 @@ test("Run button sends POST and renders queued run", async () => {
   assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "QUEUED");
   assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, true);
   assert.equal(context.documentRef.elements.runSalesAgentButton.textContent, "Queued...");
+});
+
+test("RUNNING partial results are available on demand without replacing the default previous results", async () => {
+  const context = controller({
+    responses: [
+      response(200, { success: true, status: "RUNNING", run: run({ status: "RUNNING", persistedResultCount: 2 }) }),
+      response(200, { success: true, run: run({ status: "RUNNING", persistedResultCount: 2 }) }),
+      response(200, { success: true, results: [
+        { opportunityId: "PARTIAL-1", resultStatus: "QUOTE_READY" },
+        { opportunityId: "PARTIAL-2", resultStatus: "MANUAL_REVIEW" },
+      ] }),
+      response(200, { success: true, run: run({ status: "RUNNING", persistedResultCount: 2 }) }),
+      response(200, { success: true, results: [
+        { opportunityId: "PARTIAL-1", resultStatus: "QUOTE_READY" },
+        { opportunityId: "PARTIAL-2", resultStatus: "MANUAL_REVIEW" },
+      ] }),
+    ],
+  });
+  await context.instance.pollStatus();
+  assert.equal(context.documentRef.elements.viewCurrentSalesAgentPartialResults.classList.contains("hidden"), false);
+  await context.instance.viewCurrentPartialResults();
+  assert.match(context.documentRef.elements.salesAgentResultsNotice.textContent, /Recovered persisted results: 2/);
+});
+
+test("CANCELED and FAILED runs remain selectable and CANCELED displays its recovery banner", async () => {
+  const canceled = run({ _id: "run-canceled", status: "CANCELED" });
+  const context = controller({ responses: [
+    response(200, { success: true, run: canceled }),
+    response(200, { success: true, results: [{ opportunityId: "SAVED-1", resultStatus: "QUOTE_READY" }] }),
+    response(200, { success: true, run: run({ _id: "run-failed", status: "FAILED" }) }),
+    response(200, { success: true, results: [] }),
+  ] });
+  await context.instance.loadSelectedRun("run-canceled");
+  assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+  assert.match(context.documentRef.elements.salesAgentResultsNotice.textContent, /This run was canceled.*Recovered persisted results: 1/);
+  await context.instance.loadSelectedRun("run-failed");
+  assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+});
+
+test("CANCELED run with no persisted results reports that nothing was recovered", async () => {
+  const context = controller({ responses: [
+    response(200, { success: true, run: run({ _id: "run-canceled", status: "CANCELED" }) }),
+    response(200, { success: true, results: [] }),
+  ] });
+  await context.instance.loadSelectedRun("run-canceled");
+  assert.equal(context.documentRef.elements.salesAgentResultsNotice.textContent, "This run was canceled. No persisted results were recovered.");
+});
+
+test("Cancel Current Run confirms consequences, disables during request, and restores Run button", async () => {
+  const confirmations = [];
+  // Establish the exact current run ID through the normal status path without starting any worker.
+  const context = controller({ responses: [
+    response(200, { success: true, status: "RUNNING", run: run({ _id: "run-1", status: "RUNNING" }) }),
+    response(200, { success: true, run: run({ _id: "run-1", status: "RUNNING" }) }),
+    response(200, { success: true, results: [] }),
+    response(200, { success: true, run: run({ _id: "run-1", status: "CANCELED", persistedResultCount: 0 }) }),
+  ], onConfirm: (message) => { confirmations.push(message); return true; } });
+  await context.instance.pollStatus();
+  const cancelPromise = context.instance.cancelCurrentRun();
+  assert.equal(context.documentRef.elements.cancelCurrentSalesAgentRun.disabled, true);
+  assert.match(confirmations[0], /Run ID: run-1/);
+  assert.match(confirmations[0], /Already submitted quotations will not be reversed/);
+  assert.match(confirmations[0], /Already persisted results will be preserved/);
+  assert.match(confirmations[0], /Unprocessed opportunities will remain unprocessed/);
+  await cancelPromise;
+  assert.equal(context.calls.at(-1).url, "/api/admin/sales-agent/runs/run-1/cancel");
+  assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "CANCELED");
+  assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+  assert.equal(context.documentRef.elements.runSalesAgentButton.textContent, "Run Sales Agent");
 });
 
 test("manual review button submits the explicitly selected run with confirmation", async () => {
@@ -578,20 +649,22 @@ test("queued cards remain current while canonical pending previous result is dis
   assert.equal(row.children[8].textContent, "1677448a-d2ba-4512-8f13-dacdfaafdbec");
 });
 
-test("current run results replace preserved results when they arrive", async () => {
+test("current run partial results require the explicit view action", async () => {
   const context = controller({
     responses: [
       response(201, { success: true, run: run({ _id: "run-new", status: "RUNNING" }) }),
       response(200, {
         success: true,
         status: "RUNNING",
-        run: run({ _id: "run-new", status: "RUNNING" })
+        run: run({ _id: "run-new", status: "RUNNING", persistedResultCount: 1 })
       }),
-      response(200, { success: true, run: run({ _id: "run-new", status: "RUNNING" }) }),
+      response(200, { success: true, run: run({ _id: "run-new", status: "RUNNING", persistedResultCount: 1 }) }),
       response(200, {
         success: true,
         results: [{ eventName: "Current Event", resultStatus: "SENT" }]
-      })
+      }),
+      response(200, { success: true, run: run({ _id: "run-new", status: "RUNNING", persistedResultCount: 1 }) }),
+      response(200, { success: true, results: [{ eventName: "Current Event", resultStatus: "SENT" }] })
     ],
     setIntervalFn: () => 1
   });
@@ -600,12 +673,12 @@ test("current run results replace preserved results when they arrive", async () 
   ]);
   await context.instance.startRun();
   await context.instance.pollStatus();
-  const row = context.documentRef.elements.salesAgentResultsTable.children[0];
+  let row = context.documentRef.elements.salesAgentResultsTable.children[0];
+  assert.equal(row.children[1].textContent, "Previous Event");
+  await context.instance.viewCurrentPartialResults();
+  row = context.documentRef.elements.salesAgentResultsTable.children[0];
   assert.equal(row.children[1].textContent, "Current Event");
-  assert.equal(
-    context.documentRef.elements.salesAgentResultsNotice.classList.contains("hidden"),
-    true
-  );
+  assert.match(context.documentRef.elements.salesAgentResultsNotice.textContent, /Recovered persisted results: 1/);
 });
 
 test("run history lists at most 20 safe summary options", () => {

@@ -13,6 +13,7 @@ const {
 
 const ADMIN_ID = "64b000000000000000000001";
 const SUPERADMIN_ID = "64b000000000000000000002";
+const fixedApiNow = () => new Date("2026-07-31T12:00:00.000Z");
 
 function query(value) {
   return {
@@ -25,6 +26,8 @@ function query(value) {
 
 function createHarness({
   triggerSalesAgentRun,
+  getRenderJobStatus,
+  cancelRenderJob,
   initialRuns = [],
   env = {},
   now = () => new Date(),
@@ -78,9 +81,14 @@ function createHarness({
     async findOneAndUpdate(filter, update) {
       const cutoff = filter?.$or?.[0]?.updatedAt?.$lt;
       const run = state.runs.find((item) => {
-        if (item.status !== filter.status) return false;
-        const timestamp = item.updatedAt || item.createdAt;
-        return cutoff instanceof Date && new Date(timestamp) < cutoff;
+        if (filter._id && String(item._id) !== String(filter._id)) return false;
+        if (filter.status?.$in && !filter.status.$in.includes(item.status)) return false;
+        if (typeof filter.status === "string" && item.status !== filter.status) return false;
+        if (cutoff instanceof Date) {
+          const timestamp = item.updatedAt || item.createdAt;
+          return new Date(timestamp) < cutoff;
+        }
+        return true;
       });
       if (!run) return null;
       Object.assign(run, structuredClone(update.$set || {}));
@@ -99,7 +107,8 @@ function createHarness({
   const SalesAgentOpportunityResult = {
     async countDocuments(filter) {
       return state.results.filter((result) =>
-        String(result.runId) === String(filter.runId) && result.resultStatus === filter.resultStatus
+        String(result.runId) === String(filter.runId)
+          && (!filter.resultStatus || result.resultStatus === filter.resultStatus)
       ).length;
     },
     find(filter) {
@@ -168,12 +177,162 @@ function createHarness({
     SalesAgentOpportunityResult,
     SalesAgentSettings,
     triggerSalesAgentRun: trigger,
+    getRenderJobStatus: getRenderJobStatus || (async () => ({ status: "running", checkedAt: now().toISOString() })),
+    cancelRenderJob: cancelRenderJob || (async () => ({ status: "canceled", checkedAt: now().toISOString(), finishedAt: now().toISOString() })),
     env,
     now,
     logger: { error() {} },
   }));
   return { app, state };
 }
+
+test("status reconciles a canceled Render job, releases the lock, and preserves partial results", () => {
+  const runId = "64c000000000000000000091";
+  return withServer(async ({ request, state }) => {
+    state.results.push({ _id: "result-1", runId, opportunityId: "PARTIAL-1", resultStatus: "QUOTE_READY" });
+    const response = await request("/api/admin/sales-agent/status", jsonOptions("admin"));
+    const body = await response.json();
+    assert.equal(body.run.status, "CANCELED");
+    assert.equal(body.run.failureCode, "RENDER_JOB_CANCELED");
+    assert.equal(body.run.persistedResultCount, 1);
+    assert.match(body.run.activeLock, /^released:/);
+    assert.equal(state.results[0].opportunityId, "PARTIAL-1");
+  }, {
+    initialRuns: [{
+      _id: runId, runType: "DISCOVERY", status: "RUNNING", activeLock: "global",
+      triggerJobId: "job-canceled", renderJobId: "job-canceled", renderServiceId: "srv-test",
+      createdAt: "2026-07-31T10:00:00.000Z", updatedAt: "2026-07-31T11:00:00.000Z",
+    }],
+    now: fixedApiNow,
+    getRenderJobStatus: async () => ({ status: "canceled", checkedAt: fixedApiNow().toISOString(), finishedAt: fixedApiNow().toISOString() }),
+  });
+});
+
+test("manual reconciliation is idempotent and does not run a worker", () => {
+  const runId = "64c000000000000000000092";
+  let checks = 0;
+  return withServer(async ({ request, state }) => {
+    const first = await request(`/api/admin/sales-agent/runs/${runId}/reconcile`, jsonOptions("superadmin", "POST", {}));
+    assert.equal((await first.json()).run.status, "FAILED");
+    const second = await request(`/api/admin/sales-agent/runs/${runId}/reconcile`, jsonOptions("admin", "POST", {}));
+    assert.equal((await second.json()).run.status, "FAILED");
+    assert.equal(checks, 1);
+    assert.equal(state.triggerCalls.length, 0);
+  }, {
+    initialRuns: [{
+      _id: runId, runType: "DISCOVERY", status: "RUNNING", activeLock: "global",
+      triggerJobId: "job-failed", createdAt: "2026-07-31T10:00:00.000Z",
+    }],
+    getRenderJobStatus: async () => { checks += 1; return { status: "failed", checkedAt: fixedApiNow().toISOString() }; },
+    now: fixedApiNow,
+  });
+});
+
+test("Render timeout leaves RUNNING unchanged and a missing job waits for stale threshold", async () => {
+  const freshId = "64c000000000000000000093";
+  await withServer(async ({ request, state }) => {
+    const response = await request("/api/admin/sales-agent/status", jsonOptions("admin"));
+    assert.equal((await response.json()).run.status, "RUNNING");
+    assert.equal(state.runs[0].activeLock, "global");
+  }, {
+    initialRuns: [{ _id: freshId, runType: "DISCOVERY", status: "RUNNING", activeLock: "global", triggerJobId: "job-timeout", createdAt: fixedApiNow().toISOString() }],
+    getRenderJobStatus: async () => ({ timedOut: true }), now: fixedApiNow,
+  });
+  await withServer(async ({ request }) => {
+    const response = await request("/api/admin/sales-agent/status", jsonOptions("admin"));
+    assert.equal((await response.json()).run.status, "RUNNING");
+  }, {
+    initialRuns: [{ _id: freshId, runType: "DISCOVERY", status: "RUNNING", activeLock: "global", triggerJobId: "job-missing", createdAt: fixedApiNow().toISOString() }],
+    getRenderJobStatus: async () => ({ missing: true, checkedAt: fixedApiNow().toISOString() }), now: fixedApiNow,
+    env: { SALES_AGENT_QUEUED_TIMEOUT_MS: "600000" },
+  });
+});
+
+test("a stale missing Render job is recovered as FAILED", () => {
+  const runId = "64c000000000000000000094";
+  return withServer(async ({ request }) => {
+    const response = await request("/api/admin/sales-agent/status", jsonOptions("admin"));
+    const body = await response.json();
+    assert.equal(body.run.status, "FAILED");
+    assert.equal(body.run.failureCode, "RENDER_JOB_MISSING");
+  }, {
+    initialRuns: [{ _id: runId, runType: "DISCOVERY", status: "RUNNING", activeLock: "global", triggerJobId: "job-missing", createdAt: "2026-07-31T10:00:00.000Z" }],
+    getRenderJobStatus: async () => ({ missing: true, checkedAt: fixedApiNow().toISOString() }), now: fixedApiNow,
+    env: { SALES_AGENT_QUEUED_TIMEOUT_MS: "600000" },
+  });
+});
+
+test("cancel endpoint confirms Render cancellation, releases only the run lock, and preserves counters/results", () => {
+  const runId = "64c000000000000000000095";
+  let cancelCalls = 0;
+  return withServer(async ({ request, state }) => {
+    state.results.push({ _id: "saved-result", runId, opportunityId: "SAVED", resultStatus: "QUOTE_READY" });
+    const response = await request(`/api/admin/sales-agent/runs/${runId}/cancel`, jsonOptions("admin", "POST", {}));
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.run.status, "CANCELED");
+    assert.equal(body.run.renderJobStatus, "canceled");
+    assert.equal(body.run.totals.opportunitiesFound, 7);
+    assert.equal(body.run.persistedResultCount, 1);
+    assert.match(body.run.activeLock, /^released:/);
+    assert.equal(state.results[0].opportunityId, "SAVED");
+    assert.equal(cancelCalls, 1);
+    const duplicate = await request(`/api/admin/sales-agent/runs/${runId}/cancel`, jsonOptions("superadmin", "POST", {}));
+    assert.equal((await duplicate.json()).idempotent, true);
+    assert.equal(cancelCalls, 1);
+  }, {
+    initialRuns: [{
+      _id: runId, runType: "DISCOVERY", status: "RUNNING", activeLock: "global",
+      triggerJobId: "job-running", renderJobId: "job-running", renderServiceId: "srv-test",
+      totals: { opportunitiesFound: 7, quotesSubmitted: 2 }, createdAt: "2026-07-31T10:00:00.000Z",
+    }],
+    getRenderJobStatus: async () => ({ status: "running", checkedAt: fixedApiNow().toISOString() }),
+    cancelRenderJob: async () => { cancelCalls += 1; return { status: "canceled", checkedAt: fixedApiNow().toISOString(), finishedAt: fixedApiNow().toISOString() }; },
+    now: fixedApiNow,
+  });
+});
+
+test("cancel endpoint validates authorization, run ID, and active status", async () => {
+  const completedId = "64c000000000000000000096";
+  await withServer(async ({ request }) => {
+    assert.equal((await request(`/api/admin/sales-agent/runs/${completedId}/cancel`, jsonOptions("user", "POST", {}))).status, 401);
+    assert.equal((await request("/api/admin/sales-agent/runs/not-an-id/cancel", jsonOptions("admin", "POST", {}))).status, 400);
+    const completed = await request(`/api/admin/sales-agent/runs/${completedId}/cancel`, jsonOptions("admin", "POST", {}));
+    assert.equal(completed.status, 409);
+    assert.equal((await completed.json()).code, "SALES_AGENT_RUN_NOT_ACTIVE");
+  }, { initialRuns: [{ _id: completedId, runType: "DISCOVERY", status: "COMPLETED", activeLock: "global" }] });
+});
+
+test("cancel reconciles an already-terminal Render job without sending cancel", () => {
+  const runId = "64c000000000000000000097";
+  let cancelCalls = 0;
+  return withServer(async ({ request }) => {
+    const response = await request(`/api/admin/sales-agent/runs/${runId}/cancel`, jsonOptions("admin", "POST", {}));
+    const body = await response.json();
+    assert.equal(body.alreadyTerminal, true);
+    assert.equal(body.run.status, "FAILED");
+    assert.equal(body.run.failureCode, "RECOVERY_REQUIRED");
+    assert.equal(cancelCalls, 0);
+  }, {
+    initialRuns: [{ _id: runId, runType: "DISCOVERY", status: "RUNNING", activeLock: "global", triggerJobId: "job-done", renderServiceId: "srv-test" }],
+    getRenderJobStatus: async () => ({ status: "succeeded", checkedAt: fixedApiNow().toISOString() }),
+    cancelRenderJob: async () => { cancelCalls += 1; }, now: fixedApiNow,
+  });
+});
+
+test("cancel timeout leaves the local run unchanged", () => {
+  const runId = "64c000000000000000000098";
+  return withServer(async ({ request, state }) => {
+    const response = await request(`/api/admin/sales-agent/runs/${runId}/cancel`, jsonOptions("admin", "POST", {}));
+    assert.equal(response.status, 503);
+    assert.equal(state.runs[0].status, "RUNNING");
+    assert.equal(state.runs[0].activeLock, "global");
+  }, {
+    initialRuns: [{ _id: runId, runType: "DISCOVERY", status: "RUNNING", activeLock: "global", triggerJobId: "job-timeout", renderServiceId: "srv-test" }],
+    getRenderJobStatus: async () => ({ status: "running", checkedAt: fixedApiNow().toISOString() }),
+    cancelRenderJob: async () => ({ timedOut: true }), now: fixedApiNow,
+  });
+});
 
 async function withServer(run, options) {
   const { app, state } = createHarness(options);
