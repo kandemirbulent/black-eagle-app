@@ -8,6 +8,7 @@ const {
   overlayCanonicalLatest,
   queuedTimeoutMs,
   redactFailureLog,
+  opportunitySelectionPolicy,
 } = require("../routes/salesAgentRoutes");
 
 const ADMIN_ID = "64b000000000000000000001";
@@ -109,6 +110,23 @@ function createHarness({
       }
       return query(state.results.filter((result) => result.runId === filter.runId));
     },
+    findById(id) {
+      return query(state.results.find((result) => String(result._id) === String(id)) || null);
+    },
+    findOneAndUpdate(filter, update) {
+      const result = state.results.find((item) =>
+        String(item._id) === String(filter._id) && Number(item.recordVersion) === Number(filter.recordVersion)
+      );
+      if (!result) return query(null);
+      for (const [path, value] of Object.entries(update.$set || {})) {
+        const parts = path.split(".");
+        let target = result;
+        for (const part of parts.slice(0, -1)) target = target[part] ||= {};
+        target[parts.at(-1)] = structuredClone(value);
+      }
+      for (const [key, value] of Object.entries(update.$inc || {})) result[key] = Number(result[key] || 0) + value;
+      return query(result);
+    },
   };
   const SalesAgentSettings = {
     findOne() { return query(state.settings); },
@@ -186,6 +204,95 @@ test("Admin can create a queued Sales Agent run", () => withServer(async ({ requ
   assert.equal(body.run.status, "QUEUED");
   assert.equal(body.run.triggeredByRole, "admin");
   assert.equal(body.run.triggerStatus, "TRIGGERED");
+}));
+
+const eligibleAddToEvent = (overrides = {}) => ({
+  _id: "64f000000000000000000001",
+  runId: "64d000000000000000000001",
+  platform: "addtoevent",
+  opportunityId: "ATE-1",
+  approvalStatus: "READY",
+  manualApprovalRequired: true,
+  manualSubmissionEligible: true,
+  recordVersion: 1,
+  finalPrice: 500,
+  quoteSnapshot: { calculatedPrice: 500, estimatedRevenue: 500, estimatedProfit: 150 },
+  manualOverrides: {},
+  resultStatus: "QUOTE_READY",
+  ...overrides,
+});
+
+test("manual selection policy blocks Togather and terminal or unavailable opportunities", () => {
+  assert.equal(opportunitySelectionPolicy(eligibleAddToEvent()).manualSelectionEligible, true);
+  assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ platform: "togather" })).manualSelectionBlocker, "TOGATHER_AUTOMATIC_POLICY");
+  assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ quoteSubmitted: true })).manualSelectionEligible, false);
+  assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ resultStatus: "ALREADY_QUOTED" })).manualSelectionBlocker, "ALREADY_QUOTED");
+  assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ approvalStatus: "REJECTED" })).manualSelectionEligible, false);
+  assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ unavailable: true })).manualSelectionBlocker, "UNAVAILABLE");
+  assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ expiresAt: "2000-01-01T00:00:00.000Z" })).manualSelectionBlocker, "EXPIRED");
+});
+
+test("opportunity edit requires exact ID/version, rejects operators, and increments atomically", () => withServer(async ({ request, state }) => {
+  state.results.push(eligibleAddToEvent());
+  const invalid = await request("/api/admin/sales-agent/opportunities/bad", jsonOptions("admin", "PATCH", { expectedVersion: 1, finalPrice: 450 }));
+  assert.equal(invalid.status, 400);
+  const missingVersion = await request("/api/admin/sales-agent/opportunities/64f000000000000000000001", jsonOptions("admin", "PATCH", { finalPrice: 450 }));
+  assert.equal((await missingVersion.json()).code, "EXPECTED_VERSION_REQUIRED");
+  const operator = await request("/api/admin/sales-agent/opportunities/64f000000000000000000001", jsonOptions("admin", "PATCH", { expectedVersion: 1, $set: { finalPrice: 1 } }));
+  assert.equal((await operator.json()).code, "EDITABLE_FIELD_NOT_ALLOWED");
+  const saved = await request("/api/admin/sales-agent/opportunities/64f000000000000000000001", jsonOptions("admin", "PATCH", { expectedVersion: 1, finalPrice: 450, discountReason: "Price match" }));
+  const savedBody = await saved.json();
+  assert.equal(saved.status, 200);
+  assert.equal(savedBody.opportunity.recordVersion, 2);
+  assert.equal(savedBody.opportunity.manualOverrides.finalPrice, 450);
+  assert.equal(savedBody.opportunity.approvalStatus, "NOT_REVIEWED");
+  const stale = await request("/api/admin/sales-agent/opportunities/64f000000000000000000001", jsonOptions("admin", "PATCH", { expectedVersion: 1, finalPrice: 400 }));
+  assert.equal(stale.status, 409);
+  assert.equal((await stale.json()).code, "OPPORTUNITY_VERSION_CONFLICT");
+}));
+
+test("bulk selection rejects duplicate IDs and Togather while updating eligible Add to Event records", () => withServer(async ({ request, state }) => {
+  const addToEvent = eligibleAddToEvent();
+  const togather = eligibleAddToEvent({ _id: "64f000000000000000000002", platform: "togather", opportunityId: "TOG-1" });
+  state.results.push(addToEvent, togather);
+  const duplicate = await request("/api/admin/sales-agent/opportunities/bulk-status", jsonOptions("admin", "POST", {
+    records: [{ id: addToEvent._id, expectedVersion: 1 }, { id: addToEvent._id, expectedVersion: 1 }], targetStatus: "HOLD",
+  }));
+  assert.equal((await duplicate.json()).code, "DUPLICATE_OPPORTUNITY_ID");
+  const mixed = await request("/api/admin/sales-agent/opportunities/bulk-status", jsonOptions("admin", "POST", {
+    records: [{ id: addToEvent._id, expectedVersion: 1 }, { id: togather._id, expectedVersion: 1 }], targetStatus: "HOLD",
+  }));
+  const body = await mixed.json();
+  assert.equal(body.outcomes[0].success, true);
+  assert.equal(body.outcomes[0].opportunity.approvalStatus, "HOLD");
+  assert.equal(body.outcomes[0].opportunity.recordVersion, 2);
+  assert.equal(body.outcomes[1].success, false);
+  assert.equal(body.outcomes[1].code, "TOGATHER_AUTOMATIC_POLICY");
+  assert.equal(state.triggerCalls.length, 0);
+}));
+
+test("selection preview is exact, versioned, and performs no worker or platform action", () => withServer(async ({ request, state }) => {
+  state.results.push(
+    eligibleAddToEvent(),
+    eligibleAddToEvent({ _id: "64f000000000000000000003", opportunityId: "ATE-2", finalPrice: 250, quoteSnapshot: { calculatedPrice: 250, estimatedRevenue: 250, estimatedProfit: 50 } }),
+    eligibleAddToEvent({ _id: "64f000000000000000000004", opportunityId: "ATE-3", unavailable: true })
+  );
+  const response = await request("/api/admin/sales-agent/opportunities/selection-preview", jsonOptions("admin", "POST", {
+    records: [
+      { id: "64f000000000000000000001", expectedVersion: 1 },
+      { id: "64f000000000000000000003", expectedVersion: 1 },
+      { id: "64f000000000000000000004", expectedVersion: 1 },
+    ],
+  }));
+  const body = await response.json();
+  assert.equal(body.preview.selectedCount, 2);
+  assert.deepEqual(body.preview.opportunityIds, ["ATE-1", "ATE-2"]);
+  assert.equal(body.preview.combinedQuotationValue, 750);
+  assert.equal(body.preview.estimatedProfit, 200);
+  assert.equal(body.preview.blocked[0].code, "UNAVAILABLE");
+  assert.equal(body.preview.noSubmission, true);
+  assert.match(body.preview.message, /not enabled/i);
+  assert.equal(state.triggerCalls.length, 0);
 }));
 
 test("manual review resume requires an explicit valid source run with review records", () => withServer(async ({ request, state }) => {

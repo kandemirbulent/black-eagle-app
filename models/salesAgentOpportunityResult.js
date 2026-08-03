@@ -8,6 +8,36 @@ const staffBreakdownSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const manualOverridesSchema = new mongoose.Schema(
+  {
+    guestCount: { type: Number, min: 0, default: null },
+    startTime: { type: String, trim: true, default: "" },
+    endTime: { type: String, trim: true, default: "" },
+    durationHours: { type: Number, min: 0, default: null },
+    requestedRoles: { type: [String], default: [] },
+    staffBreakdown: { type: [staffBreakdownSchema], default: [] },
+    finalPrice: { type: Number, min: 0, default: null },
+    discountType: { type: String, enum: ["", "AMOUNT", "PERCENTAGE"], default: "" },
+    discountValue: { type: Number, min: 0, default: 0 },
+    discountReason: { type: String, trim: true, default: "" },
+    customerMessage: { type: String, trim: true, maxlength: 2000, default: "" },
+  },
+  { _id: false }
+);
+
+const quoteSnapshotSchema = new mongoose.Schema(
+  {
+    calculatedPrice: { type: Number, min: 0, default: 0 },
+    estimatedRevenue: { type: Number, default: null },
+    estimatedCost: { type: Number, default: null },
+    estimatedProfit: { type: Number, default: null },
+    estimatedMargin: { type: Number, default: null },
+    pricingVersion: { type: Number, min: 1, default: 1 },
+    messageVersion: { type: Number, min: 1, default: 1 },
+  },
+  { _id: false }
+);
+
 const salesAgentOpportunityResultSchema = new mongoose.Schema(
   {
     runId: {
@@ -43,6 +73,22 @@ const salesAgentOpportunityResultSchema = new mongoose.Schema(
     verifiedPlatformState: { type: String, default: "", trim: true },
     verifiedAt: { type: Date, default: null },
     aiCallUsed: { type: Boolean, default: false },
+    approvalStatus: {
+      type: String,
+      enum: ["NOT_REVIEWED", "READY", "NEEDS_REVIEW", "APPROVED", "HOLD", "REJECTED"],
+      default: "NOT_REVIEWED",
+      index: true,
+    },
+    manualApprovalRequired: { type: Boolean, default: false },
+    manualSubmissionEligible: { type: Boolean, default: false },
+    recordVersion: { type: Number, min: 1, default: 1 },
+    lastEditedAt: { type: Date, default: null },
+    lastEditedBy: { type: String, trim: true, default: "" },
+    manualOverrides: { type: manualOverridesSchema, default: () => ({}) },
+    quoteSnapshot: { type: quoteSnapshotSchema, default: () => ({}) },
+    expiresAt: { type: Date, default: null },
+    unavailable: { type: Boolean, default: false },
+    submissionLock: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { timestamps: true }
 );

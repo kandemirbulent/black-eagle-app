@@ -160,7 +160,16 @@
       detailsContent: byId("salesAgentDetailsContent"),
       closeDetailsButton: byId("closeSalesAgentDetailsModal"),
       runSelector: byId("salesAgentRunSelector"),
-      resultsNotice: byId("salesAgentResultsNotice")
+      resultsNotice: byId("salesAgentResultsNotice"),
+      platformFilter: byId("salesAgentPlatformFilter"),
+      selectCurrentPage: byId("selectCurrentOpportunityPage"),
+      clearSelection: byId("clearOpportunitySelection"),
+      selectedCount: byId("selectedOpportunityCount"),
+      previewSelected: byId("previewSelectedOpportunities"),
+      holdSelected: byId("holdSelectedOpportunities"),
+      rejectSelected: byId("rejectSelectedOpportunities"),
+      editSelected: byId("editSelectedOpportunity"),
+      submitSelected: byId("submitSelectedOpportunities")
     };
     let currentRunId = "";
     let currentRun = null;
@@ -171,6 +180,8 @@
     let runsCache = [];
     let pollingTimer = null;
     let manualPollingTimer = null;
+    let currentResults = [];
+    const selectedOpportunities = new Map();
 
     function showRetryError(message) {
       showMessage(message, "error");
@@ -338,28 +349,86 @@
       elements.detailsModal.classList.remove("hidden");
     }
 
-    function renderResults(results) {
+    function visibleResults() {
+      const platform = String(elements.platformFilter?.value || "").toLowerCase();
+      return platform
+        ? currentResults.filter((result) => String(result?.platform || "").toLowerCase().replace(/[\s_-]+/g, "") === platform)
+        : currentResults;
+    }
+
+    function selectedReferences() {
+      return [...selectedOpportunities.values()].map((item) => ({ id: item.id, expectedVersion: item.expectedVersion }));
+    }
+
+    function updateSelectionToolbar() {
+      const count = selectedOpportunities.size;
+      if (elements.selectedCount) elements.selectedCount.textContent = `${count} selected`;
+      for (const button of [elements.previewSelected, elements.holdSelected, elements.rejectSelected, elements.submitSelected]) {
+        if (button) button.disabled = count === 0;
+      }
+      if (elements.editSelected) elements.editSelected.disabled = count !== 1;
+      if (elements.clearSelection) elements.clearSelection.disabled = count === 0;
+    }
+
+    function clearOpportunitySelection() {
+      selectedOpportunities.clear();
+      renderResults(currentResults, { preserveSelection: true });
+    }
+
+    function selectAllCurrentPage() {
+      for (const result of visibleResults()) {
+        const id = String(result?._id || "");
+        if (id && result?.manualSelectionEligible === true) {
+          selectedOpportunities.set(id, { id, expectedVersion: Number(result.recordVersion), result });
+        }
+      }
+      renderResults(currentResults, { preserveSelection: true });
+    }
+
+    function renderResults(results, { preserveSelection = false } = {}) {
+      currentResults = Array.isArray(results) ? results : [];
+      if (!preserveSelection) selectedOpportunities.clear();
       elements.resultsTable.replaceChildren();
-      displayedResultsCount = Array.isArray(results) ? results.length : 0;
-      displayedManualReviewCount = Array.isArray(results)
-        ? results.filter((result) => String(result?.resultStatus || "").toUpperCase() === "MANUAL_REVIEW").length
+      displayedResultsCount = currentResults.length;
+      displayedManualReviewCount = currentResults.length
+        ? currentResults.filter((result) => String(result?.resultStatus || "").toUpperCase() === "MANUAL_REVIEW").length
         : 0;
       if (elements.manualSelectedRun) elements.manualSelectedRun.textContent = displayedResultsRunId || "—";
       if (elements.manualCount) elements.manualCount.textContent = String(displayedManualReviewCount);
       if (elements.manualReviewButton && !ACTIVE_STATUSES.has(String(elements.manualStatus?.textContent || "").toUpperCase())) {
         elements.manualReviewButton.disabled = !displayedResultsRunId || displayedManualReviewCount === 0;
       }
-      if (!Array.isArray(results) || !results.length) {
+      const resultsToRender = visibleResults();
+      if (!resultsToRender.length) {
         const row = documentRef.createElement("tr");
         const cell = documentRef.createElement("td");
-        cell.colSpan = 10;
+        cell.colSpan = 11;
         cell.textContent = "No opportunity results yet.";
         row.appendChild(cell);
         elements.resultsTable.appendChild(row);
+        updateSelectionToolbar();
         return;
       }
-      for (const result of results) {
+      for (const result of resultsToRender) {
         const row = documentRef.createElement("tr");
+        const selectionCell = documentRef.createElement("td");
+        const checkbox = documentRef.createElement("input");
+        const recordId = String(result?._id || "");
+        checkbox.type = "checkbox";
+        checkbox.checked = selectedOpportunities.has(recordId);
+        checkbox.disabled = result?.manualSelectionEligible !== true;
+        checkbox.title = result?.manualSelectionBlocker || "Select opportunity";
+        checkbox.setAttribute?.("aria-label", `Select opportunity ${text(result?.opportunityId)}`);
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked && !checkbox.disabled) {
+            selectedOpportunities.set(recordId, { id: recordId, expectedVersion: Number(result.recordVersion), result });
+          } else {
+            selectedOpportunities.delete(recordId);
+          }
+          updateSelectionToolbar();
+        });
+        selectionCell.appendChild(checkbox);
+        row.appendChild(selectionCell);
         const values = [
           text(result?.eventName),
           text(result?.opportunityId),
@@ -367,7 +436,7 @@
           text(result?.resultStatus || result?.analysisStatus),
           reviewReason(result),
           staffText(result?.staffBreakdown),
-          formatPrice(result?.finalPrice),
+          formatPrice(result?.manualOverrides?.finalPrice ?? result?.finalPrice),
           text(result?.quoteUuid),
           formatDateTime(result?.updatedAt || result?.createdAt)
         ];
@@ -384,6 +453,120 @@
         row.appendChild(actionCell);
         elements.resultsTable.appendChild(row);
       }
+      updateSelectionToolbar();
+    }
+
+    function renderSelectionPreview(preview, submitPlaceholder = false) {
+      elements.detailsContent.replaceChildren();
+      elements.detailsTitle.textContent = submitPlaceholder ? "Submit Selected Quotes" : "Selected Opportunity Preview";
+      elements.detailsContent.appendChild(detailSection("Selection", [
+        ["Selected count", preview?.selectedCount],
+        ["Opportunity IDs", (preview?.opportunityIds || []).join(", ") || "—"],
+        ["Platform breakdown", Object.entries(preview?.platformBreakdown || {}).map(([key, value]) => `${key}: ${value}`).join(", ") || "—"],
+        ["Combined quotation value", formatPrice(preview?.combinedQuotationValue)],
+        ["Estimated revenue", formatPrice(preview?.estimatedRevenue)],
+        ["Estimated profit", formatPrice(preview?.estimatedProfit)]
+      ]));
+      elements.detailsContent.appendChild(createElement("p", "Unselected opportunities will not be touched."));
+      elements.detailsContent.appendChild(createElement("p", "Submission worker is not enabled in this phase."));
+      elements.detailsModal.classList.remove("hidden");
+    }
+
+    async function previewSelection(submitPlaceholder = false) {
+      const result = await requestJson("/api/admin/sales-agent/opportunities/selection-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ records: selectedReferences() })
+      });
+      if (!result.response.ok || !result.payload.preview) {
+        showMessage("Selected opportunities could not be previewed. Refresh and try again.", "error");
+        return null;
+      }
+      renderSelectionPreview(result.payload.preview, submitPlaceholder);
+      return result.payload.preview;
+    }
+
+    async function updateSelectedStatus(targetStatus) {
+      if (targetStatus === "REJECTED" && !confirmFn(`Reject ${selectedOpportunities.size} selected opportunities?`)) return null;
+      const result = await requestJson("/api/admin/sales-agent/opportunities/bulk-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ records: selectedReferences(), targetStatus })
+      });
+      selectedOpportunities.clear();
+      await refresh();
+      if (result.payload.outcomes?.some((item) => !item.success)) showMessage("Some opportunities were not updated. The latest data has been loaded.", "error");
+      return result.payload;
+    }
+
+    async function editSelectedOpportunity() {
+      if (selectedOpportunities.size !== 1) return null;
+      const selected = [...selectedOpportunities.values()][0];
+      const response = await requestJson(`/api/admin/sales-agent/opportunities/${encodeURIComponent(selected.id)}`);
+      if (!response.response.ok || !response.payload.opportunity) return null;
+      const opportunity = response.payload.opportunity;
+      openDetails(opportunity);
+      const form = createElement("form", undefined, "sales-agent-edit-form");
+      const fields = [
+        ["guestCount", "Guest count", "number"], ["startTime", "Start time", "time"],
+        ["endTime", "End time", "time"], ["durationHours", "Duration (hours)", "number"],
+        ["requestedRoles", "Requested roles", "text"], ["staffBreakdown", "Staff quantities (Role: quantity)", "text"],
+        ["finalPrice", "Final price", "number"],
+        ["discountType", "Discount type", "text"], ["discountValue", "Discount amount/percentage", "number"],
+        ["discountReason", "Discount reason", "text"], ["customerMessage", "Customer message", "text"]
+      ];
+      const inputs = {};
+      for (const [key, label, type] of fields) {
+        const wrapper = createElement("label", label);
+        const input = documentRef.createElement(key === "customerMessage" ? "textarea" : "input");
+        input.type = type;
+        input.value = key === "requestedRoles"
+          ? (opportunity.manualOverrides?.requestedRoles || []).join(", ")
+          : key === "staffBreakdown"
+            ? (opportunity.manualOverrides?.staffBreakdown || opportunity.staffBreakdown || []).map((item) => `${item.role}: ${item.quantity}`).join(", ")
+            : opportunity.manualOverrides?.[key] ?? (key === "finalPrice" ? opportunity.finalPrice : "");
+        wrapper.appendChild(input);
+        form.appendChild(wrapper);
+        inputs[key] = input;
+      }
+      const save = createElement("button", "Save Quote Changes", "btn btn-primary");
+      save.type = "submit";
+      form.appendChild(save);
+      form.addEventListener("submit", async (event) => {
+        event?.preventDefault?.();
+        const body = { expectedVersion: Number(opportunity.recordVersion) };
+        for (const [key, , type] of fields) {
+          const value = inputs[key].value;
+          const parsed = key === "requestedRoles"
+            ? value.split(",").map((item) => item.trim()).filter(Boolean)
+            : key === "staffBreakdown"
+              ? value.split(",").map((item) => {
+                  const [role, quantity] = item.split(":");
+                  return { role: String(role || "").trim(), quantity: Number(quantity) };
+                }).filter((item) => item.role && Number.isFinite(item.quantity) && item.quantity >= 0)
+              : type === "number" && value !== "" ? Number(value) : value;
+          const original = key === "requestedRoles"
+            ? (opportunity.manualOverrides?.requestedRoles || [])
+            : key === "staffBreakdown"
+              ? (opportunity.manualOverrides?.staffBreakdown || opportunity.staffBreakdown || [])
+              : opportunity.manualOverrides?.[key] ?? (key === "finalPrice" ? opportunity.finalPrice : "");
+          if (JSON.stringify(parsed) !== JSON.stringify(original)) body[key] = parsed;
+        }
+        if (Object.keys(body).length === 1) { showMessage("No quote changes were made.", "error"); return; }
+        const saved = await requestJson(`/api/admin/sales-agent/opportunities/${encodeURIComponent(selected.id)}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
+        });
+        if (saved.response.status === 409 && saved.payload.code === "OPPORTUNITY_VERSION_CONFLICT") {
+          showMessage("This opportunity changed after the modal opened. Reload the latest version before editing.", "error");
+          return;
+        }
+        if (!saved.response.ok) { showMessage("Quote changes could not be saved.", "error"); return; }
+        selectedOpportunities.clear();
+        closeDetails();
+        await refresh();
+      });
+      elements.detailsContent.appendChild(form);
+      return opportunity;
     }
 
     function setResultsNotice(message) {
@@ -777,6 +960,14 @@
       elements.closeDetailsButton?.addEventListener("click", closeDetails);
       elements.runSelector?.addEventListener("change", onRunSelectionChange);
       elements.manualReviewButton?.addEventListener("click", submitManualReviews);
+      elements.platformFilter?.addEventListener("change", clearOpportunitySelection);
+      elements.selectCurrentPage?.addEventListener("click", selectAllCurrentPage);
+      elements.clearSelection?.addEventListener("click", clearOpportunitySelection);
+      elements.previewSelected?.addEventListener("click", () => previewSelection(false));
+      elements.holdSelected?.addEventListener("click", () => updateSelectedStatus("HOLD"));
+      elements.rejectSelected?.addEventListener("click", () => updateSelectedStatus("REJECTED"));
+      elements.editSelected?.addEventListener("click", editSelectedOpportunity);
+      elements.submitSelected?.addEventListener("click", () => previewSelection(true));
       return refresh();
     }
 
@@ -794,6 +985,12 @@
       loadSelectedRun,
       openDetails,
       closeDetails,
+      selectAllCurrentPage,
+      clearOpportunitySelection,
+      selectedReferences,
+      previewSelection,
+      updateSelectedStatus,
+      editSelectedOpportunity,
       startPolling,
       stopPolling,
       getCurrentRunId: () => currentRunId,

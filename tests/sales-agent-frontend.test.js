@@ -93,6 +93,15 @@ function fakeDocument() {
     "closeSalesAgentDetailsModal",
     "salesAgentRunSelector",
     "salesAgentResultsNotice",
+    "salesAgentPlatformFilter",
+    "selectCurrentOpportunityPage",
+    "clearOpportunitySelection",
+    "selectedOpportunityCount",
+    "previewSelectedOpportunities",
+    "holdSelectedOpportunities",
+    "rejectSelectedOpportunities",
+    "editSelectedOpportunity",
+    "submitSelectedOpportunities",
   ];
   const elements = Object.fromEntries(ids.map((id) => [id, new FakeElement()]));
   const listeners = {};
@@ -439,13 +448,13 @@ test("results render staff, GBP price and identifiers", () => {
     },
   ]);
   const cells = context.documentRef.elements.salesAgentResultsTable.children[0].children;
-  assert.equal(cells[0].textContent, "Wedding");
-  assert.equal(cells[1].textContent, "ABC123");
-  assert.equal(cells[4].textContent, "Quote submitted");
-  assert.equal(cells[5].textContent, "2 Waiter, 1 Bartender");
-  assert.match(cells[6].textContent, /£300\.00/);
-  assert.equal(cells[7].textContent, "quote-1");
-  assert.equal(cells[9].children[0].textContent, "View Details");
+  assert.equal(cells[1].textContent, "Wedding");
+  assert.equal(cells[2].textContent, "ABC123");
+  assert.equal(cells[5].textContent, "Quote submitted");
+  assert.equal(cells[6].textContent, "2 Waiter, 1 Bartender");
+  assert.match(cells[7].textContent, /£300\.00/);
+  assert.equal(cells[8].textContent, "quote-1");
+  assert.equal(cells[10].children[0].textContent, "View Details");
 });
 
 test("empty results show the empty state", () => {
@@ -453,7 +462,50 @@ test("empty results show the empty state", () => {
   context.instance.renderResults([]);
   const row = context.documentRef.elements.salesAgentResultsTable.children[0];
   assert.equal(row.children[0].textContent, "No opportunity results yet.");
-  assert.equal(row.children[0].colSpan, 10);
+  assert.equal(row.children[0].colSpan, 11);
+});
+
+test("selection checkboxes enforce policy, select visible eligible rows, allow deselection, and clear", () => {
+  const context = controller();
+  context.documentRef.elements.salesAgentPlatformFilter.value = "addtoevent";
+  context.instance.renderResults([
+    { _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 1, manualSelectionEligible: true },
+    { _id: "b", opportunityId: "TOG-1", platform: "togather", recordVersion: 1, manualSelectionEligible: false, manualSelectionBlocker: "TOGATHER_AUTOMATIC_POLICY" },
+    { _id: "c", opportunityId: "ATE-2", platform: "addtoevent", recordVersion: 1, manualSelectionEligible: false, approvalStatus: "REJECTED" },
+    { _id: "d", opportunityId: "POP-1", platform: "poptop", recordVersion: 1, manualSelectionEligible: true },
+  ]);
+  const rows = context.documentRef.elements.salesAgentResultsTable.children;
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].children[0].children[0].checked, false);
+  assert.equal(rows[0].children[0].children[0].disabled, false);
+  assert.equal(rows[1].children[0].children[0].disabled, true);
+  context.instance.selectAllCurrentPage();
+  assert.deepEqual(context.instance.selectedReferences(), [{ id: "a", expectedVersion: 1 }]);
+  const selectedCheckbox = context.documentRef.elements.salesAgentResultsTable.children[0].children[0].children[0];
+  selectedCheckbox.checked = false;
+  selectedCheckbox.listeners.change();
+  assert.deepEqual(context.instance.selectedReferences(), []);
+  context.instance.selectAllCurrentPage();
+  context.instance.clearOpportunitySelection();
+  assert.deepEqual(context.instance.selectedReferences(), []);
+  assert.equal(context.documentRef.elements.selectedOpportunityCount.textContent, "0 selected");
+});
+
+test("Submit Selected Quotes opens a no-submission preview and makes no worker request", async () => {
+  const context = controller({ responses: [response(200, { success: true, preview: {
+    selectedCount: 1, opportunityIds: ["ATE-1"], platformBreakdown: { addtoevent: 1 },
+    combinedQuotationValue: 500, estimatedRevenue: 500, estimatedProfit: 150, noSubmission: true,
+  } })] });
+  context.instance.renderResults([
+    { _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 2, manualSelectionEligible: true },
+  ]);
+  context.instance.selectAllCurrentPage();
+  await context.instance.previewSelection(true);
+  assert.equal(context.calls.length, 1);
+  assert.equal(context.calls[0].url, "/api/admin/sales-agent/opportunities/selection-preview");
+  assert.deepEqual(JSON.parse(context.calls[0].options.body), { records: [{ id: "a", expectedVersion: 2 }] });
+  assert.match(flattenText(context.documentRef.elements.salesAgentDetailsContent), /Submission worker is not enabled in this phase/i);
+  assert.equal(context.calls.some((call) => /runs|manual-review/.test(call.url)), false);
 });
 
 test("stale worker failure stops polling and re-enables the run button safely", async () => {
@@ -499,7 +551,7 @@ test("a new queued run preserves previous results and shows a notice", async () 
   ]);
   await context.instance.startRun();
   const row = context.documentRef.elements.salesAgentResultsTable.children[0];
-  assert.equal(row.children[0].textContent, "Previous Wedding");
+  assert.equal(row.children[1].textContent, "Previous Wedding");
   assert.match(
     context.documentRef.elements.salesAgentResultsNotice.textContent,
     /Current run is QUEUED.*previous completed run/
@@ -521,9 +573,9 @@ test("queued cards remain current while canonical pending previous result is dis
   await context.instance.startRun();
   const row = context.documentRef.elements.salesAgentResultsTable.children[0];
   assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "QUEUED");
-  assert.equal(row.children[3].textContent, "PENDING");
-  assert.equal(row.children[4].textContent, "Quote submitted");
-  assert.equal(row.children[7].textContent, "1677448a-d2ba-4512-8f13-dacdfaafdbec");
+  assert.equal(row.children[4].textContent, "PENDING");
+  assert.equal(row.children[5].textContent, "Quote submitted");
+  assert.equal(row.children[8].textContent, "1677448a-d2ba-4512-8f13-dacdfaafdbec");
 });
 
 test("current run results replace preserved results when they arrive", async () => {
@@ -549,7 +601,7 @@ test("current run results replace preserved results when they arrive", async () 
   await context.instance.startRun();
   await context.instance.pollStatus();
   const row = context.documentRef.elements.salesAgentResultsTable.children[0];
-  assert.equal(row.children[0].textContent, "Current Event");
+  assert.equal(row.children[1].textContent, "Current Event");
   assert.equal(
     context.documentRef.elements.salesAgentResultsNotice.classList.contains("hidden"),
     true
@@ -594,7 +646,7 @@ test("selecting an older run loads its cards and results", async () => {
   assert.equal(context.calls[1].url, "/api/admin/sales-agent/runs/old-run/results");
   assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "COMPLETED");
   assert.equal(
-    context.documentRef.elements.salesAgentResultsTable.children[0].children[0].textContent,
+    context.documentRef.elements.salesAgentResultsTable.children[0].children[1].textContent,
     "Old Event"
   );
 });
@@ -634,7 +686,7 @@ test("Latest Run selection returns to automatic current-run behavior without del
   context.documentRef.elements.salesAgentRunSelector.value = "";
   await context.documentRef.elements.salesAgentRunSelector.listeners.change();
   assert.equal(
-    context.documentRef.elements.salesAgentResultsTable.children[0].children[0].textContent,
+    context.documentRef.elements.salesAgentResultsTable.children[0].children[1].textContent,
     "Latest Event"
   );
   assert.equal(
@@ -667,8 +719,8 @@ test("manual review summary and details show reasons, assumptions, staffing and 
   };
   context.instance.renderResults([result]);
   const row = context.documentRef.elements.salesAgentResultsTable.children[0];
-  assert.equal(row.children[4].textContent, "Travel cannot be priced safely. (+1 more)");
-  row.children[9].children[0].click();
+  assert.equal(row.children[5].textContent, "Travel cannot be priced safely. (+1 more)");
+  row.children[10].children[0].click();
   const detailText = flattenText(context.documentRef.elements.salesAgentDetailsContent);
   assert.match(detailText, /manual review is required/i);
   assert.match(detailText, /Travel cannot be priced safely/);
@@ -689,14 +741,14 @@ test("review summaries handle long, missing, sent, failed and skipped results sa
     { resultStatus: "SKIPPED", blockingReasons: ["Opportunity was already quoted."] }
   ]);
   const rows = context.documentRef.elements.salesAgentResultsTable.children;
-  assert.ok(rows[0].children[4].textContent.length <= 120);
-  assert.match(rows[0].children[4].textContent, /\(\+1 more\)$/);
-  assert.equal(rows[1].children[4].textContent, "Manual review required; no reason was recorded.");
-  assert.equal(rows[2].children[4].textContent, "Quote submitted");
-  assert.equal(rows[3].children[4].textContent, "Quote submitted");
-  assert.equal(rows[3].children[7].textContent, "verified-quote");
-  assert.equal(rows[4].children[4].textContent, "Sensitive or technical error details were withheld.");
-  assert.equal(rows[5].children[4].textContent, "Opportunity was already quoted.");
+  assert.ok(rows[0].children[5].textContent.length <= 120);
+  assert.match(rows[0].children[5].textContent, /\(\+1 more\)$/);
+  assert.equal(rows[1].children[5].textContent, "Manual review required; no reason was recorded.");
+  assert.equal(rows[2].children[5].textContent, "Quote submitted");
+  assert.equal(rows[3].children[5].textContent, "Quote submitted");
+  assert.equal(rows[3].children[8].textContent, "verified-quote");
+  assert.equal(rows[4].children[5].textContent, "Sensitive or technical error details were withheld.");
+  assert.equal(rows[5].children[5].textContent, "Opportunity was already quoted.");
 });
 
 test("details use safe text, fallbacks, Close and Escape", async () => {

@@ -24,6 +24,75 @@ const RESULT_STATUS_PRECEDENCE = Object.freeze({
   BOOKED: 5,
 });
 const DEFAULT_QUEUED_TIMEOUT_MS = 600000;
+const MAX_BULK_OPPORTUNITIES = 100;
+const APPROVAL_STATUSES = new Set(["NOT_REVIEWED", "READY", "NEEDS_REVIEW", "APPROVED", "HOLD", "REJECTED"]);
+const EDITABLE_OVERRIDE_FIELDS = new Set([
+  "guestCount", "startTime", "endTime", "durationHours", "requestedRoles", "staffBreakdown",
+  "finalPrice", "discountType", "discountValue", "discountReason", "customerMessage",
+]);
+const TERMINAL_OPPORTUNITY_STATUSES = new Set([
+  "SENT", "SUBMITTED", "PENDING", "ACCEPTED", "CONFIRMED", "BOOKED", "ALREADY_QUOTED",
+  "EXPIRED", "UNAVAILABLE", "QUEUED", "SUBMITTING",
+]);
+
+function normalizePlatform(value) {
+  return String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function currentQuotePrice(record = {}) {
+  const candidates = [record.manualOverrides?.finalPrice, record.quoteSnapshot?.calculatedPrice, record.finalPrice];
+  const value = candidates.map(Number).find((candidate) => Number.isFinite(candidate) && candidate > 0);
+  return value || 0;
+}
+
+function opportunitySelectionPolicy(record = {}) {
+  const platform = normalizePlatform(record.platform);
+  const status = canonicalStatus(record);
+  const approvalStatus = String(record.approvalStatus || "NOT_REVIEWED").toUpperCase();
+  const version = Number(record.recordVersion);
+  const price = currentQuotePrice(record);
+  let blocker = "";
+  if (platform !== "addtoevent") blocker = platform === "togather" ? "TOGATHER_AUTOMATIC_POLICY" : "PLATFORM_NOT_SUPPORTED";
+  else if (record.manualApprovalRequired !== true || record.manualSubmissionEligible !== true) blocker = "MANUAL_POLICY_NOT_ENABLED";
+  else if (!["READY", "APPROVED"].includes(approvalStatus)) blocker = `APPROVAL_STATUS_${approvalStatus}`;
+  else if (record.quoteSubmitted || record.quoteUuid || TERMINAL_OPPORTUNITY_STATUSES.has(status)) blocker = status === "ALREADY_QUOTED" ? "ALREADY_QUOTED" : `STATUS_${status || "SUBMITTED"}`;
+  else if (record.unavailable === true) blocker = "UNAVAILABLE";
+  else if (record.expiresAt && new Date(record.expiresAt) <= new Date()) blocker = "EXPIRED";
+  else if (record.submissionLock) blocker = "ACTIVE_SUBMISSION_LOCK";
+  else if (price <= 0) blocker = "CURRENT_QUOTE_REQUIRED";
+  else if (!Number.isInteger(version) || version < 1) blocker = "RECORD_VERSION_REQUIRED";
+  return { manualSelectionEligible: !blocker, manualSelectionBlocker: blocker };
+}
+
+function serializeOpportunity(record = {}) {
+  return { ...record, ...opportunitySelectionPolicy(record) };
+}
+
+function validateRecordReferences(records) {
+  if (!Array.isArray(records) || !records.length) return { error: "OPPORTUNITY_SELECTION_REQUIRED" };
+  if (records.length > MAX_BULK_OPPORTUNITIES) return { error: "OPPORTUNITY_SELECTION_TOO_LARGE" };
+  const seen = new Set();
+  const normalized = [];
+  for (const item of records) {
+    const id = String(item?.id || "").trim();
+    if (!mongoose.Types.ObjectId.isValid(id)) return { error: "INVALID_OPPORTUNITY_ID" };
+    if (seen.has(id)) return { error: "DUPLICATE_OPPORTUNITY_ID" };
+    if (!Number.isInteger(item?.expectedVersion) || item.expectedVersion < 1) return { error: "EXPECTED_VERSION_REQUIRED" };
+    seen.add(id);
+    normalized.push({ id, expectedVersion: item.expectedVersion });
+  }
+  return { records: normalized };
+}
+
+function validateManualOverrides(body = {}) {
+  const keys = Object.keys(body).filter((key) => key !== "expectedVersion");
+  if (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 1) return { error: "EXPECTED_VERSION_REQUIRED" };
+  if (!keys.length) return { error: "EDITABLE_FIELDS_REQUIRED" };
+  if (keys.some((key) => key.startsWith("$") || !EDITABLE_OVERRIDE_FIELDS.has(key))) return { error: "EDITABLE_FIELD_NOT_ALLOWED" };
+  const overrides = {};
+  for (const key of keys) overrides[key] = body[key];
+  return { expectedVersion: body.expectedVersion, overrides };
+}
 
 function redactFailureLog(value) {
   return String(value || "")
@@ -202,6 +271,123 @@ function createSalesAgentRouter({
     return { failedRun: failedRun || run, safeRenderMessage };
   }
 
+  router.get("/admin/sales-agent/opportunities/:id", requireAdminAuth, async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, code: "INVALID_OPPORTUNITY_ID" });
+    }
+    const opportunity = await SalesAgentOpportunityResult.findById(req.params.id).lean();
+    if (!opportunity) return res.status(404).json({ success: false, code: "OPPORTUNITY_NOT_FOUND" });
+    return res.json({ success: true, opportunity: serializeOpportunity(opportunity) });
+  });
+
+  router.patch("/admin/sales-agent/opportunities/:id", requireAdminAuth, async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, code: "INVALID_OPPORTUNITY_ID" });
+    }
+    const validation = validateManualOverrides(req.body || {});
+    if (validation.error) return res.status(400).json({ success: false, code: validation.error });
+    const existing = await SalesAgentOpportunityResult.findById(req.params.id).lean();
+    if (!existing) return res.status(404).json({ success: false, code: "OPPORTUNITY_NOT_FOUND" });
+    const policy = opportunitySelectionPolicy(existing);
+    if (normalizePlatform(existing.platform) !== "addtoevent" || existing.manualApprovalRequired !== true) {
+      return res.status(409).json({ success: false, code: policy.manualSelectionBlocker || "PLATFORM_POLICY_BLOCKED" });
+    }
+    const set = Object.fromEntries(Object.entries(validation.overrides).map(([key, value]) => [`manualOverrides.${key}`, value]));
+    set.lastEditedAt = now();
+    set.lastEditedBy = String(req.adminUser._id);
+    set.approvalStatus = "NOT_REVIEWED";
+    const updated = await SalesAgentOpportunityResult.findOneAndUpdate(
+      { _id: req.params.id, recordVersion: validation.expectedVersion },
+      { $set: set, $inc: { recordVersion: 1 } },
+      { new: true, runValidators: true }
+    ).lean();
+    if (!updated) return res.status(409).json({ success: false, code: "OPPORTUNITY_VERSION_CONFLICT" });
+    return res.json({ success: true, opportunity: serializeOpportunity(updated) });
+  });
+
+  router.post("/admin/sales-agent/opportunities/bulk-status", requireAdminAuth, async (req, res) => {
+    const validation = validateRecordReferences(req.body?.records);
+    if (validation.error) return res.status(400).json({ success: false, code: validation.error });
+    const targetStatus = String(req.body?.targetStatus || "").toUpperCase();
+    if (!["HOLD", "REJECTED"].includes(targetStatus)) {
+      return res.status(400).json({ success: false, code: "INVALID_TARGET_STATUS" });
+    }
+    const outcomes = [];
+    for (const reference of validation.records) {
+      const existing = await SalesAgentOpportunityResult.findById(reference.id).lean();
+      if (!existing) {
+        outcomes.push({ id: reference.id, success: false, code: "OPPORTUNITY_NOT_FOUND" });
+        continue;
+      }
+      const policy = opportunitySelectionPolicy(existing);
+      if (!policy.manualSelectionEligible) {
+        outcomes.push({ id: reference.id, success: false, code: policy.manualSelectionBlocker });
+        continue;
+      }
+      const updated = await SalesAgentOpportunityResult.findOneAndUpdate(
+        { _id: reference.id, recordVersion: reference.expectedVersion },
+        {
+          $set: {
+            approvalStatus: targetStatus,
+            lastEditedAt: now(),
+            lastEditedBy: String(req.adminUser._id),
+          },
+          $inc: { recordVersion: 1 },
+        },
+        { new: true, runValidators: true }
+      ).lean();
+      outcomes.push(updated
+        ? { id: reference.id, success: true, opportunity: serializeOpportunity(updated) }
+        : { id: reference.id, success: false, code: "OPPORTUNITY_VERSION_CONFLICT" });
+    }
+    return res.json({ success: outcomes.every((item) => item.success), outcomes });
+  });
+
+  router.post("/admin/sales-agent/opportunities/selection-preview", requireAdminAuth, async (req, res) => {
+    const validation = validateRecordReferences(req.body?.records);
+    if (validation.error) return res.status(400).json({ success: false, code: validation.error });
+    const records = [];
+    const blocked = [];
+    for (const reference of validation.records) {
+      const existing = await SalesAgentOpportunityResult.findById(reference.id).lean();
+      if (!existing) {
+        blocked.push({ id: reference.id, code: "OPPORTUNITY_NOT_FOUND" });
+        continue;
+      }
+      if (Number(existing.recordVersion) !== reference.expectedVersion) {
+        blocked.push({ id: reference.id, code: "OPPORTUNITY_VERSION_CONFLICT" });
+        continue;
+      }
+      const serialized = serializeOpportunity(existing);
+      if (!serialized.manualSelectionEligible) {
+        blocked.push({ id: reference.id, code: serialized.manualSelectionBlocker });
+        continue;
+      }
+      records.push(serialized);
+    }
+    const platformBreakdown = records.reduce((totals, record) => {
+      const platform = String(record.platform || "unknown").toLowerCase();
+      totals[platform] = (totals[platform] || 0) + 1;
+      return totals;
+    }, {});
+    const sum = (selector) => records.reduce((total, record) => total + (Number(selector(record)) || 0), 0);
+    return res.json({
+      success: blocked.length === 0,
+      preview: {
+        selectedCount: records.length,
+        opportunityIds: records.map((record) => record.opportunityId),
+        platformBreakdown,
+        combinedQuotationValue: sum(currentQuotePrice),
+        estimatedRevenue: sum((record) => record.quoteSnapshot?.estimatedRevenue),
+        estimatedProfit: sum((record) => record.quoteSnapshot?.estimatedProfit),
+        records,
+        blocked,
+        noSubmission: true,
+        message: "Submission worker is not enabled in this phase.",
+      },
+    });
+  });
+
   router.post("/admin/sales-agent/runs", requireAdminAuth, async (req, res) => {
     try {
       await recoverStaleQueuedRun(SalesAgentRun, { env, now: now() });
@@ -378,7 +564,7 @@ function createSalesAgentRouter({
     const results = await SalesAgentOpportunityResult.find({ runId: req.params.runId })
       .sort({ createdAt: 1 }).lean();
     if (req.query.canonicalLatest !== "true" || !results.length) {
-      return res.json({ success: true, results });
+      return res.json({ success: true, results: results.map(serializeOpportunity) });
     }
     const keys = results.map((result) => ({
       platform: result.platform,
@@ -386,7 +572,7 @@ function createSalesAgentRouter({
     }));
     const allResults = await SalesAgentOpportunityResult.find({ $or: keys })
       .sort({ updatedAt: -1 }).lean();
-    return res.json({ success: true, results: overlayCanonicalLatest(results, allResults) });
+    return res.json({ success: true, results: overlayCanonicalLatest(results, allResults).map(serializeOpportunity) });
   });
 
   router.get("/admin/sales-agent/status", requireAdminAuth, async (req, res) => {
@@ -441,4 +627,8 @@ module.exports = {
   redactFailureLog,
   recoverStaleQueuedRun,
   validateSettingsUpdate,
+  opportunitySelectionPolicy,
+  serializeOpportunity,
+  validateManualOverrides,
+  validateRecordReferences,
 };

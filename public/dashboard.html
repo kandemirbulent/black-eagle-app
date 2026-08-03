@@ -800,19 +800,39 @@
         </div>
 
         <div class="btn-row" style="justify-content:space-between;align-items:end;">
-          <h3 style="margin:0;">Opportunity Results</h3>
-          <label for="salesAgentRunSelector">
-            Select Run
-            <select id="salesAgentRunSelector">
-              <option value="">Latest Run</option>
-            </select>
-          </label>
+          <h3 style="margin:0;">New Opportunities / Opportunities</h3>
+          <div class="btn-row" style="align-items:end;">
+            <label for="salesAgentPlatformFilter">Platform
+              <select id="salesAgentPlatformFilter">
+                <option value="">All platforms</option>
+                <option value="togather">Togather</option>
+                <option value="addtoevent">Add to Event</option>
+                <option value="poptop">Poptop</option>
+              </select>
+            </label>
+            <label for="salesAgentRunSelector">Select Run
+              <select id="salesAgentRunSelector">
+                <option value="">Latest Run</option>
+              </select>
+            </label>
+          </div>
         </div>
         <p id="salesAgentResultsNotice" class="subtle hidden" style="margin:10px 0 0;"></p>
+        <div class="btn-row" id="salesAgentOpportunityToolbar" style="margin-top:12px;align-items:center;gap:8px;">
+          <button type="button" class="btn btn-secondary" id="selectCurrentOpportunityPage">Select All on Current Page</button>
+          <button type="button" class="btn btn-secondary" id="clearOpportunitySelection">Clear Selection</button>
+          <span class="subtle" id="selectedOpportunityCount">0 selected</span>
+          <button type="button" class="btn btn-secondary" id="previewSelectedOpportunities" disabled>Preview Selected</button>
+          <button type="button" class="btn btn-secondary" id="holdSelectedOpportunities" disabled>Hold</button>
+          <button type="button" class="btn btn-secondary" id="rejectSelectedOpportunities" disabled>Reject</button>
+          <button type="button" class="btn btn-secondary" id="editSelectedOpportunity" disabled>Edit Quote</button>
+          <button type="button" class="btn btn-primary" id="submitSelectedOpportunities" disabled>Submit Selected Quotes</button>
+        </div>
         <div class="table-wrap" style="margin-top:12px;">
           <table class="table">
             <thead>
               <tr>
+                <th scope="col">Select</th>
                 <th>Event</th>
                 <th>Opportunity ID</th>
                 <th>Platform</th>
@@ -826,7 +846,7 @@
               </tr>
             </thead>
             <tbody id="salesAgentResultsTable">
-              <tr><td colspan="10">No opportunity results yet.</td></tr>
+              <tr><td colspan="11">No opportunity results yet.</td></tr>
             </tbody>
           </table>
         </div>
@@ -1111,6 +1131,10 @@
     let salesAgentDashboard = null;
 
     const MANUAL_ORDER_VAT_RATE = 0.2;
+    const MANUAL_FORM_STORAGE_KEYS = {
+      customer: "blackeagle-manual-customer-form",
+      event: "blackeagle-manual-event-form"
+    };
     const MANUAL_SERVICE_DEFINITIONS = {
       Bartender: { label: "Bartender", rate: 27 },
       Waiter: { label: "Waiter", rate: 18 },
@@ -1330,6 +1354,125 @@
       populateManualOrderStaffSelect();
     }
 
+    function resetManualFormByMode(mode) {
+      if (mode === "customer") {
+        manualCustomerForm.reset();
+      } else if (mode === "event") {
+        manualEventForm.reset();
+        manualOrderLineItems = [];
+        updateManualOrderTable();
+      }
+      resetManualResult();
+    }
+
+    function getManualFormState(mode) {
+      const form = mode === "customer" ? manualCustomerForm : manualEventForm;
+      const state = {};
+
+      form.querySelectorAll("input, select, textarea").forEach((field) => {
+        const key = field.id || field.name;
+        if (!key) return;
+
+        if (field.tagName === "SELECT" && field.multiple) {
+          state[key] = Array.from(field.selectedOptions || []).map((option) => option.value).filter(Boolean);
+          return;
+        }
+
+        if (field.type === "checkbox" || field.type === "radio") {
+          state[key] = Boolean(field.checked);
+          return;
+        }
+
+        state[key] = field.value ?? "";
+      });
+
+      if (mode === "event") {
+        state.manualOrderLineItems = Array.isArray(manualOrderLineItems)
+          ? manualOrderLineItems.map((item) => ({ ...item }))
+          : [];
+      }
+
+      return state;
+    }
+
+    function setManualFormState(mode, state) {
+      const form = mode === "customer" ? manualCustomerForm : manualEventForm;
+      if (!form || !state || typeof state !== "object") return;
+
+      form.querySelectorAll("input, select, textarea").forEach((field) => {
+        const key = field.id || field.name;
+        if (!key || !(key in state)) return;
+
+        const value = state[key];
+        if (field.tagName === "SELECT" && field.multiple) {
+          const selectedValues = Array.isArray(value) ? value.map(String) : [];
+          Array.from(field.options || []).forEach((option) => {
+            option.selected = selectedValues.includes(option.value);
+          });
+          return;
+        }
+
+        if (field.type === "checkbox" || field.type === "radio") {
+          field.checked = Boolean(value);
+          return;
+        }
+
+        field.value = value ?? "";
+      });
+
+      if (mode === "event") {
+        manualOrderLineItems = Array.isArray(state.manualOrderLineItems)
+          ? state.manualOrderLineItems.map((item) => ({ ...item }))
+          : [];
+        updateManualOrderTable();
+      }
+    }
+
+    function saveManualFormState(mode) {
+      const key = MANUAL_FORM_STORAGE_KEYS[mode];
+      if (!key) return;
+      sessionStorage.setItem(key, JSON.stringify(getManualFormState(mode)));
+    }
+
+    function restoreManualFormState(mode) {
+      const key = MANUAL_FORM_STORAGE_KEYS[mode];
+      if (!key) return;
+
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return;
+
+      try {
+        setManualFormState(mode, JSON.parse(raw));
+      } catch (error) {
+        console.error("Manual form state restore failed:", error);
+        sessionStorage.removeItem(key);
+        resetManualFormByMode(mode);
+      }
+    }
+
+    function clearManualFormState(mode) {
+      const key = MANUAL_FORM_STORAGE_KEYS[mode];
+      if (key) {
+        sessionStorage.removeItem(key);
+      }
+    }
+
+    function isManualFormDirty(mode) {
+      const state = getManualFormState(mode);
+      return Object.entries(state).some(([key, value]) => {
+        if (key === "manualOrderLineItems") {
+          return Array.isArray(value) && value.length > 0;
+        }
+        if (Array.isArray(value)) {
+          return value.length > 0;
+        }
+        if (typeof value === "boolean") {
+          return value;
+        }
+        return String(value ?? "").trim() !== "";
+      });
+    }
+
     function setManualModalMode(mode) {
       activeManualMode = mode;
       manualCustomerForm.classList.toggle("hidden", mode !== "customer");
@@ -1356,11 +1499,23 @@
         resetManualForms();
       }
       setManualModalMode(mode);
+      restoreManualFormState(mode);
+      if (mode === "event") {
+        fillManualOrderCustomerDetails(document.getElementById("manualEventCustomerId").value);
+      }
       manualAdminModal.classList.remove("hidden");
     }
 
-    function closeManualAdminModal() {
+    async function closeManualAdminModal() {
+      if (activeManualMode && isManualFormDirty(activeManualMode)) {
+        const confirmed = window.confirm("There is unsaved information in the manual entry form. Are you sure you want to close it?");
+        if (!confirmed) {
+          return;
+        }
+      }
+
       manualAdminModal.classList.add("hidden");
+      activeManualMode = "";
     }
 
     function renderManualResult({ title, message, details = [] }) {
@@ -1445,14 +1600,17 @@
       });
 
       updateManualOrderTable();
+      saveManualFormState("event");
       ["manualEventServiceType", "manualEventQuantity", "manualEventHours", "manualEventDate", "manualEventStartTime"].forEach((id) => {
         document.getElementById(id).value = "";
       });
+      saveManualFormState("event");
     }
 
     window.removeManualOrderLine = (index) => {
       manualOrderLineItems.splice(index, 1);
       updateManualOrderTable();
+      saveManualFormState("event");
     };
 
     async function loadAllStaff() {
@@ -1511,6 +1669,8 @@
         const data = await createManualCustomerRecord(payload);
         activeManualCustomerForOrderId = String(data.customer?._id || "");
         await refreshAll();
+        clearManualFormState("customer");
+        resetManualFormByMode("customer");
         renderManualResult({
           title: "Manual customer created",
           message: "The customer is approved and ready for manual event creation.",
@@ -1565,6 +1725,8 @@
       try {
         const data = await createManualEventRecord(payload);
         await refreshAll();
+        clearManualFormState("event");
+        resetManualFormByMode("event");
         manualOrderLineItems = [];
         updateManualOrderTable();
         renderManualResult({
@@ -2284,11 +2446,6 @@
     closeManualAdminModalButton.addEventListener("click", closeManualAdminModal);
     closeSupportMessageModalButton.addEventListener("click", closeSupportMessageModal);
     closeStaffDetailsModalButton.addEventListener("click", closeStaffDetailsModal);
-    manualAdminModal.addEventListener("click", (event) => {
-      if (event.target === manualAdminModal) {
-        closeManualAdminModal();
-      }
-    });
     supportMessageModal.addEventListener("click", (event) => {
       if (event.target === supportMessageModal) {
         closeSupportMessageModal();
@@ -2298,9 +2455,6 @@
       if (event.target === staffDetailsModal) closeStaffDetailsModal();
     });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && !manualAdminModal.classList.contains("hidden")) {
-        closeManualAdminModal();
-      }
       if (event.key === "Escape" && !supportMessageModal.classList.contains("hidden")) {
         closeSupportMessageModal();
       }
@@ -2319,7 +2473,12 @@
     });
     document.getElementById("manualEventCustomerId").addEventListener("change", () => {
       fillManualOrderCustomerDetails(document.getElementById("manualEventCustomerId").value);
+      saveManualFormState("event");
     });
+    manualCustomerForm.addEventListener("input", () => saveManualFormState("customer"));
+    manualCustomerForm.addEventListener("change", () => saveManualFormState("customer"));
+    manualEventForm.addEventListener("input", () => saveManualFormState("event"));
+    manualEventForm.addEventListener("change", () => saveManualFormState("event"));
     document.getElementById("manualEventAddLineButton").addEventListener("click", addManualOrderLine);
     manualCustomerForm.addEventListener("submit", async (event) => {
       event.preventDefault();
