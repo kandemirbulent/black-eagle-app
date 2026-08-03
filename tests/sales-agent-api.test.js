@@ -7,6 +7,7 @@ const {
   createSalesAgentRouter,
   overlayCanonicalLatest,
   queuedTimeoutMs,
+  workerStartGraceMs,
   redactFailureLog,
   opportunitySelectionPolicy,
 } = require("../routes/salesAgentRoutes");
@@ -39,9 +40,10 @@ function createHarness({
     settings: null,
     sequence: initialRuns.length + 1,
     triggerCalls: [],
+    persistedReadIds: [],
   };
   const trigger = triggerSalesAgentRun || (async (input) => {
-    state.triggerCalls.push(input);
+    state.triggerCalls.push({ ...input, persistedReadIds: [...state.persistedReadIds] });
     return { jobId: `job-${state.triggerCalls.length}` };
   });
   const SalesAgentRun = {
@@ -66,6 +68,7 @@ function createHarness({
     },
     find() { return query(state.runs.slice().reverse()); },
     findById(id) {
+      state.persistedReadIds.push(String(id));
       const found = state.runs.find((run) => run._id === id) || null;
       const value = found && persistedSourceRunOverride && found.runType === "MANUAL_REVIEW_RESUME"
         ? { ...found, sourceRunId: persistedSourceRunOverride }
@@ -365,6 +368,40 @@ test("Admin can create a queued Sales Agent run", () => withServer(async ({ requ
   assert.equal(body.run.triggerStatus, "TRIGGERED");
 }));
 
+test("canonical queued run is read back before Render trigger and keeps one identity", () => withServer(async ({ request, state }) => {
+  const response = await request("/api/admin/sales-agent/runs", jsonOptions("admin", "POST", {}));
+  const body = await response.json();
+  assert.equal(response.status, 201);
+  assert.equal(state.triggerCalls.length, 1);
+  assert.equal(state.triggerCalls[0].runId, body.run._id);
+  assert.deepEqual(state.triggerCalls[0].persistedReadIds, [body.run._id]);
+  assert.equal(body.run.runType, "DISCOVERY");
+  assert.equal(body.run.status, "QUEUED");
+  assert.equal(body.run.activeLock, "global");
+  assert.equal(body.run.origin, "ADMIN_DASHBOARD");
+  assert.ok(body.run.queuedAt);
+  assert.equal(body.run.renderJobId, "job-1");
+}));
+
+test("fresh QUEUED run is protected when Render reports succeeded during worker-start grace", () => {
+  const runId = "64c000000000000000000088";
+  return withServer(async ({ request, state }) => {
+    const response = await request("/api/admin/sales-agent/status", jsonOptions("admin"));
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.run.status, "QUEUED");
+    assert.equal(state.runs[0].activeLock, "global");
+  }, {
+    initialRuns: [{
+      _id: runId, runType: "DISCOVERY", status: "QUEUED", activeLock: "global",
+      queuedAt: "2026-07-31T11:59:30.000Z", createdAt: "2026-07-31T11:59:30.000Z",
+      renderJobId: "job-fresh", renderServiceId: "srv-test",
+    }],
+    env: { SALES_AGENT_WORKER_START_GRACE_MS: "120000" }, now: fixedApiNow,
+    getRenderJobStatus: async () => ({ status: "succeeded", checkedAt: fixedApiNow().toISOString() }),
+  });
+});
+
 const eligibleAddToEvent = (overrides = {}) => ({
   _id: "64f000000000000000000001",
   runId: "64d000000000000000000001",
@@ -520,6 +557,7 @@ test("worker trigger failure marks the queued run FAILED", () => withServer(asyn
   assert.equal(state.runs[0].status, "FAILED");
   assert.equal(state.runs[0].failureCode, "WORKER_TRIGGER_FAILED");
   assert.equal(state.runs[0].triggerStatus, "FAILED");
+  assert.match(state.runs[0].activeLock, /^released:/);
   assert.equal(state.runs[0].failedStage, "RENDER_TRIGGER");
   assert.equal(state.runs[0].failureReason, "Render could not create the Sales Agent job.");
   assert.equal(state.runs[0].errorMessage, "Sales Agent worker could not be started.");
@@ -563,8 +601,14 @@ test("queued timeout defaults safely to ten minutes", () => {
   assert.equal(queuedTimeoutMs({ SALES_AGENT_QUEUED_TIMEOUT_MS: "invalid" }), 600000);
 });
 
+test("worker-start grace defaults to two minutes and is configurable", () => {
+  assert.equal(workerStartGraceMs({}), 120000);
+  assert.equal(workerStartGraceMs({ SALES_AGENT_WORKER_START_GRACE_MS: "45000" }), 45000);
+});
+
 test("failure stages are supported by the run schema and server logs redact secrets", () => {
   const SalesAgentRun = require("../models/salesAgentRun");
+  assert.equal(SalesAgentRun.collection.name, "salesagentruns");
   assert.deepEqual(
     SalesAgentRun.schema.path("failedStage").enumValues,
     ["", "RENDER_TRIGGER", "WORKER_START", "TOGATHER_LOGIN", "DISCOVERY", "OPENAI", "SUBMISSION"]

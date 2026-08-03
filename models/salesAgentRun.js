@@ -52,6 +52,8 @@ const salesAgentRunSchema = new mongoose.Schema(
       default: "",
       trim: true,
     },
+    origin: { type: String, default: "ADMIN_DASHBOARD", trim: true },
+    queuedAt: { type: Date, default: Date.now, index: true },
     failureReason: { type: String, default: "", trim: true },
     errorMessage: { type: String, default: "", trim: true },
     failureAt: { type: Date, default: null },

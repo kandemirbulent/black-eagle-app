@@ -26,6 +26,7 @@ const RESULT_STATUS_PRECEDENCE = Object.freeze({
   BOOKED: 5,
 });
 const DEFAULT_QUEUED_TIMEOUT_MS = 600000;
+const DEFAULT_WORKER_START_GRACE_MS = 120000;
 const MAX_BULK_OPPORTUNITIES = 100;
 const APPROVAL_STATUSES = new Set(["NOT_REVIEWED", "READY", "NEEDS_REVIEW", "APPROVED", "HOLD", "REJECTED"]);
 const EDITABLE_OVERRIDE_FIELDS = new Set([
@@ -109,8 +110,27 @@ function queuedTimeoutMs(env = process.env) {
     : DEFAULT_QUEUED_TIMEOUT_MS;
 }
 
+function workerStartGraceMs(env = process.env) {
+  const configured = Number(env.SALES_AGENT_WORKER_START_GRACE_MS);
+  return Number.isFinite(configured) && configured >= 0
+    ? configured
+    : DEFAULT_WORKER_START_GRACE_MS;
+}
+
+function withinWorkerStartGrace(run, env, currentTime) {
+  const queuedAt = new Date(run?.queuedAt || run?.createdAt || 0);
+  return Number.isFinite(queuedAt.getTime())
+    && currentTime.getTime() - queuedAt.getTime() < workerStartGraceMs(env);
+}
+
+function terminalRenderWithinGrace(render, env, currentTime) {
+  const finishedAt = new Date(render?.finishedAt || 0);
+  return Number.isFinite(finishedAt.getTime())
+    && currentTime.getTime() - finishedAt.getTime() < workerStartGraceMs(env);
+}
+
 async function recoverStaleQueuedRun(SalesAgentRun, { env = process.env, now = new Date() } = {}) {
-  const cutoff = new Date(now.getTime() - queuedTimeoutMs(env));
+  const cutoff = new Date(now.getTime() - Math.max(queuedTimeoutMs(env), workerStartGraceMs(env)));
   return SalesAgentRun.findOneAndUpdate(
     {
       status: "QUEUED",
@@ -298,6 +318,10 @@ function createSalesAgentRouter({
       failureCode = "RENDER_JOB_FAILED";
       failureReason = "The Render One-Off Job failed before the workflow recorded completion.";
     } else if (status === "succeeded") {
+      if (["QUEUED", "RUNNING"].includes(String(run.status).toUpperCase())
+        && (withinWorkerStartGrace(run, env, now()) || terminalRenderWithinGrace(render, env, now()))) {
+        return run;
+      }
       terminalStatus = "FAILED";
       failureCode = "RECOVERY_REQUIRED";
       failureReason = "Render succeeded but the Sales Agent workflow did not record completion.";
@@ -341,6 +365,7 @@ function createSalesAgentRouter({
       {
         $set: {
           status: "FAILED",
+          activeLock: `released:${run._id}`,
           triggerStatus: "FAILED",
           failureCode: diagnostic.errorCode || "WORKER_TRIGGER_FAILED",
           errorSummary: "Sales Agent worker could not be started.",
@@ -482,13 +507,26 @@ function createSalesAgentRouter({
     try {
       await recoverStaleQueuedRun(SalesAgentRun, { env, now: now() });
       const run = await SalesAgentRun.create({
+        runType: "DISCOVERY",
         status: "QUEUED",
         activeLock: "global",
+        origin: "ADMIN_DASHBOARD",
+        queuedAt: now(),
         triggeredBy: req.adminUser._id,
         triggeredByRole: req.adminUser.role,
         triggerStatus: "TRIGGERING",
       });
       try {
+        const persistedRun = await SalesAgentRun.findById(run._id)
+          .select("_id runType status activeLock origin queuedAt triggerStatus")
+          .lean();
+        if (!persistedRun || String(persistedRun._id) !== String(run._id)
+          || persistedRun.status !== "QUEUED" || persistedRun.activeLock !== "global") {
+          const handoffError = new Error("Persisted Sales Agent run could not be verified before Render trigger.");
+          handoffError.code = "RUN_PERSISTENCE_VERIFICATION_FAILED";
+          throw handoffError;
+        }
+        logger.info?.(`SALES_AGENT_RUN_PERSISTED runId=${String(persistedRun._id)} status=${persistedRun.status}`);
         const trigger = await triggerSalesAgentRun({ runId: String(run._id) });
         const triggeredRun = await SalesAgentRun.findByIdAndUpdate(
           run._id,
@@ -770,6 +808,8 @@ function createSalesAgentRouter({
 
 module.exports = {
   DEFAULT_QUEUED_TIMEOUT_MS,
+  DEFAULT_WORKER_START_GRACE_MS,
+  workerStartGraceMs,
   createSalesAgentRouter,
   overlayCanonicalLatest,
   queuedTimeoutMs,
