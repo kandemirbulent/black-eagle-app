@@ -322,6 +322,9 @@ function createSalesAgentRouter({
     if (!run) return null;
     const value = typeof run.toObject === "function" ? run.toObject() : { ...run };
     value.persistedResultCount = await SalesAgentOpportunityResult.countDocuments({ runId: value._id });
+    value.partialResultCount = value.persistedResultCount;
+    value.partialResultsAvailable = value.persistedResultCount > 0
+      && ["RUNNING", "FAILED", "CANCELED"].includes(String(value.status || "").toUpperCase());
     return value;
   }
 

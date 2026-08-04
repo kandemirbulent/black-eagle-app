@@ -687,6 +687,22 @@
       setResultsNotice("");
     }
 
+    function interruptedRunNotice(run, resultCount) {
+      const status = text(run?.status, "").toUpperCase();
+      if (!["FAILED", "CANCELED"].includes(status)) return "";
+      if (!resultCount) return status === "CANCELED"
+        ? "This run was canceled. No persisted results were recovered."
+        : "This run did not complete. No persisted results were recovered.";
+      const page = safeNumber(run?.lastCheckpointPage);
+      const checkpointAt = run?.lastCheckpointAt ? formatDateTime(run.lastCheckpointAt) : "";
+      return [
+        "This run did not complete. Showing results saved before interruption.",
+        `Persisted results: ${resultCount}.`,
+        page ? `Last checkpoint page: ${page}.` : "",
+        checkpointAt ? `Last checkpoint: ${checkpointAt}.` : "",
+      ].filter(Boolean).join(" ");
+    }
+
     async function loadCurrentRun(id) {
       const record = await loadRunRecord(id, true);
       if (!record) return null;
@@ -700,13 +716,7 @@
       } else if (automaticLatestRun) {
         displayedResultsRunId = currentRunId;
         renderResults(record.results);
-        if (status === "CANCELED") {
-          setResultsNotice(record.results.length
-            ? `This run was canceled. Showing results saved before cancellation. Recovered persisted results: ${record.results.length}`
-            : "This run was canceled. No persisted results were recovered.");
-        } else {
-          setResultsNotice("");
-        }
+        setResultsNotice(interruptedRunNotice(record.run, record.results.length));
       }
       if (!automaticLatestRun) updateButton(status);
       if (TERMINAL_STATUSES.has(status)) {
@@ -732,11 +742,7 @@
       renderRun(record.run);
       renderResults(record.results);
       const status = text(record.run?.status, "").toUpperCase();
-      setResultsNotice(status === "CANCELED"
-        ? (record.results.length
-          ? `This run was canceled. Showing results saved before cancellation. Recovered persisted results: ${record.results.length}`
-          : "This run was canceled. No persisted results were recovered.")
-        : "");
+      setResultsNotice(interruptedRunNotice(record.run, record.results.length));
       updateButton(currentRun?.status);
       return record.run;
     }

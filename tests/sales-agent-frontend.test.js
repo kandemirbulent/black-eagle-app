@@ -203,19 +203,22 @@ test("RUNNING partial results are available on demand without replacing the defa
   assert.match(context.documentRef.elements.salesAgentResultsNotice.textContent, /Recovered persisted results: 2/);
 });
 
-test("CANCELED and FAILED runs remain selectable and CANCELED displays its recovery banner", async () => {
-  const canceled = run({ _id: "run-canceled", status: "CANCELED" });
+test("CANCELED and FAILED runs remain selectable and display interruption recovery details", async () => {
+  const canceled = run({ _id: "run-canceled", status: "CANCELED", lastCheckpointPage: 3, lastCheckpointAt: "2026-07-31T11:05:00.000Z" });
   const context = controller({ responses: [
     response(200, { success: true, run: canceled }),
     response(200, { success: true, results: [{ opportunityId: "SAVED-1", resultStatus: "QUOTE_READY" }] }),
-    response(200, { success: true, run: run({ _id: "run-failed", status: "FAILED" }) }),
-    response(200, { success: true, results: [] }),
+    response(200, { success: true, run: run({ _id: "run-failed", status: "FAILED", lastCheckpointPage: 2 }) }),
+    response(200, { success: true, results: [{ opportunityId: "SAVED-2", resultStatus: "DISCOVERED" }] }),
   ] });
   await context.instance.loadSelectedRun("run-canceled");
   assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
-  assert.match(context.documentRef.elements.salesAgentResultsNotice.textContent, /This run was canceled.*Recovered persisted results: 1/);
+  assert.match(context.documentRef.elements.salesAgentResultsNotice.textContent, /This run did not complete\. Showing results saved before interruption\./);
+  assert.match(context.documentRef.elements.salesAgentResultsNotice.textContent, /Persisted results: 1/);
+  assert.match(context.documentRef.elements.salesAgentResultsNotice.textContent, /Last checkpoint page: 3/);
   await context.instance.loadSelectedRun("run-failed");
   assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+  assert.match(context.documentRef.elements.salesAgentResultsNotice.textContent, /Last checkpoint page: 2/);
 });
 
 test("CANCELED run with no persisted results reports that nothing was recovered", async () => {

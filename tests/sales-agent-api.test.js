@@ -201,6 +201,8 @@ test("status reconciles a canceled Render job, releases the lock, and preserves 
     assert.equal(body.run.status, "CANCELED");
     assert.equal(body.run.failureCode, "RENDER_JOB_CANCELED");
     assert.equal(body.run.persistedResultCount, 1);
+    assert.equal(body.run.partialResultCount, 1);
+    assert.equal(body.run.partialResultsAvailable, true);
     assert.match(body.run.activeLock, /^released:/);
     assert.equal(state.results[0].opportunityId, "PARTIAL-1");
   }, {
@@ -211,6 +213,27 @@ test("status reconciles a canceled Render job, releases the lock, and preserves 
     }],
     now: fixedApiNow,
     getRenderJobStatus: async () => ({ status: "canceled", checkedAt: fixedApiNow().toISOString(), finishedAt: fixedApiNow().toISOString() }),
+  });
+});
+
+test("failed run API preserves checkpoint metadata and reports partial results", () => {
+  const runId = "64c000000000000000000092";
+  return withServer(async ({ request, state }) => {
+    state.results.push({ _id: "result-checkpoint", runId, opportunityId: "CHECKPOINT-1", resultStatus: "DISCOVERED" });
+    const response = await request(`/api/admin/sales-agent/runs/${runId}`, jsonOptions("admin"));
+    const body = await response.json();
+    assert.equal(body.run.status, "FAILED");
+    assert.equal(body.run.partialResultsAvailable, true);
+    assert.equal(body.run.partialResultCount, 1);
+    assert.equal(body.run.lastCheckpointPage, 4);
+    assert.equal(body.run.lastCheckpointAt, "2026-07-31T11:05:00.000Z");
+  }, {
+    initialRuns: [{
+      _id: runId, runType: "DISCOVERY", status: "FAILED", activeLock: `released:${runId}`,
+      lastCheckpointPage: 4, lastCheckpointAt: "2026-07-31T11:05:00.000Z",
+      createdAt: "2026-07-31T10:00:00.000Z", updatedAt: "2026-07-31T11:05:00.000Z",
+    }],
+    now: fixedApiNow,
   });
 });
 
