@@ -8,6 +8,8 @@ const {
   overlayCanonicalLatest,
   queuedTimeoutMs,
   workerStartGraceMs,
+  buildActiveRunDiagnostics,
+  workerDiagnosticReason,
   redactFailureLog,
   opportunitySelectionPolicy,
 } = require("../routes/salesAgentRoutes");
@@ -33,6 +35,7 @@ function createHarness({
   env = {},
   now = () => new Date(),
   persistedSourceRunOverride = "",
+  logger = { error() {} },
 } = {}) {
   const state = {
     runs: structuredClone(initialRuns),
@@ -184,7 +187,7 @@ function createHarness({
     cancelRenderJob: cancelRenderJob || (async () => ({ status: "canceled", checkedAt: now().toISOString(), finishedAt: now().toISOString() })),
     env,
     now,
-    logger: { error() {} },
+    logger,
   }));
   return { app, state };
 }
@@ -314,13 +317,60 @@ test("cancel reconciles an already-terminal Render job without sending cancel", 
     const body = await response.json();
     assert.equal(body.alreadyTerminal, true);
     assert.equal(body.run.status, "FAILED");
-    assert.equal(body.run.failureCode, "RECOVERY_REQUIRED");
+    assert.equal(body.run.failureCode, "NO_QUEUED_RUN");
+    assert.match(body.run.errorMessage, /NO_QUEUED_RUN.*activeRunCount=1.*queuedCount=0/);
     assert.equal(cancelCalls, 0);
   }, {
     initialRuns: [{ _id: runId, runType: "DISCOVERY", status: "RUNNING", activeLock: "global", triggerJobId: "job-done", renderServiceId: "srv-test" }],
     getRenderJobStatus: async () => ({ status: "succeeded", checkedAt: fixedApiNow().toISOString() }),
     cancelRenderJob: async () => { cancelCalls += 1; }, now: fixedApiNow,
   });
+});
+
+test("active-run diagnostics explain why a run remains active without exposing secrets", () => {
+  const diagnostic = buildActiveRunDiagnostics([{
+    _id: "run-1", status: "RUNNING", activeLock: "global",
+    createdAt: "2026-07-31T11:55:00.000Z", updatedAt: "2026-07-31T11:59:00.000Z",
+    renderJobId: "job-1", renderJobStatus: "succeeded",
+  }], { currentTime: fixedApiNow(), env: { SALES_AGENT_WORKER_START_GRACE_MS: "30000" }, render: { status: "succeeded" } });
+  assert.equal(diagnostic.queuedCount, 0);
+  assert.equal(diagnostic.activeRunCount, 1);
+  assert.deepEqual(diagnostic.activeRunIds[0].activeReasons, [
+    "status RUNNING", "lock not released", "waiting for reconciliation",
+  ]);
+  assert.equal(diagnostic.activeRunIds[0].ageSeconds, 60);
+  assert.equal(diagnostic.activeRunIds[0].actuallyTerminal, true);
+  assert.equal(diagnostic.activeRunIds[0].expected, false);
+  assert.equal(diagnostic.activeRunIds[0].reconciliationShouldAlreadyHaveCompleted, true);
+  assert.equal(JSON.stringify(diagnostic).includes("mongodb"), false);
+});
+
+test("worker no-queue reason has precedence and structured active diagnostic is logged", () => {
+  const runId = "64c000000000000000000087";
+  const lines = [];
+  const exactReason = "NO_QUEUED_RUN: queuedCount=0 activeRunCount=1 exclusion=RUNNING";
+  return withServer(async ({ request }) => {
+    const response = await request("/api/admin/sales-agent/status", jsonOptions("admin"));
+    const body = await response.json();
+    assert.equal(body.run.failureReason, exactReason);
+    assert.equal(body.run.errorMessage, exactReason);
+    assert.ok(lines.some((line) => line.startsWith("SALES_AGENT_QUEUE_DIAGNOSTICS ")));
+    assert.ok(lines.some((line) => line.startsWith("SALES_AGENT_ACTIVE_RUN_DIAGNOSTICS ")));
+  }, {
+    initialRuns: [{
+      _id: runId, runType: "DISCOVERY", status: "RUNNING", activeLock: "global",
+      createdAt: "2026-07-31T11:50:00.000Z", updatedAt: "2026-07-31T11:58:00.000Z",
+      renderJobId: "job-done", renderJobStatus: "succeeded", errorMessage: exactReason,
+    }],
+    now: fixedApiNow,
+    getRenderJobStatus: async () => ({ status: "succeeded", checkedAt: fixedApiNow().toISOString() }),
+    logger: { error() {}, info(value) { lines.push(String(value)); } },
+  });
+});
+
+test("worker diagnostic reason helper ignores the former generic Render message", () => {
+  assert.equal(workerDiagnosticReason({ errorMessage: "Render succeeded but the Sales Agent workflow did not record completion." }), "");
+  assert.equal(workerDiagnosticReason({ workerDiagnostic: { errorMessage: "No queued Sales Agent run." } }), "No queued Sales Agent run.");
 });
 
 test("cancel timeout leaves the local run unchanged", () => {

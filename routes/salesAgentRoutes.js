@@ -129,6 +129,53 @@ function terminalRenderWithinGrace(render, env, currentTime) {
     && currentTime.getTime() - finishedAt.getTime() < workerStartGraceMs(env);
 }
 
+function workerDiagnosticReason(run = {}) {
+  const candidates = [
+    run.workerDiagnostic?.errorMessage,
+    run.workerDiagnostic?.failureReason,
+    run.errorMessage,
+    run.failureReason,
+    run.errorSummary,
+  ];
+  return candidates
+    .map((value) => String(value || "").replace(/\s+/g, " ").trim())
+    .find((value) => /NO_QUEUED_RUN|No queued Sales Agent run|SALES_AGENT_QUEUE_DIAGNOSTICS/i.test(value)) || "";
+}
+
+function buildActiveRunDiagnostics(runs = [], { currentTime = new Date(), env = process.env, render = {} } = {}) {
+  const activeRunIds = runs.map((run) => {
+    const status = String(run.status || "UNKNOWN").toUpperCase();
+    const activeLock = String(run.activeLock || "");
+    const createdAt = run.createdAt || null;
+    const updatedAt = run.updatedAt || null;
+    const reference = new Date(updatedAt || createdAt || currentTime);
+    const gracePeriodActive = withinWorkerStartGrace(run, env, currentTime)
+      || terminalRenderWithinGrace(render, env, currentTime);
+    const renderStatus = String(run.renderJobStatus || render.status || "").toLowerCase();
+    const actuallyTerminal = ["succeeded", "failed", "canceled"].includes(renderStatus);
+    const reasons = [`status ${status}`];
+    if (activeLock && !activeLock.startsWith("released:")) reasons.push("lock not released");
+    if (gracePeriodActive) reasons.push("grace period active");
+    if (["QUEUED", "RUNNING"].includes(status)) reasons.push("waiting for reconciliation");
+    return {
+      runId: String(run._id || ""), status, activeLock,
+      createdAt, updatedAt,
+      renderJobId: String(run.renderJobId || run.triggerJobId || ""),
+      renderJobStatus: renderStatus,
+      ageSeconds: Math.max(0, Math.floor((currentTime.getTime() - reference.getTime()) / 1000)),
+      activeReasons: reasons,
+      expected: gracePeriodActive || !actuallyTerminal,
+      actuallyTerminal,
+      reconciliationShouldAlreadyHaveCompleted: actuallyTerminal && !gracePeriodActive,
+    };
+  });
+  return {
+    queuedCount: activeRunIds.filter((run) => run.status === "QUEUED").length,
+    activeRunCount: activeRunIds.length,
+    activeRunIds,
+  };
+}
+
 async function recoverStaleQueuedRun(SalesAgentRun, { env = process.env, now = new Date() } = {}) {
   const cutoff = new Date(now.getTime() - Math.max(queuedTimeoutMs(env), workerStartGraceMs(env)));
   return SalesAgentRun.findOneAndUpdate(
@@ -323,8 +370,23 @@ function createSalesAgentRouter({
         return run;
       }
       terminalStatus = "FAILED";
-      failureCode = "RECOVERY_REQUIRED";
-      failureReason = "Render succeeded but the Sales Agent workflow did not record completion.";
+      const activeRuns = await SalesAgentRun.find({ status: { $in: ["QUEUED", "RUNNING"] } })
+        .select("_id status activeLock createdAt updatedAt renderJobId triggerJobId renderJobStatus")
+        .lean();
+      const activeDiagnostic = buildActiveRunDiagnostics(activeRuns, { currentTime: now(), env, render });
+      logger.info?.(`SALES_AGENT_QUEUE_DIAGNOSTICS ${JSON.stringify(activeDiagnostic)}`);
+      if (activeDiagnostic.activeRunCount === 1 && activeDiagnostic.queuedCount === 0) {
+        logger.info?.(`SALES_AGENT_ACTIVE_RUN_DIAGNOSTICS ${JSON.stringify(activeDiagnostic.activeRunIds[0])}`);
+      }
+      const current = activeDiagnostic.activeRunIds.find((item) => item.runId === String(run._id));
+      const preservedWorkerReason = workerDiagnosticReason(run);
+      failureCode = "NO_QUEUED_RUN";
+      failureReason = preservedWorkerReason || (
+        `NO_QUEUED_RUN: Worker found no eligible QUEUED Sales Agent run; `
+        + `activeRunCount=${activeDiagnostic.activeRunCount}; queuedCount=${activeDiagnostic.queuedCount}; `
+        + `runId=${String(run._id)}; status=${current?.status || String(run.status).toUpperCase()}; `
+        + `activeLock=${current?.activeLock || String(run.activeLock || "")}.`
+      );
     } else if (render?.missing) {
       const reference = new Date(run.triggeredAt || run.updatedAt || run.createdAt || 0);
       if (!Number.isFinite(reference.getTime()) || now().getTime() - reference.getTime() < queuedTimeoutMs(env)) return run;
@@ -810,6 +872,8 @@ module.exports = {
   DEFAULT_QUEUED_TIMEOUT_MS,
   DEFAULT_WORKER_START_GRACE_MS,
   workerStartGraceMs,
+  buildActiveRunDiagnostics,
+  workerDiagnosticReason,
   createSalesAgentRouter,
   overlayCanonicalLatest,
   queuedTimeoutMs,
