@@ -193,6 +193,7 @@ async function recoverStaleQueuedRun(SalesAgentRun, { env = process.env, now = n
     {
       $set: {
         status: "FAILED",
+        activeLock: "released:stale-queued",
         failureCode: "WORKER_NOT_AVAILABLE",
         triggerStatus: "FAILED",
         errorSummary: "Queued run expired before being claimed by a worker.",
@@ -201,6 +202,7 @@ async function recoverStaleQueuedRun(SalesAgentRun, { env = process.env, now = n
         errorMessage: "Queued run expired before being claimed by a worker.",
         failureAt: now,
         completedAt: now,
+        finishedAt: now,
         updatedAt: now,
       },
     },
@@ -324,7 +326,20 @@ function createSalesAgentRouter({
   }
 
   async function reconcileRun(run, renderOverride = null) {
-    if (!run || !["QUEUED", "RUNNING"].includes(String(run.status).toUpperCase())) return run;
+    if (!run) return run;
+    const localStatus = String(run.status).toUpperCase();
+    if (["COMPLETED", "FAILED", "CANCELED"].includes(localStatus)) {
+      if (String(run.activeLock || "") === "global" || !run.finishedAt) {
+        const terminalAt = new Date(run.finishedAt || run.completedAt || run.failureAt || run.updatedAt || now());
+        return await SalesAgentRun.findOneAndUpdate(
+          { _id: run._id, status: localStatus },
+          { $set: { activeLock: `released:${run._id}`, finishedAt: terminalAt } },
+          { new: true, runValidators: true }
+        ) || run;
+      }
+      return run;
+    }
+    if (!["QUEUED", "RUNNING"].includes(localStatus)) return run;
     const jobId = String(run.renderJobId || run.triggerJobId || "").trim();
     const serviceId = String(run.renderServiceId || env.RENDER_SALES_AGENT_SERVICE_ID || "").trim();
     if (!jobId) return run;
@@ -348,7 +363,7 @@ function createSalesAgentRouter({
     if (["pending", "running"].includes(status)) {
       const updated = await SalesAgentRun.findOneAndUpdate(
         { _id: run._id, status: { $in: ["QUEUED", "RUNNING"] } },
-        { $set: { ...baseSet, ...(status === "running" ? { status: "RUNNING" } : {}) } },
+        { $set: baseSet },
         { new: true, runValidators: true }
       );
       return updated || run;
@@ -441,6 +456,7 @@ function createSalesAgentRouter({
           upstreamResponseBody: diagnostic.responseBody || "",
           failureRequestAt: diagnostic.requestTimestamp ? new Date(diagnostic.requestTimestamp) : failedAt,
           completedAt: failedAt,
+          finishedAt: failedAt,
         },
       },
       { new: true, runValidators: true }
@@ -677,6 +693,7 @@ function createSalesAgentRouter({
               failedStage: "RENDER_TRIGGER",
               failureAt: now(),
               completedAt: now(),
+              finishedAt: now(),
             },
           });
           return res.status(409).json({ success: false, code: "MANUAL_REVIEW_SOURCE_RUN_MISMATCH" });
@@ -748,8 +765,26 @@ function createSalesAgentRouter({
     }
     const run = await SalesAgentRun.findById(req.params.runId).lean();
     if (!run) return res.status(404).json({ success: false, code: "SALES_AGENT_RUN_NOT_FOUND" });
+    const previousStatus = String(run.status || "").toUpperCase();
+    const previousLock = String(run.activeLock || "");
     const reconciled = await reconcileRun(run);
-    return res.json({ success: true, run: await withPersistedResultCount(reconciled) });
+    const value = await withPersistedResultCount(reconciled);
+    const newStatus = String(value?.status || previousStatus).toUpperCase();
+    const lockReleased = previousLock === "global" && String(value?.activeLock || "") !== "global";
+    const reconciliationReason = newStatus === previousStatus && !lockReleased
+      ? "RUN_STILL_ACTIVE_OR_ALREADY_CONSISTENT"
+      : String(value?.failureCode || (lockReleased ? "TERMINAL_LOCK_RELEASED" : "STATUS_RECONCILED"));
+    return res.json({
+      success: true,
+      run: value,
+      reconciliation: {
+        previousStatus,
+        newStatus,
+        lockReleased,
+        preservedResultCount: Number(value?.persistedResultCount || 0),
+        reconciliationReason,
+      },
+    });
   });
 
   router.post("/admin/sales-agent/runs/:runId/cancel", requireAdminAuth, async (req, res) => {

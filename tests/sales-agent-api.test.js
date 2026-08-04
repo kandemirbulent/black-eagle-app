@@ -219,9 +219,19 @@ test("manual reconciliation is idempotent and does not run a worker", () => {
   let checks = 0;
   return withServer(async ({ request, state }) => {
     const first = await request(`/api/admin/sales-agent/runs/${runId}/reconcile`, jsonOptions("superadmin", "POST", {}));
-    assert.equal((await first.json()).run.status, "FAILED");
+    const firstBody = await first.json();
+    assert.equal(firstBody.run.status, "FAILED");
+    assert.deepEqual(firstBody.reconciliation, {
+      previousStatus: "RUNNING",
+      newStatus: "FAILED",
+      lockReleased: true,
+      preservedResultCount: 0,
+      reconciliationReason: "RENDER_JOB_FAILED",
+    });
     const second = await request(`/api/admin/sales-agent/runs/${runId}/reconcile`, jsonOptions("admin", "POST", {}));
-    assert.equal((await second.json()).run.status, "FAILED");
+    const secondBody = await second.json();
+    assert.equal(secondBody.run.status, "FAILED");
+    assert.equal(secondBody.reconciliation.lockReleased, false);
     assert.equal(checks, 1);
     assert.equal(state.triggerCalls.length, 0);
   }, {
@@ -230,6 +240,40 @@ test("manual reconciliation is idempotent and does not run a worker", () => {
       triggerJobId: "job-failed", createdAt: "2026-07-31T10:00:00.000Z",
     }],
     getRenderJobStatus: async () => { checks += 1; return { status: "failed", checkedAt: fixedApiNow().toISOString() }; },
+    now: fixedApiNow,
+  });
+});
+
+test("Render running metadata does not claim a QUEUED run on behalf of the worker", () => {
+  const runId = "64c00000000000000000009a";
+  return withServer(async ({ request, state }) => {
+    const response = await request(`/api/admin/sales-agent/runs/${runId}/reconcile`, jsonOptions("admin", "POST", {}));
+    const body = await response.json();
+    assert.equal(body.run.status, "QUEUED");
+    assert.equal(body.run.renderJobStatus, "running");
+    assert.equal(body.reconciliation.newStatus, "QUEUED");
+    assert.equal(state.runs[0].workerId, undefined);
+  }, {
+    initialRuns: [{ _id: runId, runType: "DISCOVERY", status: "QUEUED", activeLock: "global", renderJobId: "job-running" }],
+    getRenderJobStatus: async () => ({ status: "running", checkedAt: fixedApiNow().toISOString() }),
+    now: fixedApiNow,
+  });
+});
+
+test("reconcile repairs a terminal run lock without overwriting terminal status or results", () => {
+  const runId = "64c00000000000000000009b";
+  return withServer(async ({ request, state }) => {
+    state.results.push({ _id: "terminal-result", runId, opportunityId: "DONE", resultStatus: "SUBMITTED" });
+    const response = await request(`/api/admin/sales-agent/runs/${runId}/reconcile`, jsonOptions("admin", "POST", {}));
+    const body = await response.json();
+    assert.equal(body.run.status, "COMPLETED");
+    assert.match(body.run.activeLock, /^released:/);
+    assert.ok(body.run.finishedAt);
+    assert.equal(body.reconciliation.preservedResultCount, 1);
+    assert.equal(body.reconciliation.lockReleased, true);
+    assert.equal(state.results[0].opportunityId, "DONE");
+  }, {
+    initialRuns: [{ _id: runId, runType: "DISCOVERY", status: "COMPLETED", activeLock: "global", completedAt: fixedApiNow().toISOString() }],
     now: fixedApiNow,
   });
 });
