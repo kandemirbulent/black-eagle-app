@@ -495,11 +495,14 @@
         ["Opportunity IDs", (preview?.opportunityIds || []).join(", ") || "—"],
         ["Platform breakdown", Object.entries(preview?.platformBreakdown || {}).map(([key, value]) => `${key}: ${value}`).join(", ") || "—"],
         ["Combined quotation value", formatPrice(preview?.combinedQuotationValue)],
+        ["Estimated platform cost", `${safeNumber(preview?.estimatedCredits)} credits`],
         ["Estimated revenue", formatPrice(preview?.estimatedRevenue)],
         ["Estimated profit", formatPrice(preview?.estimatedProfit)]
       ]));
       elements.detailsContent.appendChild(createElement("p", "Unselected opportunities will not be touched."));
-      elements.detailsContent.appendChild(createElement("p", "Submission worker is not enabled in this phase."));
+      elements.detailsContent.appendChild(createElement("p", submitPlaceholder
+        ? "Only these explicitly selected READY Add to Event opportunities can be submitted."
+        : "Preview only. No quote or paid action has occurred."));
       elements.detailsModal.classList.remove("hidden");
     }
 
@@ -515,6 +518,26 @@
       }
       renderSelectionPreview(result.payload.preview, submitPlaceholder);
       return result.payload.preview;
+    }
+
+    async function submitSelectedOpportunities() {
+      const preview = await previewSelection(true);
+      if (!preview || preview.blocked?.length || preview.selectedCount !== selectedOpportunities.size) return null;
+      const confirmation = `Submit ${preview.selectedCount} selected Add to Event quotes? Estimated cost: ${safeNumber(preview.estimatedCredits)} credits. This may consume platform credits.`;
+      if (!confirmFn(confirmation)) return null;
+      const result = await requestJson("/api/admin/sales-agent/opportunities/submit-selected", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ records: selectedReferences() })
+      });
+      if (!result.response.ok || result.payload.success === false) {
+        showMessage("Selected quotes were not queued. Refresh and review the current versions.", "error");
+        return null;
+      }
+      selectedOpportunities.clear();
+      closeDetails();
+      showMessage(`${result.payload.selectedCount} selected quotes queued with an estimated cost of ${safeNumber(result.payload.estimatedCredits)} credits.`);
+      await refresh();
+      return result.payload;
     }
 
     async function updateSelectedStatus(targetStatus) {
@@ -1060,7 +1083,7 @@
       elements.holdSelected?.addEventListener("click", () => updateSelectedStatus("HOLD"));
       elements.rejectSelected?.addEventListener("click", () => updateSelectedStatus("REJECTED"));
       elements.editSelected?.addEventListener("click", editSelectedOpportunity);
-      elements.submitSelected?.addEventListener("click", () => previewSelection(true));
+      elements.submitSelected?.addEventListener("click", submitSelectedOpportunities);
       return refresh();
     }
 
@@ -1084,6 +1107,7 @@
       clearOpportunitySelection,
       selectedReferences,
       previewSelection,
+      submitSelectedOpportunities,
       updateSelectedStatus,
       editSelectedOpportunity,
       startPolling,

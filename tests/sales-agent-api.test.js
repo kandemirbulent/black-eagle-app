@@ -532,12 +532,13 @@ const eligibleAddToEvent = (overrides = {}) => ({
   platformCostEstimate: { unit: "CREDITS", status: "KNOWN", amount: 8 },
   quoteSnapshot: { calculatedPrice: 500, estimatedRevenue: 500, estimatedProfit: 150 },
   manualOverrides: {},
-  resultStatus: "QUOTE_READY",
+  resultStatus: "READY",
   ...overrides,
 });
 
 test("manual selection policy blocks Togather and terminal or unavailable opportunities", () => {
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent()).manualSelectionEligible, true);
+  assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ approvalStatus: "NOT_REVIEWED" })).manualSelectionEligible, true);
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ platform: "togather" })).manualSelectionBlocker, "TOGATHER_AUTOMATIC_POLICY");
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ quoteSubmitted: true })).manualSelectionEligible, false);
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ resultStatus: "ALREADY_QUOTED" })).manualSelectionBlocker, "ALREADY_QUOTED");
@@ -608,6 +609,42 @@ test("selection preview is exact, versioned, and performs no worker or platform 
   assert.equal(body.preview.blocked[0].code, "UNAVAILABLE");
   assert.equal(body.preview.noSubmission, true);
   assert.match(body.preview.message, /not enabled/i);
+  assert.equal(state.triggerCalls.length, 0);
+}));
+
+test("selected Add to Event submission persists exact IDs and versions before triggering worker", () => withServer(async ({ request, state }) => {
+  state.results.push(eligibleAddToEvent({ resultStatus: "READY" }));
+  const empty = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", { records: [] }));
+  assert.equal((await empty.json()).code, "OPPORTUNITY_SELECTION_REQUIRED");
+  const response = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", {
+    records: [{ id: "64f000000000000000000001", expectedVersion: 1 }],
+  }));
+  const body = await response.json();
+  assert.equal(response.status, 201);
+  assert.equal(body.selectedCount, 1);
+  assert.equal(body.estimatedCredits, 8);
+  assert.equal(state.runs.at(-1).runType, "ADD_TO_EVENT_SUBMISSION");
+  assert.deepEqual(state.runs.at(-1).submissionSelection.records[0], {
+    id: "64f000000000000000000001", selectedVersion: 1, opportunityId: "ATE-1", platform: "addtoevent",
+  });
+  assert.equal(state.results[0].selectedVersion, 1);
+  assert.equal(state.results[0].approvalStatus, "APPROVED");
+  assert.equal(String(state.results[0].submissionLock.runId), String(state.runs.at(-1)._id));
+  assert.equal(state.triggerCalls.at(-1).startCommand, "npm run worker:submit-addtoevent");
+}));
+
+test("submission backend rejects non-READY and stale selected records before worker trigger", () => withServer(async ({ request, state }) => {
+  state.results.push(eligibleAddToEvent({ resultStatus: "MANUAL_REVIEW" }));
+  const blocked = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", {
+    records: [{ id: "64f000000000000000000001", expectedVersion: 1 }],
+  }));
+  assert.equal(blocked.status, 409);
+  assert.equal(state.triggerCalls.length, 0);
+  state.results[0].resultStatus = "READY";
+  const stale = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", {
+    records: [{ id: "64f000000000000000000001", expectedVersion: 2 }],
+  }));
+  assert.equal((await stale.json()).code, "OPPORTUNITY_VERSION_CONFLICT");
   assert.equal(state.triggerCalls.length, 0);
 }));
 

@@ -92,6 +92,7 @@ const salesAgentOpportunityResultSchema = new mongoose.Schema(
     manualApprovalRequired: { type: Boolean, default: false },
     manualSubmissionEligible: { type: Boolean, default: false },
     recordVersion: { type: Number, min: 1, default: 1 },
+    selectedVersion: { type: Number, min: 1, default: null },
     lastEditedAt: { type: Date, default: null },
     lastEditedBy: { type: String, trim: true, default: "" },
     manualOverrides: { type: manualOverridesSchema, default: () => ({}) },
@@ -99,6 +100,19 @@ const salesAgentOpportunityResultSchema = new mongoose.Schema(
     expiresAt: { type: Date, default: null },
     unavailable: { type: Boolean, default: false },
     submissionLock: { type: mongoose.Schema.Types.Mixed, default: null },
+    submissionStatus: { type: String, default: "", trim: true, index: true },
+    submissionAttemptedAt: { type: Date, default: null },
+    submissionVerifiedAt: { type: Date, default: null },
+    platformQuoteId: { type: String, default: "", trim: true },
+    approvedCreditCost: { type: Number, min: 0, default: null },
+    creditsConsumed: { type: Number, min: 0, default: null },
+    contactDetails: {
+      sourcePlatform: { type: String, enum: ["", "addtoevent"], default: "" },
+      phone: { type: String, default: "", trim: true },
+      email: { type: String, default: "", trim: true, lowercase: true },
+      contactUnlockedAt: { type: Date, default: null },
+      sourceOpportunityId: { type: String, default: "", trim: true },
+    },
   },
   { timestamps: true }
 );

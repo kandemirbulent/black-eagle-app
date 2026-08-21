@@ -5,6 +5,7 @@ const {
   createRenderSalesAgentJobStatusClient,
   createRenderSalesAgentJobCancelClient,
   MANUAL_REVIEW_WORKER_COMMAND,
+  ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND,
 } = require("../services/salesAgentJobTrigger");
 
 const SETTINGS_FIELDS = new Set([
@@ -57,7 +58,8 @@ function opportunitySelectionPolicy(record = {}) {
   let blocker = "";
   if (platform !== "addtoevent") blocker = platform === "togather" ? "TOGATHER_AUTOMATIC_POLICY" : "PLATFORM_NOT_SUPPORTED";
   else if (record.manualApprovalRequired !== true || record.manualSubmissionEligible !== true) blocker = "MANUAL_POLICY_NOT_ENABLED";
-  else if (!["READY", "APPROVED"].includes(approvalStatus)) blocker = `APPROVAL_STATUS_${approvalStatus}`;
+  else if (status !== "READY") blocker = status === "ALREADY_QUOTED" ? "ALREADY_QUOTED" : `STATUS_${status || "UNKNOWN"}`;
+  else if (!["NOT_REVIEWED", "READY", "APPROVED"].includes(approvalStatus)) blocker = `APPROVAL_STATUS_${approvalStatus}`;
   else if (record.quoteSubmitted || record.quoteUuid || TERMINAL_OPPORTUNITY_STATUSES.has(status)) blocker = status === "ALREADY_QUOTED" ? "ALREADY_QUOTED" : `STATUS_${status || "SUBMITTED"}`;
   else if (record.unavailable === true) blocker = "UNAVAILABLE";
   else if (record.expiresAt && new Date(record.expiresAt) <= new Date()) blocker = "EXPIRED";
@@ -574,6 +576,7 @@ function createSalesAgentRouter({
         opportunityIds: records.map((record) => record.opportunityId),
         platformBreakdown,
         combinedQuotationValue: sum(currentQuotePrice),
+        estimatedCredits: sum((record) => record.platformCostEstimate?.status === "KNOWN" ? record.platformCostEstimate.amount : 0),
         estimatedRevenue: sum((record) => record.quoteSnapshot?.estimatedRevenue),
         estimatedProfit: sum((record) => record.quoteSnapshot?.estimatedProfit),
         records,
@@ -582,6 +585,69 @@ function createSalesAgentRouter({
         message: "Submission worker is not enabled in this phase.",
       },
     });
+  });
+
+  router.post("/admin/sales-agent/opportunities/submit-selected", requireAdminAuth, async (req, res) => {
+    const validation = validateRecordReferences(req.body?.records);
+    if (validation.error) return res.status(400).json({ success: false, code: validation.error });
+    const selected = [];
+    for (const reference of validation.records) {
+      const existing = await SalesAgentOpportunityResult.findById(reference.id).lean();
+      if (!existing) return res.status(404).json({ success: false, code: "OPPORTUNITY_NOT_FOUND" });
+      if (Number(existing.recordVersion) !== reference.expectedVersion) return res.status(409).json({ success: false, code: "OPPORTUNITY_VERSION_CONFLICT" });
+      const policy = opportunitySelectionPolicy(existing);
+      if (!policy.manualSelectionEligible || canonicalStatus(existing) !== "READY") {
+        return res.status(409).json({ success: false, code: policy.manualSelectionBlocker || "STATUS_NOT_READY" });
+      }
+      const credits = existing.platformCostEstimate || {};
+      if (credits.status !== "KNOWN" || !Number.isFinite(Number(credits.amount))) {
+        return res.status(409).json({ success: false, code: "CREDIT_COST_UNKNOWN" });
+      }
+      selected.push({ record: existing, reference, price: currentQuotePrice(existing), credits: Number(credits.amount) });
+    }
+    let run;
+    const lockedIds = [];
+    try {
+      run = await SalesAgentRun.create({
+        runType: "ADD_TO_EVENT_SUBMISSION", status: "QUEUED", activeLock: "global", origin: "ADMIN_DASHBOARD_SELECTION",
+        queuedAt: now(), triggeredBy: req.adminUser._id, triggeredByRole: req.adminUser.role, triggerStatus: "TRIGGERING",
+        submissionSelection: {
+          records: selected.map(({ record, reference }) => ({ id: reference.id, selectedVersion: reference.expectedVersion, opportunityId: record.opportunityId, platform: "addtoevent" })),
+          selectedCount: selected.length,
+          approvedCreditCost: selected.reduce((sum, item) => sum + item.credits, 0),
+          combinedQuotationValue: selected.reduce((sum, item) => sum + item.price, 0),
+        },
+      });
+      for (const item of selected) {
+        const locked = await SalesAgentOpportunityResult.findOneAndUpdate(
+          { _id: item.reference.id, recordVersion: item.reference.expectedVersion, submissionLock: null },
+          { $set: { approvalStatus: "APPROVED", selectedVersion: item.reference.expectedVersion, submissionLock: { runId: run._id, selectedAt: now(), selectedBy: String(req.adminUser._id) } } },
+          { new: true, runValidators: true }
+        ).lean();
+        if (!locked) {
+          const error = new Error("Selection changed before submission lock.");
+          error.code = "OPPORTUNITY_VERSION_CONFLICT";
+          throw error;
+        }
+        lockedIds.push(item.reference.id);
+      }
+      const trigger = await triggerSalesAgentRun({ startCommand: ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND });
+      const queued = await SalesAgentRun.findOneAndUpdate(
+        { _id: run._id, status: "QUEUED" },
+        { $set: { triggerStatus: "TRIGGERED", triggerJobId: trigger.jobId, renderJobId: trigger.jobId, renderServiceId: env.RENDER_SALES_AGENT_SERVICE_ID || "", triggeredAt: now() } },
+        { new: true, runValidators: true }
+      );
+      return res.status(201).json({ success: true, run: queued, selectedCount: selected.length, estimatedCredits: selected.reduce((sum, item) => sum + item.credits, 0) });
+    } catch (error) {
+      await Promise.all(lockedIds.map((id) => SalesAgentOpportunityResult.findOneAndUpdate(
+        { _id: id, "submissionLock.runId": run?._id }, { $set: { selectedVersion: null, submissionLock: null } }, { new: true }
+      )));
+      if (run) await SalesAgentRun.findOneAndUpdate(
+        { _id: run._id }, { $set: { status: "FAILED", activeLock: `released:${run._id}`, triggerStatus: "FAILED", failedStage: "RENDER_TRIGGER", failureCode: error.code || "WORKER_TRIGGER_FAILED", completedAt: now(), finishedAt: now() } }, { new: true }
+      );
+      const conflict = error.code === "OPPORTUNITY_VERSION_CONFLICT";
+      return res.status(conflict ? 409 : 503).json({ success: false, code: conflict ? error.code : "WORKER_TRIGGER_FAILED" });
+    }
   });
 
   router.post("/admin/sales-agent/runs", requireAdminAuth, async (req, res) => {
@@ -757,7 +823,7 @@ function createSalesAgentRouter({
   });
 
   router.get("/admin/sales-agent/runs", requireAdminAuth, async (req, res) => {
-    const runs = await SalesAgentRun.find({ runType: { $ne: "MANUAL_REVIEW_RESUME" } })
+    const runs = await SalesAgentRun.find({ runType: { $in: ["DISCOVERY", null] } })
       .sort({ createdAt: -1 }).limit(100).lean();
     return res.json({ success: true, runs: await Promise.all(runs.map(withPersistedResultCount)) });
   });
@@ -864,7 +930,7 @@ function createSalesAgentRouter({
   router.get("/admin/sales-agent/status", requireAdminAuth, async (req, res) => {
     await recoverStaleQueuedRun(SalesAgentRun, { env, now: now() });
     let run = await SalesAgentRun.findOne({
-      runType: { $ne: "MANUAL_REVIEW_RESUME" },
+      runType: { $in: ["DISCOVERY", null] },
       status: { $in: ["QUEUED", "RUNNING"] },
     })
       .sort({ createdAt: -1 }).lean();

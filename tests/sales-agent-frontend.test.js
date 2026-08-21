@@ -590,21 +590,37 @@ test("selection checkboxes enforce policy, select visible eligible rows, allow d
   assert.equal(context.documentRef.elements.selectedOpportunityCount.textContent, "0 selected");
 });
 
-test("Submit Selected Quotes opens a no-submission preview and makes no worker request", async () => {
+test("Submit Selected Quotes previews count/credits then posts only exact selected versions", async () => {
   const context = controller({ responses: [response(200, { success: true, preview: {
     selectedCount: 1, opportunityIds: ["ATE-1"], platformBreakdown: { addtoevent: 1 },
-    combinedQuotationValue: 500, estimatedRevenue: 500, estimatedProfit: 150, noSubmission: true,
-  } })] });
+    combinedQuotationValue: 500, estimatedRevenue: 500, estimatedProfit: 150, estimatedCredits: 6, blocked: [],
+  } }), response(201, { success: true, selectedCount: 1, estimatedCredits: 6, run: { _id: "submission-1" } }),
+  response(200, { success: true, runs: [] }), response(200, { success: true, status: "IDLE", run: null }),
+  response(200, { success: true, runs: [] })] });
   context.instance.renderResults([
     { _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 2, manualSelectionEligible: true },
   ]);
   context.instance.selectAllCurrentPage();
-  await context.instance.previewSelection(true);
-  assert.equal(context.calls.length, 1);
+  await context.instance.submitSelectedOpportunities();
+  assert.equal(context.calls.length, 5);
   assert.equal(context.calls[0].url, "/api/admin/sales-agent/opportunities/selection-preview");
   assert.deepEqual(JSON.parse(context.calls[0].options.body), { records: [{ id: "a", expectedVersion: 2 }] });
-  assert.match(flattenText(context.documentRef.elements.salesAgentDetailsContent), /Submission worker is not enabled in this phase/i);
-  assert.equal(context.calls.some((call) => /runs|manual-review/.test(call.url)), false);
+  assert.equal(context.calls[1].url, "/api/admin/sales-agent/opportunities/submit-selected");
+  assert.deepEqual(JSON.parse(context.calls[1].options.body), { records: [{ id: "a", expectedVersion: 2 }] });
+  assert.match(context.confirmations[0], /1 selected.*6 credits/i);
+  assert.deepEqual(context.instance.selectedReferences(), []);
+});
+
+test("submission confirmation refusal performs no submit request and preserves selection", async () => {
+  const context = controller({ onConfirm: () => false, responses: [response(200, { success: true, preview: {
+    selectedCount: 1, opportunityIds: ["ATE-1"], platformBreakdown: { addtoevent: 1 }, combinedQuotationValue: 500,
+    estimatedCredits: 6, blocked: [],
+  } })] });
+  context.instance.renderResults([{ _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 2, manualSelectionEligible: true }]);
+  context.instance.selectAllCurrentPage();
+  await context.instance.submitSelectedOpportunities();
+  assert.equal(context.calls.length, 1);
+  assert.deepEqual(context.instance.selectedReferences(), [{ id: "a", expectedVersion: 2 }]);
 });
 
 test("stale worker failure stops polling and re-enables the run button safely", async () => {

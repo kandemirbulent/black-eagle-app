@@ -1,6 +1,7 @@
 const WORKER_COMMAND = "npm run worker:once";
 const MANUAL_REVIEW_WORKER_COMMAND = "npm run worker:submit-manual-review";
-const ALLOWED_WORKER_COMMANDS = new Set([WORKER_COMMAND, MANUAL_REVIEW_WORKER_COMMAND]);
+const ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND = "npm run worker:submit-addtoevent";
+const ALLOWED_WORKER_COMMANDS = new Set([WORKER_COMMAND, MANUAL_REVIEW_WORKER_COMMAND, ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND]);
 const DEFAULT_RENDER_API_BASE_URL = "https://api.render.com/v1";
 const RENDER_TRIGGER_STAGE = "RENDER_TRIGGER";
 
@@ -296,6 +297,7 @@ module.exports = {
   RENDER_TRIGGER_STAGE,
   RenderTriggerError,
   MANUAL_REVIEW_WORKER_COMMAND,
+  ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND,
   WORKER_COMMAND,
   createRenderSalesAgentTrigger,
   createRenderSalesAgentJobStatusClient,

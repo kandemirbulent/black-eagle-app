@@ -4,7 +4,7 @@ const salesAgentRunSchema = new mongoose.Schema(
   {
     runType: {
       type: String,
-      enum: ["DISCOVERY", "MANUAL_REVIEW_RESUME"],
+      enum: ["DISCOVERY", "MANUAL_REVIEW_RESUME", "ADD_TO_EVENT_SUBMISSION"],
       default: "DISCOVERY",
       required: true,
       index: true,
@@ -91,6 +91,17 @@ const salesAgentRunSchema = new mongoose.Schema(
       alreadyQuoted: { type: Number, min: 0, default: 0 },
       remainingManualReview: { type: Number, min: 0, default: 0 },
       failedItems: { type: Number, min: 0, default: 0 },
+    },
+    submissionSelection: {
+      records: { type: [{
+        id: { type: mongoose.Schema.Types.ObjectId, ref: "SalesAgentOpportunityResult", required: true },
+        selectedVersion: { type: Number, min: 1, required: true },
+        opportunityId: { type: String, required: true, trim: true },
+        platform: { type: String, enum: ["addtoevent"], required: true },
+      }], default: [] },
+      selectedCount: { type: Number, min: 0, default: 0 },
+      approvedCreditCost: { type: Number, min: 0, default: 0 },
+      combinedQuotationValue: { type: Number, min: 0, default: 0 },
     },
   },
   { timestamps: true }
