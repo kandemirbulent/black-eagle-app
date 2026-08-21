@@ -38,6 +38,15 @@ const quoteSnapshotSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const platformCostEstimateSchema = new mongoose.Schema(
+  {
+    unit: { type: String, enum: ["CREDITS"], default: "CREDITS" },
+    status: { type: String, enum: ["KNOWN", "UNKNOWN"], default: "UNKNOWN" },
+    amount: { type: Number, min: 0, default: null },
+  },
+  { _id: false }
+);
+
 const salesAgentOpportunityResultSchema = new mongoose.Schema(
   {
     runId: {
@@ -62,6 +71,7 @@ const salesAgentOpportunityResultSchema = new mongoose.Schema(
     parkingCost: { type: Number, min: 0, default: 0 },
     accommodationCost: { type: Number, min: 0, default: 0 },
     finalPrice: { type: Number, min: 0, default: 0 },
+    platformCostEstimate: { type: platformCostEstimateSchema, default: () => ({}) },
     assumptions: { type: [String], default: [] },
     blockingReasons: { type: [String], default: [] },
     reviewCodes: { type: [String], default: [] },

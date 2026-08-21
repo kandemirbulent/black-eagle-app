@@ -527,8 +527,9 @@ test("results render staff, GBP price and identifiers", () => {
   assert.equal(cells[5].textContent, "Quote submitted");
   assert.equal(cells[6].textContent, "2 Waiter, 1 Bartender");
   assert.match(cells[7].textContent, /£300\.00/);
-  assert.equal(cells[8].textContent, "quote-1");
-  assert.equal(cells[10].children[0].textContent, "View Details");
+  assert.equal(cells[8].textContent, "—");
+  assert.equal(cells[9].textContent, "quote-1");
+  assert.equal(cells[11].children[0].textContent, "View Details");
 });
 
 test("empty results show the empty state", () => {
@@ -536,7 +537,31 @@ test("empty results show the empty state", () => {
   context.instance.renderResults([]);
   const row = context.documentRef.elements.salesAgentResultsTable.children[0];
   assert.equal(row.children[0].textContent, "No opportunity results yet.");
-  assert.equal(row.children[0].colSpan, 11);
+  assert.equal(row.children[0].colSpan, 12);
+});
+
+test("Add to Event rows keep customer quote and platform credits distinct", () => {
+  const context = controller();
+  context.instance.renderResults([
+    {
+      eventName: "Known credits", platform: "addtoevent", resultStatus: "READY", finalPrice: 420,
+      platformCostEstimate: { unit: "CREDITS", status: "KNOWN", amount: 8 },
+    },
+    {
+      eventName: "Unknown credits", platform: "addtoevent", resultStatus: "MANUAL_REVIEW", finalPrice: 350,
+      platformCostEstimate: { unit: "CREDITS", status: "UNKNOWN" },
+    },
+  ]);
+  const rows = context.documentRef.elements.salesAgentResultsTable.children;
+  assert.equal(rows[0].children[3].textContent, "Add to Event");
+  assert.match(rows[0].children[7].textContent, /£420\.00/);
+  assert.equal(rows[0].children[8].textContent, "8 credits");
+  assert.match(rows[1].children[7].textContent, /£350\.00/);
+  assert.equal(rows[1].children[8].textContent, "UNKNOWN");
+  rows[1].children[11].children[0].click();
+  const detailText = flattenText(context.documentRef.elements.salesAgentDetailsContent);
+  assert.match(detailText, /Customer quote\s+£350\.00/);
+  assert.match(detailText, /Credits required\s+UNKNOWN/);
 });
 
 test("selection checkboxes enforce policy, select visible eligible rows, allow deselection, and clear", () => {
@@ -649,7 +674,7 @@ test("queued cards remain current while canonical pending previous result is dis
   assert.equal(context.documentRef.elements.salesAgentCurrentStatus.textContent, "QUEUED");
   assert.equal(row.children[4].textContent, "PENDING");
   assert.equal(row.children[5].textContent, "Quote submitted");
-  assert.equal(row.children[8].textContent, "1677448a-d2ba-4512-8f13-dacdfaafdbec");
+  assert.equal(row.children[9].textContent, "1677448a-d2ba-4512-8f13-dacdfaafdbec");
 });
 
 test("current run partial results require the explicit view action", async () => {
@@ -796,7 +821,7 @@ test("manual review summary and details show reasons, assumptions, staffing and 
   context.instance.renderResults([result]);
   const row = context.documentRef.elements.salesAgentResultsTable.children[0];
   assert.equal(row.children[5].textContent, "Travel cannot be priced safely. (+1 more)");
-  row.children[10].children[0].click();
+  row.children[11].children[0].click();
   const detailText = flattenText(context.documentRef.elements.salesAgentDetailsContent);
   assert.match(detailText, /manual review is required/i);
   assert.match(detailText, /Travel cannot be priced safely/);
@@ -822,7 +847,7 @@ test("review summaries handle long, missing, sent, failed and skipped results sa
   assert.equal(rows[1].children[5].textContent, "Manual review required; no reason was recorded.");
   assert.equal(rows[2].children[5].textContent, "Quote submitted");
   assert.equal(rows[3].children[5].textContent, "Quote submitted");
-  assert.equal(rows[3].children[8].textContent, "verified-quote");
+  assert.equal(rows[3].children[9].textContent, "verified-quote");
   assert.equal(rows[4].children[5].textContent, "Sensitive or technical error details were withheld.");
   assert.equal(rows[5].children[5].textContent, "Opportunity was already quoted.");
 });

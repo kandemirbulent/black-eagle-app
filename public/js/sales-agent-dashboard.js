@@ -41,6 +41,24 @@
     return normalized || fallback;
   }
 
+  function formatPlatform(value) {
+    const platform = String(value || "").toLowerCase().replace(/[\s_-]+/g, "");
+    if (platform === "addtoevent") return "Add to Event";
+    if (platform === "togather") return "Togather";
+    if (platform === "poptop") return "Poptop";
+    return text(value);
+  }
+
+  function formatCredits(result) {
+    const platform = String(result?.platform || "").toLowerCase().replace(/[\s_-]+/g, "");
+    if (platform !== "addtoevent") return "—";
+    const estimate = result?.platformCostEstimate;
+    const amount = Number(estimate?.amount);
+    return String(estimate?.status || "").toUpperCase() === "KNOWN" && Number.isFinite(amount) && amount >= 0
+      ? `${amount} credits`
+      : "UNKNOWN";
+  }
+
   function safeOperationalText(value) {
     const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
     if (!normalized) return "";
@@ -303,7 +321,7 @@
         detailSection("Basic Information", [
           ["Event name", result?.eventName],
           ["Opportunity ID", result?.opportunityId],
-          ["Platform", text(result?.platform).toUpperCase()],
+          ["Platform", formatPlatform(result?.platform)],
           ["Event date", formatDateTime(result?.eventDate)],
           ["Location", result?.location],
           ["Analysis status", result?.analysisStatus],
@@ -346,7 +364,8 @@
           ["Vehicle cost", formatPrice(result?.vehicleCost)],
           ["Parking cost", formatPrice(result?.parkingCost)],
           ["Accommodation cost", formatPrice(result?.accommodationCost)],
-          ["Final price", formatPrice(result?.finalPrice)]
+          ["Customer quote", formatPrice(result?.finalPrice)],
+          ["Credits required", formatCredits(result)]
         ])
       );
       elements.detailsContent.appendChild(
@@ -413,7 +432,7 @@
       if (!resultsToRender.length) {
         const row = documentRef.createElement("tr");
         const cell = documentRef.createElement("td");
-        cell.colSpan = 11;
+        cell.colSpan = 12;
         cell.textContent = "No opportunity results yet.";
         row.appendChild(cell);
         elements.resultsTable.appendChild(row);
@@ -443,11 +462,12 @@
         const values = [
           text(result?.eventName),
           text(result?.opportunityId),
-          text(result?.platform).toUpperCase(),
+          formatPlatform(result?.platform),
           text(result?.resultStatus || result?.analysisStatus),
           reviewReason(result),
           staffText(result?.staffBreakdown),
           formatPrice(result?.manualOverrides?.finalPrice ?? result?.finalPrice),
+          formatCredits(result),
           text(result?.quoteUuid),
           formatDateTime(result?.updatedAt || result?.createdAt)
         ];

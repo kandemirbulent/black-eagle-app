@@ -529,6 +529,7 @@ const eligibleAddToEvent = (overrides = {}) => ({
   manualSubmissionEligible: true,
   recordVersion: 1,
   finalPrice: 500,
+  platformCostEstimate: { unit: "CREDITS", status: "KNOWN", amount: 8 },
   quoteSnapshot: { calculatedPrice: 500, estimatedRevenue: 500, estimatedProfit: 150 },
   manualOverrides: {},
   resultStatus: "QUOTE_READY",
@@ -601,6 +602,8 @@ test("selection preview is exact, versioned, and performs no worker or platform 
   assert.equal(body.preview.selectedCount, 2);
   assert.deepEqual(body.preview.opportunityIds, ["ATE-1", "ATE-2"]);
   assert.equal(body.preview.combinedQuotationValue, 750);
+  assert.equal(body.preview.records[0].finalPrice, 500);
+  assert.deepEqual(body.preview.records[0].platformCostEstimate, { unit: "CREDITS", status: "KNOWN", amount: 8 });
   assert.equal(body.preview.estimatedProfit, 200);
   assert.equal(body.preview.blocked[0].code, "UNAVAILABLE");
   assert.equal(body.preview.noSubmission, true);
