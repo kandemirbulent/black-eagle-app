@@ -564,8 +564,11 @@ test("Add to Event rows keep customer quote and platform credits distinct", () =
   assert.match(detailText, /Credits required\s+UNKNOWN/);
 });
 
-test("selection checkboxes enforce policy, select visible eligible rows, allow deselection, and clear", () => {
-  const context = controller();
+test("selection checkboxes persist, survive rerender/list reload, remain visible, and unselect cleanly", async () => {
+  const context = controller({ responses: [
+    response(200, { success: true, selected: true, opportunity: { selectedVersion: 1 } }),
+    response(200, { success: true, selected: false, opportunity: { selectedVersion: null } }),
+  ] });
   context.documentRef.elements.salesAgentPlatformFilter.value = "addtoevent";
   context.instance.renderResults([
     { _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 1, manualSelectionEligible: true },
@@ -578,16 +581,24 @@ test("selection checkboxes enforce policy, select visible eligible rows, allow d
   assert.equal(rows[0].children[0].children[0].checked, false);
   assert.equal(rows[0].children[0].children[0].disabled, false);
   assert.equal(rows[1].children[0].children[0].disabled, true);
-  context.instance.selectAllCurrentPage();
+  await context.instance.selectAllCurrentPage();
   assert.deepEqual(context.instance.selectedReferences(), [{ id: "a", expectedVersion: 1 }]);
+  assert.equal(context.calls[0].url, "/api/admin/sales-agent/opportunities/selection");
+  assert.equal(JSON.parse(context.calls[0].options.body).selected, true);
+  context.instance.renderResults([
+    { _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 1, selectedVersion: 1, manualSelectionEligible: true },
+    { _id: "c", opportunityId: "ATE-2", platform: "addtoevent", recordVersion: 1, manualSelectionEligible: false },
+  ]);
+  assert.deepEqual(context.instance.selectedReferences(), [{ id: "a", expectedVersion: 1 }]);
+  assert.equal(context.documentRef.elements.salesAgentResultsTable.children.length, 2);
+  assert.equal(context.documentRef.elements.salesAgentResultsTable.children[0].children[0].children[0].checked, true);
   const selectedCheckbox = context.documentRef.elements.salesAgentResultsTable.children[0].children[0].children[0];
   selectedCheckbox.checked = false;
-  selectedCheckbox.listeners.change();
+  await selectedCheckbox.listeners.change();
   assert.deepEqual(context.instance.selectedReferences(), []);
-  context.instance.selectAllCurrentPage();
-  context.instance.clearOpportunitySelection();
-  assert.deepEqual(context.instance.selectedReferences(), []);
+  assert.equal(JSON.parse(context.calls[1].options.body).selected, false);
   assert.equal(context.documentRef.elements.selectedOpportunityCount.textContent, "0 selected");
+  assert.equal(context.calls.some((call) => /submit-selected/.test(call.url)), false);
 });
 
 test("Submit Selected Quotes previews count/credits then posts only exact selected versions", async () => {
@@ -598,9 +609,8 @@ test("Submit Selected Quotes previews count/credits then posts only exact select
   response(200, { success: true, runs: [] }), response(200, { success: true, status: "IDLE", run: null }),
   response(200, { success: true, runs: [] })] });
   context.instance.renderResults([
-    { _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 2, manualSelectionEligible: true },
+    { _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 2, selectedVersion: 2, manualSelectionEligible: true },
   ]);
-  context.instance.selectAllCurrentPage();
   await context.instance.submitSelectedOpportunities();
   assert.equal(context.calls.length, 5);
   assert.equal(context.calls[0].url, "/api/admin/sales-agent/opportunities/selection-preview");
@@ -616,8 +626,7 @@ test("submission confirmation refusal performs no submit request and preserves s
     selectedCount: 1, opportunityIds: ["ATE-1"], platformBreakdown: { addtoevent: 1 }, combinedQuotationValue: 500,
     estimatedCredits: 6, blocked: [],
   } })] });
-  context.instance.renderResults([{ _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 2, manualSelectionEligible: true }]);
-  context.instance.selectAllCurrentPage();
+  context.instance.renderResults([{ _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 2, selectedVersion: 2, manualSelectionEligible: true }]);
   await context.instance.submitSelectedOpportunities();
   assert.equal(context.calls.length, 1);
   assert.deepEqual(context.instance.selectedReferences(), [{ id: "a", expectedVersion: 2 }]);

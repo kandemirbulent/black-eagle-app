@@ -400,24 +400,48 @@
       if (elements.clearSelection) elements.clearSelection.disabled = count === 0;
     }
 
-    function clearOpportunitySelection() {
-      selectedOpportunities.clear();
+    async function persistOpportunitySelection(result, selected) {
+      const id = String(result?._id || "");
+      const expectedVersion = Number(result?.recordVersion);
+      if (!id || !Number.isInteger(expectedVersion)) return false;
+      const response = await requestJson("/api/admin/sales-agent/opportunities/selection", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ records: [{ id, expectedVersion }], selected })
+      });
+      if (!response.response.ok || response.payload.success === false) return false;
+      result.selectedVersion = selected ? expectedVersion : null;
+      if (selected) selectedOpportunities.set(id, { id, expectedVersion, result });
+      else selectedOpportunities.delete(id);
+      updateSelectionToolbar();
+      return true;
+    }
+
+    async function clearOpportunitySelection() {
+      const selected = [...selectedOpportunities.values()];
+      await Promise.all(selected.map((item) => persistOpportunitySelection(item.result, false)));
       renderResults(currentResults, { preserveSelection: true });
     }
 
-    function selectAllCurrentPage() {
+    async function selectAllCurrentPage() {
       for (const result of visibleResults()) {
         const id = String(result?._id || "");
-        if (id && result?.manualSelectionEligible === true) {
-          selectedOpportunities.set(id, { id, expectedVersion: Number(result.recordVersion), result });
-        }
+        if (id && result?.manualSelectionEligible === true && !selectedOpportunities.has(id)) await persistOpportunitySelection(result, true);
       }
       renderResults(currentResults, { preserveSelection: true });
     }
 
     function renderResults(results, { preserveSelection = false } = {}) {
       currentResults = Array.isArray(results) ? results : [];
-      if (!preserveSelection) selectedOpportunities.clear();
+      if (!preserveSelection) {
+        selectedOpportunities.clear();
+        for (const result of currentResults) {
+          const id = String(result?._id || "");
+          const version = Number(result?.recordVersion);
+          if (id && Number(result?.selectedVersion) === version && result?.manualSelectionEligible === true) {
+            selectedOpportunities.set(id, { id, expectedVersion: version, result });
+          }
+        }
+      }
       elements.resultsTable.replaceChildren();
       displayedResultsCount = currentResults.length;
       displayedManualReviewCount = currentResults.length
@@ -449,12 +473,12 @@
         checkbox.disabled = result?.manualSelectionEligible !== true;
         checkbox.title = result?.manualSelectionBlocker || "Select opportunity";
         checkbox.setAttribute?.("aria-label", `Select opportunity ${text(result?.opportunityId)}`);
-        checkbox.addEventListener("change", () => {
-          if (checkbox.checked && !checkbox.disabled) {
-            selectedOpportunities.set(recordId, { id: recordId, expectedVersion: Number(result.recordVersion), result });
-          } else {
-            selectedOpportunities.delete(recordId);
-          }
+        checkbox.addEventListener("change", async () => {
+          const requested = checkbox.checked && !checkbox.disabled;
+          checkbox.disabled = true;
+          const saved = await persistOpportunitySelection(result, requested).catch(() => false);
+          if (!saved) checkbox.checked = !requested;
+          checkbox.disabled = result?.manualSelectionEligible !== true;
           updateSelectionToolbar();
         });
         selectionCell.appendChild(checkbox);
@@ -1076,7 +1100,7 @@
       elements.manualReviewButton?.addEventListener("click", submitManualReviews);
       elements.viewCurrentPartialButton?.addEventListener("click", viewCurrentPartialResults);
       elements.cancelRunButton?.addEventListener("click", cancelCurrentRun);
-      elements.platformFilter?.addEventListener("change", clearOpportunitySelection);
+      elements.platformFilter?.addEventListener("change", () => renderResults(currentResults, { preserveSelection: true }));
       elements.selectCurrentPage?.addEventListener("click", selectAllCurrentPage);
       elements.clearSelection?.addEventListener("click", clearOpportunitySelection);
       elements.previewSelected?.addEventListener("click", () => previewSelection(false));

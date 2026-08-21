@@ -612,8 +612,39 @@ test("selection preview is exact, versioned, and performs no worker or platform 
   assert.equal(state.triggerCalls.length, 0);
 }));
 
-test("selected Add to Event submission persists exact IDs and versions before triggering worker", () => withServer(async ({ request, state }) => {
+test("checkbox selection persists exact version and unselect clears only selection fields", () => withServer(async ({ request, state }) => {
+  state.results.push(eligibleAddToEvent({ approvalStatus: "NOT_REVIEWED", resultStatus: "READY" }));
+  const selected = await request("/api/admin/sales-agent/opportunities/selection", jsonOptions("admin", "POST", {
+    records: [{ id: "64f000000000000000000001", expectedVersion: 1 }], selected: true,
+  }));
+  const selectedBody = await selected.json();
+  assert.equal(selected.status, 200);
+  assert.equal(selectedBody.selected, true);
+  assert.equal(state.results[0].selectedVersion, 1);
+  assert.equal(state.results[0].resultStatus, "READY");
+  assert.equal(state.results[0].runId, "64d000000000000000000001");
+  assert.equal(state.triggerCalls.length, 0);
+  const cleared = await request("/api/admin/sales-agent/opportunities/selection", jsonOptions("admin", "POST", {
+    records: [{ id: "64f000000000000000000001", expectedVersion: 1 }], selected: false,
+  }));
+  assert.equal(cleared.status, 200);
+  assert.equal(state.results[0].selectedVersion, null);
+  assert.equal(state.results[0].resultStatus, "READY");
+  assert.equal(state.triggerCalls.length, 0);
+}));
+
+test("submission rejects request-body selection without persisted backend selection", () => withServer(async ({ request, state }) => {
   state.results.push(eligibleAddToEvent({ resultStatus: "READY" }));
+  const response = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", {
+    records: [{ id: "64f000000000000000000001", expectedVersion: 1 }],
+  }));
+  assert.equal(response.status, 409);
+  assert.equal((await response.json()).code, "PERSISTED_SELECTION_REQUIRED");
+  assert.equal(state.triggerCalls.length, 0);
+}));
+
+test("selected Add to Event submission persists exact IDs and versions before triggering worker", () => withServer(async ({ request, state }) => {
+  state.results.push(eligibleAddToEvent({ resultStatus: "READY", selectedVersion: 1 }));
   const empty = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", { records: [] }));
   assert.equal((await empty.json()).code, "OPPORTUNITY_SELECTION_REQUIRED");
   const response = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", {

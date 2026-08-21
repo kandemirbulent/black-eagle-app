@@ -587,6 +587,41 @@ function createSalesAgentRouter({
     });
   });
 
+  router.post("/admin/sales-agent/opportunities/selection", requireAdminAuth, async (req, res) => {
+    const validation = validateRecordReferences(req.body?.records);
+    if (validation.error) return res.status(400).json({ success: false, code: validation.error });
+    if (validation.records.length !== 1 || typeof req.body?.selected !== "boolean") {
+      return res.status(400).json({ success: false, code: "SINGLE_SELECTION_UPDATE_REQUIRED" });
+    }
+    const reference = validation.records[0];
+    const existing = await SalesAgentOpportunityResult.findById(reference.id).lean();
+    if (!existing) return res.status(404).json({ success: false, code: "OPPORTUNITY_NOT_FOUND" });
+    if (Number(existing.recordVersion) !== reference.expectedVersion) {
+      return res.status(409).json({ success: false, code: "OPPORTUNITY_VERSION_CONFLICT" });
+    }
+    if (req.body.selected) {
+      const policy = opportunitySelectionPolicy(existing);
+      if (!policy.manualSelectionEligible || canonicalStatus(existing) !== "READY") {
+        return res.status(409).json({ success: false, code: policy.manualSelectionBlocker || "STATUS_NOT_READY" });
+      }
+    }
+    const updated = await SalesAgentOpportunityResult.findOneAndUpdate(
+      { _id: reference.id, recordVersion: reference.expectedVersion },
+      { $set: req.body.selected ? {
+        selectedVersion: reference.expectedVersion,
+        selectionSelectedAt: now(),
+        selectionSelectedBy: String(req.adminUser._id),
+      } : {
+        selectedVersion: null,
+        selectionSelectedAt: null,
+        selectionSelectedBy: "",
+      } },
+      { new: true, runValidators: true }
+    ).lean();
+    if (!updated) return res.status(409).json({ success: false, code: "OPPORTUNITY_VERSION_CONFLICT" });
+    return res.json({ success: true, selected: req.body.selected, opportunity: serializeOpportunity(updated) });
+  });
+
   router.post("/admin/sales-agent/opportunities/submit-selected", requireAdminAuth, async (req, res) => {
     const validation = validateRecordReferences(req.body?.records);
     if (validation.error) return res.status(400).json({ success: false, code: validation.error });
@@ -595,6 +630,7 @@ function createSalesAgentRouter({
       const existing = await SalesAgentOpportunityResult.findById(reference.id).lean();
       if (!existing) return res.status(404).json({ success: false, code: "OPPORTUNITY_NOT_FOUND" });
       if (Number(existing.recordVersion) !== reference.expectedVersion) return res.status(409).json({ success: false, code: "OPPORTUNITY_VERSION_CONFLICT" });
+      if (Number(existing.selectedVersion) !== reference.expectedVersion) return res.status(409).json({ success: false, code: "PERSISTED_SELECTION_REQUIRED" });
       const policy = opportunitySelectionPolicy(existing);
       if (!policy.manualSelectionEligible || canonicalStatus(existing) !== "READY") {
         return res.status(409).json({ success: false, code: policy.manualSelectionBlocker || "STATUS_NOT_READY" });
@@ -621,7 +657,7 @@ function createSalesAgentRouter({
       for (const item of selected) {
         const locked = await SalesAgentOpportunityResult.findOneAndUpdate(
           { _id: item.reference.id, recordVersion: item.reference.expectedVersion, submissionLock: null },
-          { $set: { approvalStatus: "APPROVED", selectedVersion: item.reference.expectedVersion, submissionLock: { runId: run._id, selectedAt: now(), selectedBy: String(req.adminUser._id) } } },
+          { $set: { approvalStatus: "APPROVED", submissionLock: { runId: run._id, selectedAt: now(), selectedBy: String(req.adminUser._id) } } },
           { new: true, runValidators: true }
         ).lean();
         if (!locked) {

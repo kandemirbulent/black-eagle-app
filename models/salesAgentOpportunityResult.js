@@ -93,6 +93,8 @@ const salesAgentOpportunityResultSchema = new mongoose.Schema(
     manualSubmissionEligible: { type: Boolean, default: false },
     recordVersion: { type: Number, min: 1, default: 1 },
     selectedVersion: { type: Number, min: 1, default: null },
+    selectionSelectedAt: { type: Date, default: null },
+    selectionSelectedBy: { type: String, trim: true, default: "" },
     lastEditedAt: { type: Date, default: null },
     lastEditedBy: { type: String, trim: true, default: "" },
     manualOverrides: { type: manualOverridesSchema, default: () => ({}) },
