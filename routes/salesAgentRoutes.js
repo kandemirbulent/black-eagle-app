@@ -330,6 +330,27 @@ function createSalesAgentRouter({
     return value;
   }
 
+  async function releaseFailedAddToEventSubmissionLocks(results = []) {
+    for (const result of results) {
+      const lockRunId = result?.submissionLock?.runId;
+      const hasVerifiedQuote = result?.quoteSubmitted === true
+        || Boolean(String(result?.verifiedQuoteUuid || result?.quoteUuid || "").trim());
+      if (normalizePlatform(result?.platform) !== "addtoevent" || !lockRunId || hasVerifiedQuote) continue;
+      const run = await SalesAgentRun.findById(lockRunId).lean();
+      const terminal = ["COMPLETED", "FAILED", "CANCELED"].includes(String(run?.status || "").toUpperCase());
+      const noPlatformAction = Number(run?.totals?.platformActions || 0) === 0
+        && Number(run?.totals?.quotesSubmitted || 0) === 0;
+      if (!terminal || !noPlatformAction || run?.runType !== "ADD_TO_EVENT_SUBMISSION") continue;
+      const cleared = await SalesAgentOpportunityResult.findOneAndUpdate(
+        { _id: result._id, recordVersion: result.recordVersion, "submissionLock.runId": lockRunId },
+        { $set: { submissionLock: null, selectedVersion: null, selectionSelectedAt: null, selectionSelectedBy: "" } },
+        { new: true, runValidators: true }
+      ).lean();
+      if (cleared) Object.assign(result, cleared);
+    }
+    return results;
+  }
+
   async function reconcileRun(run, renderOverride = null) {
     if (!run) return run;
     const localStatus = String(run.status).toUpperCase();
@@ -962,6 +983,7 @@ function createSalesAgentRouter({
     if (!run) return res.status(404).json({ success: false, code: "SALES_AGENT_RUN_NOT_FOUND" });
     const results = await SalesAgentOpportunityResult.find({ runId: req.params.runId })
       .sort({ createdAt: 1 }).lean();
+    await releaseFailedAddToEventSubmissionLocks(results);
     if (req.query.canonicalLatest !== "true" || !results.length) {
       return res.json({ success: true, results: results.map(serializeOpportunity) });
     }

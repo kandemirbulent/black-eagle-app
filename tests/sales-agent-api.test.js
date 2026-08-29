@@ -547,6 +547,34 @@ test("manual selection policy blocks Togather and terminal or unavailable opport
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ expiresAt: "2000-01-01T00:00:00.000Z" })).manualSelectionBlocker, "EXPIRED");
 });
 
+test("failed Add to Event submissions without a platform action release selection while verified quotes stay protected", () => withServer(async ({ request, state }) => {
+  const sourceRunId = "64d000000000000000000001";
+  const failedRunId = "64c000000000000000000099";
+  state.runs.push({
+    _id: sourceRunId, runType: "DISCOVERY", status: "COMPLETED", activeLock: `released:${sourceRunId}`,
+  }, {
+    _id: failedRunId, runType: "ADD_TO_EVENT_SUBMISSION", status: "COMPLETED", activeLock: `released:${failedRunId}`,
+    totals: { opportunitiesFound: 1, quotesSubmitted: 0, failed: 1, platformActions: 0 },
+  });
+  state.results.push(
+    eligibleAddToEvent({ submissionLock: { runId: failedRunId }, selectedVersion: 1 }),
+    eligibleAddToEvent({
+      _id: "64f000000000000000000002", opportunityId: "ATE-VERIFIED", submissionLock: { runId: failedRunId },
+      selectedVersion: 1, quoteSubmitted: true, verifiedQuoteUuid: "verified-quote",
+    })
+  );
+
+  const response = await request(`/api/admin/sales-agent/runs/${sourceRunId}/results`, jsonOptions("admin"));
+  const body = await response.json();
+
+  assert.equal(body.results[0].manualSelectionEligible, true);
+  assert.equal(state.results[0].submissionLock, null);
+  assert.equal(state.results[0].selectedVersion, null);
+  assert.equal(body.results[1].manualSelectionEligible, false);
+  assert.deepEqual(state.results[1].submissionLock, { runId: failedRunId });
+  assert.equal(state.triggerCalls.length, 0);
+}));
+
 test("opportunity edit requires exact ID/version, rejects operators, and increments atomically", () => withServer(async ({ request, state }) => {
   state.results.push(eligibleAddToEvent());
   const invalid = await request("/api/admin/sales-agent/opportunities/bad", jsonOptions("admin", "PATCH", { expectedVersion: 1, finalPrice: 450 }));
