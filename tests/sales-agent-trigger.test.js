@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
   DEFAULT_RENDER_API_BASE_URL,
+  ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND,
   MANUAL_REVIEW_WORKER_COMMAND,
   WORKER_COMMAND,
   createRenderSalesAgentTrigger,
@@ -43,6 +44,22 @@ test("successful One-Off Job creation uses the official endpoint and supported p
   assert.deepEqual(JSON.parse(calls[0].options.body), {
     startCommand: WORKER_COMMAND,
     planId: "plan-srv-006",
+  });
+});
+
+test("Add to Event submission enables its feature flag only in the One-Off Job command", async () => {
+  const calls = [];
+  const trigger = createRenderSalesAgentTrigger({
+    env: baseEnv,
+    now: fixedNow,
+    fetchFn: async (url, options) => {
+      calls.push({ url, options });
+      return response(201, "Created", { id: "job-addtoevent" });
+    },
+  });
+  assert.deepEqual(await trigger({ startCommand: ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND }), { jobId: "job-addtoevent" });
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    startCommand: "ADD_TO_EVENT_SUBMIT_ENABLED=true npm run worker:submit-addtoevent",
   });
 });
 

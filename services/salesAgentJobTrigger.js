@@ -105,7 +105,10 @@ function createRenderSalesAgentTrigger({
           requestTimestamp,
         });
       }
-      const body = { startCommand };
+      const effectiveStartCommand = startCommand === ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND
+        ? `ADD_TO_EVENT_SUBMIT_ENABLED=true ${startCommand}`
+        : startCommand;
+      const body = { startCommand: effectiveStartCommand };
       const planId = String(env.RENDER_SALES_AGENT_JOB_PLAN_ID || "").trim();
       if (planId) body.planId = planId;
       let response;
