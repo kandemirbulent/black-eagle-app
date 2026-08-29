@@ -128,7 +128,7 @@
     documentRef,
     setIntervalFn = setInterval,
     clearIntervalFn = clearInterval,
-    confirmFn = (message) => globalThis.confirm?.(message) !== false
+    confirmFn = null
   }) {
     const byId = (id) => documentRef.getElementById(id);
     function diagnosticElement(id, label) {
@@ -202,6 +202,8 @@
     let manualPollingTimer = null;
     let currentResults = [];
     let cancellationInProgress = false;
+    let submissionInProgress = false;
+    let pendingDetailsConfirmation = null;
     const selectedOpportunities = new Map();
 
     function showRetryError(message) {
@@ -289,6 +291,8 @@
     }
 
     function closeDetails() {
+      pendingDetailsConfirmation?.(false);
+      pendingDetailsConfirmation = null;
       elements.detailsModal?.classList.add("hidden");
       elements.detailsContent?.replaceChildren();
     }
@@ -544,24 +548,60 @@
       return result.payload.preview;
     }
 
-    async function submitSelectedOpportunities() {
-      const preview = await previewSelection(true);
-      if (!preview || preview.blocked?.length || preview.selectedCount !== selectedOpportunities.size) return null;
-      const confirmation = `Submit ${preview.selectedCount} selected Add to Event quotes? Estimated cost: ${safeNumber(preview.estimatedCredits)} credits. This may consume platform credits.`;
-      if (!confirmFn(confirmation)) return null;
-      const result = await requestJson("/api/admin/sales-agent/opportunities/submit-selected", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ records: selectedReferences() })
+    function confirmSelectedSubmission(message) {
+      if (typeof confirmFn === "function") return Promise.resolve(confirmFn(message));
+      return new Promise((resolve) => {
+        let settled = false;
+        const settle = (confirmed) => {
+          if (settled) return;
+          settled = true;
+          pendingDetailsConfirmation = null;
+          resolve(confirmed);
+        };
+        pendingDetailsConfirmation = settle;
+        const actions = createElement("div", undefined, "sales-agent-detail-actions");
+        const cancelButton = createElement("button", "Cancel", "button secondary");
+        cancelButton.type = "button";
+        cancelButton.addEventListener("click", () => settle(false));
+        const confirmButton = createElement("button", "Confirm Submission", "button primary");
+        confirmButton.type = "button";
+        confirmButton.addEventListener("click", () => {
+          confirmButton.disabled = true;
+          settle(true);
+        });
+        actions.appendChild(cancelButton);
+        actions.appendChild(confirmButton);
+        elements.detailsContent.appendChild(createElement("p", message));
+        elements.detailsContent.appendChild(actions);
       });
-      if (!result.response.ok || result.payload.success === false) {
-        showMessage("Selected quotes were not queued. Refresh and review the current versions.", "error");
-        return null;
+    }
+
+    async function submitSelectedOpportunities() {
+      if (submissionInProgress) return null;
+      submissionInProgress = true;
+      if (elements.submitSelected) elements.submitSelected.disabled = true;
+      try {
+        const preview = await previewSelection(true);
+        if (!preview || preview.blocked?.length || preview.selectedCount !== selectedOpportunities.size) return null;
+        const confirmation = `Submit ${preview.selectedCount} selected Add to Event quotes? Estimated cost: ${safeNumber(preview.estimatedCredits)} credits. This may consume platform credits.`;
+        if (!await confirmSelectedSubmission(confirmation)) return null;
+        const result = await requestJson("/api/admin/sales-agent/opportunities/submit-selected", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ records: selectedReferences() })
+        });
+        if (!result.response.ok || result.payload.success === false) {
+          showMessage("Selected quotes were not queued. Refresh and review the current versions.", "error");
+          return null;
+        }
+        selectedOpportunities.clear();
+        closeDetails();
+        showMessage(`${result.payload.selectedCount} selected quotes queued with an estimated cost of ${safeNumber(result.payload.estimatedCredits)} credits.`);
+        await refresh();
+        return result.payload;
+      } finally {
+        submissionInProgress = false;
+        updateSelectionToolbar();
       }
-      selectedOpportunities.clear();
-      closeDetails();
-      showMessage(`${result.payload.selectedCount} selected quotes queued with an estimated cost of ${safeNumber(result.payload.estimatedCredits)} credits.`);
-      await refresh();
-      return result.payload;
     }
 
     async function updateSelectedStatus(targetStatus) {

@@ -141,7 +141,7 @@ function queuedFetch(entries, calls) {
   };
 }
 
-function controller({ responses = [], setIntervalFn, clearIntervalFn, onConfirm } = {}) {
+function controller({ responses = [], setIntervalFn, clearIntervalFn, onConfirm, modalConfirmation = false } = {}) {
   const documentRef = fakeDocument();
   const calls = [];
   const messages = [];
@@ -152,7 +152,7 @@ function controller({ responses = [], setIntervalFn, clearIntervalFn, onConfirm 
     documentRef,
     setIntervalFn,
     clearIntervalFn,
-    confirmFn: (message) => {
+    confirmFn: modalConfirmation ? null : (message) => {
       confirmations.push(message);
       return onConfirm ? onConfirm(message, documentRef) : true;
     },
@@ -619,6 +619,29 @@ test("Submit Selected Quotes previews count/credits then posts only exact select
   assert.deepEqual(JSON.parse(context.calls[1].options.body), { records: [{ id: "a", expectedVersion: 2 }] });
   assert.match(context.confirmations[0], /1 selected.*6 credits/i);
   assert.deepEqual(context.instance.selectedReferences(), []);
+});
+
+test("Submit Selected Quotes uses one in-page confirmation and queues only once", async () => {
+  const context = controller({ modalConfirmation: true, responses: [response(200, { success: true, preview: {
+    selectedCount: 1, opportunityIds: ["ATE-1"], platformBreakdown: { addtoevent: 1 },
+    combinedQuotationValue: 500, estimatedCredits: 6, blocked: [],
+  } }), response(201, { success: true, selectedCount: 1, estimatedCredits: 6, run: { _id: "submission-1" } }),
+  response(200, { success: true, runs: [] }), response(200, { success: true, status: "IDLE", run: null }),
+  response(200, { success: true, runs: [] })] });
+  context.instance.renderResults([
+    { _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 2, selectedVersion: 2, manualSelectionEligible: true },
+  ]);
+  const pending = context.instance.submitSelectedOpportunities();
+  await new Promise((resolve) => setImmediate(resolve));
+  const confirmButton = context.documentRef.elements.salesAgentDetailsContent.children
+    .flatMap((child) => child.children || [])
+    .find((child) => child.textContent === "Confirm Submission");
+  assert.ok(confirmButton);
+  confirmButton.click();
+  confirmButton.click();
+  await pending;
+  assert.equal(context.calls.filter((call) => /submit-selected/.test(call.url)).length, 1);
+  assert.equal(context.confirmations.length, 0);
 });
 
 test("submission confirmation refusal performs no submit request and preserves selection", async () => {
