@@ -664,6 +664,36 @@ test("selected Add to Event submission persists exact IDs and versions before tr
   assert.equal(state.triggerCalls.at(-1).startCommand, "npm run worker:submit-addtoevent");
 }));
 
+test("selected Add to Event submission reconciles a failed stale job and triggers one replacement job", () => withServer(async ({ request, state }) => {
+  state.results.push(eligibleAddToEvent({ resultStatus: "READY", selectedVersion: 1 }));
+  const response = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", {
+    records: [{ id: "64f000000000000000000001", expectedVersion: 1 }],
+  }));
+  assert.equal(response.status, 201);
+  assert.equal(state.runs[0].status, "FAILED");
+  assert.match(state.runs[0].activeLock, /^released:/);
+  assert.equal(state.runs.at(-1).runType, "ADD_TO_EVENT_SUBMISSION");
+  assert.equal(state.triggerCalls.length, 1);
+  assert.equal(state.triggerCalls[0].startCommand, "npm run worker:submit-addtoevent");
+}, {
+  initialRuns: [{
+    _id: "64c000000000000000000099",
+    runType: "ADD_TO_EVENT_SUBMISSION",
+    status: "QUEUED",
+    activeLock: "global",
+    renderJobId: "job-stale-failed",
+    renderServiceId: "srv_test_sales_agent",
+    createdAt: "2026-07-31T10:00:00.000Z",
+    updatedAt: "2026-07-31T11:00:00.000Z",
+  }],
+  now: fixedApiNow,
+  getRenderJobStatus: async () => ({
+    status: "failed",
+    checkedAt: fixedApiNow().toISOString(),
+    finishedAt: fixedApiNow().toISOString(),
+  }),
+}));
+
 test("submission backend rejects non-READY and stale selected records before worker trigger", () => withServer(async ({ request, state }) => {
   state.results.push(eligibleAddToEvent({ resultStatus: "MANUAL_REVIEW" }));
   const blocked = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", {

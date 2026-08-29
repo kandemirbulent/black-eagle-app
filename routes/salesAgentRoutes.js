@@ -641,6 +641,17 @@ function createSalesAgentRouter({
       }
       selected.push({ record: existing, reference, price: currentQuotePrice(existing), credits: Number(credits.amount) });
     }
+    const activeSubmissionRun = await SalesAgentRun.findOne({
+      runType: "ADD_TO_EVENT_SUBMISSION",
+      status: { $in: ["QUEUED", "RUNNING"] },
+      activeLock: "global",
+    }).sort({ createdAt: -1 }).lean();
+    if (activeSubmissionRun) {
+      const reconciled = await reconcileRun(activeSubmissionRun);
+      if (["QUEUED", "RUNNING"].includes(String(reconciled?.status || "").toUpperCase())) {
+        return res.status(409).json({ success: false, code: "ADD_TO_EVENT_SUBMISSION_ALREADY_ACTIVE" });
+      }
+    }
     let run;
     const lockedIds = [];
     try {
