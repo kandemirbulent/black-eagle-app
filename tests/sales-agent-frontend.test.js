@@ -8,6 +8,7 @@ test("dashboard contains the separate manual review submission controls", () => 
   const html = fs.readFileSync(path.join(__dirname, "../public/dashboard.html"), "utf8");
   assert.match(html, /id="runSalesAgentButton">Run Sales Agent</);
   assert.match(html, /id="submitManualReviewsButton"[^>]*>Submit Manual Reviews</);
+  assert.match(html, /confirmFn:\s*window\.confirm\.bind\(window\)/);
   for (const id of [
     "manualReviewSelectedRun",
     "manualReviewSelectedCount",
@@ -289,6 +290,26 @@ test("manual review button submits the explicitly selected run with confirmation
   assert.match(context.confirmations[0], /Eligible quotations WILL be submitted/);
   assert.equal(context.documentRef.elements.submitManualReviewsButton.textContent, "Manual Reviews Queued...");
   assert.equal(context.documentRef.elements.runSalesAgentButton.disabled, false);
+});
+
+test("manual review confirmation cancel does not send the submission request", async () => {
+  const sourceRunId = "64d000000000000000000003";
+  const context = controller({
+    responses: [
+      response(200, { success: true, run: run({ _id: sourceRunId, status: "COMPLETED" }) }),
+      response(200, { success: true, results: [{ opportunityId: "A", resultStatus: "MANUAL_REVIEW" }] }),
+    ],
+    onConfirm: () => false,
+  });
+  context.instance.renderRunHistory([run({
+    _id: sourceRunId,
+    status: "COMPLETED",
+    totals: { manualReview: 1 },
+  })]);
+  await context.instance.loadSelectedRun(sourceRunId);
+  await context.instance.submitManualReviews();
+  assert.equal(context.confirmations.length, 1);
+  assert.equal(context.calls.length, 2);
 });
 
 test("manual review submission re-reads the dropdown and never uses a cached displayed run", async () => {

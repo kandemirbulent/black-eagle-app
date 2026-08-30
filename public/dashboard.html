@@ -2615,7 +2615,8 @@
         salesAgentDashboard = window.SalesAgentDashboard.createController({
           authFetch,
           showMessage,
-          documentRef: document
+          documentRef: document,
+          confirmFn: window.confirm.bind(window)
         });
         await salesAgentDashboard.init();
         await refreshAll();
