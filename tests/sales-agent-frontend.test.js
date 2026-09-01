@@ -561,7 +561,7 @@ test("empty results show the empty state", () => {
   assert.equal(row.children[0].colSpan, 12);
 });
 
-test("Add to Event manual-review rows stay unselectable but expose the shared quote editor", () => {
+test("Add to Event manual-review rows are selectable and expose the shared quote editor", () => {
   const context = controller();
   context.instance.renderResults([
     {
@@ -570,7 +570,7 @@ test("Add to Event manual-review rows stay unselectable but expose the shared qu
     },
     {
       _id: "manual-review-id", eventName: "Unknown credits", platform: "addtoevent", resultStatus: "MANUAL_REVIEW", finalPrice: 350,
-      recordVersion: 1, manualSelectionEligible: false,
+      recordVersion: 1, manualSelectionEligible: true,
       platformCostEstimate: { unit: "CREDITS", status: "UNKNOWN" },
     },
   ]);
@@ -580,7 +580,7 @@ test("Add to Event manual-review rows stay unselectable but expose the shared qu
   assert.equal(rows[0].children[8].textContent, "8 credits");
   assert.match(rows[1].children[7].textContent, /£350\.00/);
   assert.equal(rows[1].children[8].textContent, "UNKNOWN");
-  assert.equal(rows[1].children[0].children[0].disabled, true);
+  assert.equal(rows[1].children[0].children[0].disabled, false);
   assert.equal(rows[1].children[11].children[1].textContent, "Edit Quote");
   rows[1].children[11].children[0].click();
   const detailText = flattenText(context.documentRef.elements.salesAgentDetailsContent);
@@ -635,37 +635,41 @@ test("manual quote editor prefills canonical values and PATCHes only non-empty c
 test("selection checkboxes persist, survive rerender/list reload, remain visible, and unselect cleanly", async () => {
   const context = controller({ responses: [
     response(200, { success: true, selected: true, opportunity: { selectedVersion: 1 } }),
+    response(200, { success: true, selected: true, opportunity: { selectedVersion: 1 } }),
     response(200, { success: true, selected: false, opportunity: { selectedVersion: null } }),
   ] });
   context.documentRef.elements.salesAgentPlatformFilter.value = "addtoevent";
   context.instance.renderResults([
     { _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 1, manualSelectionEligible: true },
+    { _id: "m", opportunityId: "ATE-MANUAL", platform: "addtoevent", resultStatus: "MANUAL_REVIEW", recordVersion: 1, manualSelectionEligible: true },
     { _id: "b", opportunityId: "TOG-1", platform: "togather", recordVersion: 1, manualSelectionEligible: false, manualSelectionBlocker: "TOGATHER_AUTOMATIC_POLICY" },
     { _id: "c", opportunityId: "ATE-2", platform: "addtoevent", recordVersion: 1, manualSelectionEligible: false, approvalStatus: "REJECTED" },
     { _id: "d", opportunityId: "POP-1", platform: "poptop", recordVersion: 1, manualSelectionEligible: true },
   ]);
   const rows = context.documentRef.elements.salesAgentResultsTable.children;
-  assert.equal(rows.length, 2);
+  assert.equal(rows.length, 3);
   assert.equal(rows[0].children[0].children[0].checked, false);
   assert.equal(rows[0].children[0].children[0].disabled, false);
-  assert.equal(rows[1].children[0].children[0].disabled, true);
+  assert.equal(rows[1].children[0].children[0].disabled, false);
+  assert.equal(rows[2].children[0].children[0].disabled, true);
   await context.instance.selectAllCurrentPage();
-  assert.deepEqual(context.instance.selectedReferences(), [{ id: "a", expectedVersion: 1 }]);
+  assert.deepEqual(context.instance.selectedReferences(), [{ id: "a", expectedVersion: 1 }, { id: "m", expectedVersion: 1 }]);
   assert.equal(context.calls[0].url, "/api/admin/sales-agent/opportunities/selection");
   assert.equal(JSON.parse(context.calls[0].options.body).selected, true);
   context.instance.renderResults([
     { _id: "a", opportunityId: "ATE-1", platform: "addtoevent", recordVersion: 1, selectedVersion: 1, manualSelectionEligible: true },
+    { _id: "m", opportunityId: "ATE-MANUAL", platform: "addtoevent", resultStatus: "MANUAL_REVIEW", recordVersion: 1, selectedVersion: 1, manualSelectionEligible: true },
     { _id: "c", opportunityId: "ATE-2", platform: "addtoevent", recordVersion: 1, manualSelectionEligible: false },
   ]);
-  assert.deepEqual(context.instance.selectedReferences(), [{ id: "a", expectedVersion: 1 }]);
-  assert.equal(context.documentRef.elements.salesAgentResultsTable.children.length, 2);
+  assert.deepEqual(context.instance.selectedReferences(), [{ id: "a", expectedVersion: 1 }, { id: "m", expectedVersion: 1 }]);
+  assert.equal(context.documentRef.elements.salesAgentResultsTable.children.length, 3);
   assert.equal(context.documentRef.elements.salesAgentResultsTable.children[0].children[0].children[0].checked, true);
   const selectedCheckbox = context.documentRef.elements.salesAgentResultsTable.children[0].children[0].children[0];
   selectedCheckbox.checked = false;
   await selectedCheckbox.listeners.change();
-  assert.deepEqual(context.instance.selectedReferences(), []);
-  assert.equal(JSON.parse(context.calls[1].options.body).selected, false);
-  assert.equal(context.documentRef.elements.selectedOpportunityCount.textContent, "0 selected");
+  assert.deepEqual(context.instance.selectedReferences(), [{ id: "m", expectedVersion: 1 }]);
+  assert.equal(JSON.parse(context.calls[2].options.body).selected, false);
+  assert.equal(context.documentRef.elements.selectedOpportunityCount.textContent, "1 selected");
   assert.equal(context.calls.some((call) => /submit-selected/.test(call.url)), false);
 });
 

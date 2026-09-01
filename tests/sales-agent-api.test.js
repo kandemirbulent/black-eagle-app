@@ -543,6 +543,12 @@ test("manual selection policy blocks Togather and terminal or unavailable opport
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ quoteSubmitted: true })).manualSelectionEligible, false);
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ resultStatus: "ALREADY_QUOTED" })).manualSelectionBlocker, "ALREADY_QUOTED");
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ approvalStatus: "REJECTED" })).manualSelectionEligible, false);
+  const manualReview = opportunitySelectionPolicy(eligibleAddToEvent({
+    resultStatus: "MANUAL_REVIEW", approvalStatus: "NEEDS_REVIEW", manualSubmissionEligible: false,
+  }));
+  assert.equal(manualReview.manualSelectionEligible, true);
+  assert.equal(manualReview.submissionEligible, false);
+  assert.equal(manualReview.submissionBlocker, "MANUAL_POLICY_NOT_ENABLED");
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ unavailable: true })).manualSelectionBlocker, "UNAVAILABLE");
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ expiresAt: "2000-01-01T00:00:00.000Z" })).manualSelectionBlocker, "EXPIRED");
 });
@@ -573,6 +579,27 @@ test("failed Add to Event submissions without a platform action release selectio
   assert.equal(body.results[1].manualSelectionEligible, false);
   assert.deepEqual(state.results[1].submissionLock, { runId: failedRunId });
   assert.equal(state.triggerCalls.length, 0);
+}));
+
+test("unapproved manual review can be selected but cannot create a submission run", () => withServer(async ({ request, state }) => {
+  state.results.push(eligibleAddToEvent({
+    resultStatus: "MANUAL_REVIEW",
+    approvalStatus: "NEEDS_REVIEW",
+    manualSubmissionEligible: false,
+  }));
+  const records = [{ id: "64f000000000000000000001", expectedVersion: 1 }];
+  const selected = await request("/api/admin/sales-agent/opportunities/selection", jsonOptions("admin", "POST", {
+    records, selected: true,
+  }));
+  assert.equal(selected.status, 200);
+  assert.equal(state.results[0].selectedVersion, 1);
+
+  const submitted = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", { records }));
+  const body = await submitted.json();
+  assert.equal(submitted.status, 409);
+  assert.equal(body.code, "MANUAL_POLICY_NOT_ENABLED");
+  assert.equal(state.triggerCalls.length, 0);
+  assert.equal(state.runs.length, 0);
 }));
 
 test("opportunity edit requires exact ID/version, rejects operators, and increments atomically", () => withServer(async ({ request, state }) => {

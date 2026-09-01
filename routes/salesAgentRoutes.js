@@ -55,18 +55,32 @@ function opportunitySelectionPolicy(record = {}) {
   const approvalStatus = String(record.approvalStatus || "NOT_REVIEWED").toUpperCase();
   const version = Number(record.recordVersion);
   const price = currentQuotePrice(record);
-  let blocker = "";
-  if (platform !== "addtoevent") blocker = platform === "togather" ? "TOGATHER_AUTOMATIC_POLICY" : "PLATFORM_NOT_SUPPORTED";
-  else if (record.manualApprovalRequired !== true || record.manualSubmissionEligible !== true) blocker = "MANUAL_POLICY_NOT_ENABLED";
-  else if (status !== "READY") blocker = status === "ALREADY_QUOTED" ? "ALREADY_QUOTED" : `STATUS_${status || "UNKNOWN"}`;
-  else if (!["NOT_REVIEWED", "READY", "APPROVED"].includes(approvalStatus)) blocker = `APPROVAL_STATUS_${approvalStatus}`;
-  else if (record.quoteSubmitted || record.quoteUuid || TERMINAL_OPPORTUNITY_STATUSES.has(status)) blocker = status === "ALREADY_QUOTED" ? "ALREADY_QUOTED" : `STATUS_${status || "SUBMITTED"}`;
-  else if (record.unavailable === true) blocker = "UNAVAILABLE";
-  else if (record.expiresAt && new Date(record.expiresAt) <= new Date()) blocker = "EXPIRED";
-  else if (record.submissionLock) blocker = "ACTIVE_SUBMISSION_LOCK";
-  else if (price <= 0) blocker = "CURRENT_QUOTE_REQUIRED";
-  else if (!Number.isInteger(version) || version < 1) blocker = "RECORD_VERSION_REQUIRED";
-  return { manualSelectionEligible: !blocker, manualSelectionBlocker: blocker };
+  let selectionBlocker = "";
+  if (platform !== "addtoevent") selectionBlocker = platform === "togather" ? "TOGATHER_AUTOMATIC_POLICY" : "PLATFORM_NOT_SUPPORTED";
+  else if (record.quoteSubmitted || record.quoteUuid || TERMINAL_OPPORTUNITY_STATUSES.has(status)) selectionBlocker = status === "ALREADY_QUOTED" ? "ALREADY_QUOTED" : `STATUS_${status || "SUBMITTED"}`;
+  else if (!Number.isInteger(version) || version < 1) selectionBlocker = "RECORD_VERSION_REQUIRED";
+  else if (status !== "MANUAL_REVIEW" && (record.manualApprovalRequired !== true || record.manualSubmissionEligible !== true)) selectionBlocker = "MANUAL_POLICY_NOT_ENABLED";
+  else if (status !== "MANUAL_REVIEW" && status !== "READY") selectionBlocker = `STATUS_${status || "UNKNOWN"}`;
+  else if (status !== "MANUAL_REVIEW" && !["NOT_REVIEWED", "READY", "APPROVED"].includes(approvalStatus)) selectionBlocker = `APPROVAL_STATUS_${approvalStatus}`;
+  else if (status !== "MANUAL_REVIEW" && record.unavailable === true) selectionBlocker = "UNAVAILABLE";
+  else if (status !== "MANUAL_REVIEW" && record.expiresAt && new Date(record.expiresAt) <= new Date()) selectionBlocker = "EXPIRED";
+  else if (status !== "MANUAL_REVIEW" && record.submissionLock) selectionBlocker = "ACTIVE_SUBMISSION_LOCK";
+  else if (status !== "MANUAL_REVIEW" && price <= 0) selectionBlocker = "CURRENT_QUOTE_REQUIRED";
+
+  let submissionBlocker = selectionBlocker;
+  if (!submissionBlocker && (record.manualApprovalRequired !== true || record.manualSubmissionEligible !== true)) submissionBlocker = "MANUAL_POLICY_NOT_ENABLED";
+  else if (!submissionBlocker && status !== "READY") submissionBlocker = status === "ALREADY_QUOTED" ? "ALREADY_QUOTED" : `STATUS_${status || "UNKNOWN"}`;
+  else if (!submissionBlocker && !["NOT_REVIEWED", "READY", "APPROVED"].includes(approvalStatus)) submissionBlocker = `APPROVAL_STATUS_${approvalStatus}`;
+  else if (!submissionBlocker && record.unavailable === true) submissionBlocker = "UNAVAILABLE";
+  else if (!submissionBlocker && record.expiresAt && new Date(record.expiresAt) <= new Date()) submissionBlocker = "EXPIRED";
+  else if (!submissionBlocker && record.submissionLock) submissionBlocker = "ACTIVE_SUBMISSION_LOCK";
+  else if (!submissionBlocker && price <= 0) submissionBlocker = "CURRENT_QUOTE_REQUIRED";
+  return {
+    manualSelectionEligible: !selectionBlocker,
+    manualSelectionBlocker: selectionBlocker,
+    submissionEligible: !submissionBlocker,
+    submissionBlocker,
+  };
 }
 
 function serializeOpportunity(record = {}) {
@@ -649,8 +663,8 @@ function createSalesAgentRouter({
     }
     if (req.body.selected) {
       const policy = opportunitySelectionPolicy(existing);
-      if (!policy.manualSelectionEligible || canonicalStatus(existing) !== "READY") {
-        return res.status(409).json({ success: false, code: policy.manualSelectionBlocker || "STATUS_NOT_READY" });
+      if (!policy.manualSelectionEligible) {
+        return res.status(409).json({ success: false, code: policy.manualSelectionBlocker });
       }
     }
     const updated = await SalesAgentOpportunityResult.findOneAndUpdate(
@@ -680,8 +694,8 @@ function createSalesAgentRouter({
       if (Number(existing.recordVersion) !== reference.expectedVersion) return res.status(409).json({ success: false, code: "OPPORTUNITY_VERSION_CONFLICT" });
       if (Number(existing.selectedVersion) !== reference.expectedVersion) return res.status(409).json({ success: false, code: "PERSISTED_SELECTION_REQUIRED" });
       const policy = opportunitySelectionPolicy(existing);
-      if (!policy.manualSelectionEligible || canonicalStatus(existing) !== "READY") {
-        return res.status(409).json({ success: false, code: policy.manualSelectionBlocker || "STATUS_NOT_READY" });
+      if (!policy.submissionEligible) {
+        return res.status(409).json({ success: false, code: policy.submissionBlocker || "STATUS_NOT_READY" });
       }
       const credits = existing.platformCostEstimate || {};
       if (credits.status !== "KNOWN" || !Number.isFinite(Number(credits.amount))) {
