@@ -712,6 +712,11 @@
         }
         if (!saved.response.ok) { showMessage("Quote changes could not be saved.", "error"); return; }
         selectedOpportunities.clear();
+        const savedOpportunity = saved.payload.opportunity;
+        if (savedOpportunity) {
+          currentResults = currentResults.map((item) => String(item?._id || "") === id ? savedOpportunity : item);
+          renderResults(currentResults);
+        }
         closeDetails();
         await refresh();
       });

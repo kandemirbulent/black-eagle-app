@@ -594,6 +594,11 @@ test("unapproved manual review can be selected but cannot create a submission ru
   assert.equal(selected.status, 200);
   assert.equal(state.results[0].selectedVersion, 1);
 
+  const preview = await request("/api/admin/sales-agent/opportunities/selection-preview", jsonOptions("admin", "POST", { records }));
+  const previewBody = await preview.json();
+  assert.equal(previewBody.preview.selectedCount, 0);
+  assert.equal(previewBody.preview.blocked[0].code, "MANUAL_POLICY_NOT_ENABLED");
+
   const submitted = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", { records }));
   const body = await submitted.json();
   assert.equal(submitted.status, 409);
@@ -627,6 +632,7 @@ test("manual Add to Event quote override resolves review and becomes selectable 
     analysisStatus: "MANUAL_REVIEW",
     approvalStatus: "NEEDS_REVIEW",
     manualSubmissionEligible: false,
+    verifiedStatus: "MANUAL_REVIEW",
     blockingReasons: ["RELIABLE_PRICE_UNAVAILABLE"],
     reviewCodes: ["UNSUPPORTED_ROLE"],
     selectedVersion: 1,
@@ -662,6 +668,14 @@ test("manual Add to Event quote override resolves review and becomes selectable 
   assert.deepEqual(body.opportunity.resolvedBlockingReasons, ["RELIABLE_PRICE_UNAVAILABLE"]);
   assert.deepEqual(body.opportunity.resolvedReviewCodes, ["UNSUPPORTED_ROLE"]);
   assert.equal(body.opportunity.manualSelectionEligible, true);
+  assert.equal(body.opportunity.submissionEligible, true);
+  const preview = await request("/api/admin/sales-agent/opportunities/selection-preview", jsonOptions("admin", "POST", {
+    records: [{ id: "64f000000000000000000001", expectedVersion: 2 }],
+  }));
+  const previewBody = await preview.json();
+  assert.equal(preview.status, 200);
+  assert.equal(previewBody.preview.selectedCount, 1);
+  assert.equal(previewBody.preview.records[0].resultStatus, "READY");
   assert.equal(state.triggerCalls.length, 0);
 }));
 

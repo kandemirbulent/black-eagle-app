@@ -546,6 +546,9 @@ function createSalesAgentRouter({
       set.approvalStatus = "APPROVED";
       set.resultStatus = "READY";
       set.analysisStatus = "QUOTE_READY";
+      set.platformState = "";
+      set.verifiedStatus = "";
+      set.verifiedPlatformState = "";
       set.resolvedBlockingReasons = Array.isArray(existing.blockingReasons) ? existing.blockingReasons : [];
       set.resolvedReviewCodes = Array.isArray(existing.reviewCodes) ? existing.reviewCodes : [];
       set.blockingReasons = [];
@@ -619,8 +622,8 @@ function createSalesAgentRouter({
         continue;
       }
       const serialized = serializeOpportunity(existing);
-      if (!serialized.manualSelectionEligible) {
-        blocked.push({ id: reference.id, code: serialized.manualSelectionBlocker });
+      if (!serialized.submissionEligible) {
+        blocked.push({ id: reference.id, code: serialized.submissionBlocker });
         continue;
       }
       records.push(serialized);
