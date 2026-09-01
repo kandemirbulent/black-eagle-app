@@ -509,6 +509,12 @@
         detailsButton.type = "button";
         detailsButton.addEventListener("click", () => openDetails(result));
         actionCell.appendChild(detailsButton);
+        if (String(result?.platform || "").toLowerCase() === "addtoevent" && String(result?.resultStatus || "").toUpperCase() === "MANUAL_REVIEW") {
+          const editButton = createElement("button", "Edit Quote", "button secondary sales-agent-action-button");
+          editButton.type = "button";
+          editButton.addEventListener("click", () => editOpportunity(result));
+          actionCell.appendChild(editButton);
+        }
         row.appendChild(actionCell);
         elements.resultsTable.appendChild(row);
       }
@@ -617,19 +623,21 @@
       return result.payload;
     }
 
-    async function editSelectedOpportunity() {
-      if (selectedOpportunities.size !== 1) return null;
-      const selected = [...selectedOpportunities.values()][0];
-      const response = await requestJson(`/api/admin/sales-agent/opportunities/${encodeURIComponent(selected.id)}`);
+    async function editOpportunity(reference) {
+      const id = String(reference?.id || reference?._id || "");
+      if (!id) return null;
+      const response = await requestJson(`/api/admin/sales-agent/opportunities/${encodeURIComponent(id)}`);
       if (!response.response.ok || !response.payload.opportunity) return null;
       const opportunity = response.payload.opportunity;
+      const saveAndApprove = String(opportunity.platform || "").toLowerCase() === "addtoevent"
+        && String(opportunity.resultStatus || "").toUpperCase() === "MANUAL_REVIEW";
       openDetails(opportunity);
       const form = createElement("form", undefined, "sales-agent-edit-form");
       const fields = [
         ["guestCount", "Guest count", "number"], ["startTime", "Start time", "time"],
         ["endTime", "End time", "time"], ["durationHours", "Duration (hours)", "number"],
         ["requestedRoles", "Requested roles", "text"], ["staffBreakdown", "Staff quantities (Role: quantity)", "text"],
-        ["finalPrice", "Final price", "number"],
+        ["travelCharge", "Travel charge", "number"], ["finalPrice", "Final price", "number"],
         ["discountType", "Discount type", "text"], ["discountValue", "Discount amount/percentage", "number"],
         ["discountReason", "Discount reason", "text"], ["customerMessage", "Customer message", "text"]
       ];
@@ -647,12 +655,13 @@
         form.appendChild(wrapper);
         inputs[key] = input;
       }
-      const save = createElement("button", "Save Quote Changes", "btn btn-primary");
+      const save = createElement("button", saveAndApprove ? "Save & Approve" : "Save Quote Changes", "btn btn-primary");
       save.type = "submit";
       form.appendChild(save);
       form.addEventListener("submit", async (event) => {
         event?.preventDefault?.();
         const body = { expectedVersion: Number(opportunity.recordVersion) };
+        if (saveAndApprove) body.saveAndApprove = true;
         for (const [key, , type] of fields) {
           const value = inputs[key].value;
           const parsed = key === "requestedRoles"
@@ -670,8 +679,8 @@
               : opportunity.manualOverrides?.[key] ?? (key === "finalPrice" ? opportunity.finalPrice : "");
           if (JSON.stringify(parsed) !== JSON.stringify(original)) body[key] = parsed;
         }
-        if (Object.keys(body).length === 1) { showMessage("No quote changes were made.", "error"); return; }
-        const saved = await requestJson(`/api/admin/sales-agent/opportunities/${encodeURIComponent(selected.id)}`, {
+        if (Object.keys(body).length === (saveAndApprove ? 2 : 1)) { showMessage("No quote changes were made.", "error"); return; }
+        const saved = await requestJson(`/api/admin/sales-agent/opportunities/${encodeURIComponent(id)}`, {
           method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body)
         });
         if (saved.response.status === 409 && saved.payload.code === "OPPORTUNITY_VERSION_CONFLICT") {
@@ -685,6 +694,11 @@
       });
       elements.detailsContent.appendChild(form);
       return opportunity;
+    }
+
+    async function editSelectedOpportunity() {
+      if (selectedOpportunities.size !== 1) return null;
+      return editOpportunity([...selectedOpportunities.values()][0]);
     }
 
     function setResultsNotice(message) {

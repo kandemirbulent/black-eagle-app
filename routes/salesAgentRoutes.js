@@ -32,7 +32,7 @@ const MAX_BULK_OPPORTUNITIES = 100;
 const APPROVAL_STATUSES = new Set(["NOT_REVIEWED", "READY", "NEEDS_REVIEW", "APPROVED", "HOLD", "REJECTED"]);
 const EDITABLE_OVERRIDE_FIELDS = new Set([
   "guestCount", "startTime", "endTime", "durationHours", "requestedRoles", "staffBreakdown",
-  "finalPrice", "discountType", "discountValue", "discountReason", "customerMessage",
+  "travelCharge", "finalPrice", "discountType", "discountValue", "discountReason", "customerMessage",
 ]);
 const TERMINAL_OPPORTUNITY_STATUSES = new Set([
   "SENT", "SUBMITTED", "PENDING", "ACCEPTED", "CONFIRMED", "BOOKED", "ALREADY_QUOTED",
@@ -90,13 +90,14 @@ function validateRecordReferences(records) {
 }
 
 function validateManualOverrides(body = {}) {
-  const keys = Object.keys(body).filter((key) => key !== "expectedVersion");
+  const keys = Object.keys(body).filter((key) => !["expectedVersion", "saveAndApprove"].includes(key));
   if (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 1) return { error: "EXPECTED_VERSION_REQUIRED" };
+  if (body.saveAndApprove !== undefined && typeof body.saveAndApprove !== "boolean") return { error: "INVALID_APPROVAL_ACTION" };
   if (!keys.length) return { error: "EDITABLE_FIELDS_REQUIRED" };
   if (keys.some((key) => key.startsWith("$") || !EDITABLE_OVERRIDE_FIELDS.has(key))) return { error: "EDITABLE_FIELD_NOT_ALLOWED" };
   const overrides = {};
   for (const key of keys) overrides[key] = body[key];
-  return { expectedVersion: body.expectedVersion, overrides };
+  return { expectedVersion: body.expectedVersion, overrides, saveAndApprove: body.saveAndApprove === true };
 }
 
 function redactFailureLog(value) {
@@ -512,9 +513,33 @@ function createSalesAgentRouter({
       return res.status(409).json({ success: false, code: policy.manualSelectionBlocker || "PLATFORM_POLICY_BLOCKED" });
     }
     const set = Object.fromEntries(Object.entries(validation.overrides).map(([key, value]) => [`manualOverrides.${key}`, value]));
-    set.lastEditedAt = now();
+    const editedAt = now();
+    set.lastEditedAt = editedAt;
     set.lastEditedBy = String(req.adminUser._id);
-    set.approvalStatus = "NOT_REVIEWED";
+    if (validation.saveAndApprove) {
+      const approvedPrice = Number(validation.overrides.finalPrice ?? currentQuotePrice(existing));
+      if (canonicalStatus(existing) !== "MANUAL_REVIEW") {
+        return res.status(409).json({ success: false, code: "MANUAL_REVIEW_REQUIRED" });
+      }
+      if (!Number.isFinite(approvedPrice) || approvedPrice <= 0) {
+        return res.status(400).json({ success: false, code: "CURRENT_QUOTE_REQUIRED" });
+      }
+      set.manualOverrideApplied = true;
+      set.manualApprovedAt = editedAt;
+      set.manualApprovedBy = String(req.adminUser._id);
+      set.approvalStatus = "APPROVED";
+      set.resultStatus = "READY";
+      set.analysisStatus = "QUOTE_READY";
+      set.resolvedBlockingReasons = Array.isArray(existing.blockingReasons) ? existing.blockingReasons : [];
+      set.resolvedReviewCodes = Array.isArray(existing.reviewCodes) ? existing.reviewCodes : [];
+      set.blockingReasons = [];
+      set.reviewCodes = [];
+      set.selectedVersion = null;
+      set.selectionSelectedAt = null;
+      set.selectionSelectedBy = "";
+    } else {
+      set.approvalStatus = "NOT_REVIEWED";
+    }
     const updated = await SalesAgentOpportunityResult.findOneAndUpdate(
       { _id: req.params.id, recordVersion: validation.expectedVersion },
       { $set: set, $inc: { recordVersion: 1 } },

@@ -561,7 +561,7 @@ test("empty results show the empty state", () => {
   assert.equal(row.children[0].colSpan, 12);
 });
 
-test("Add to Event rows keep customer quote and platform credits distinct", () => {
+test("Add to Event manual-review rows stay unselectable but expose the shared quote editor", () => {
   const context = controller();
   context.instance.renderResults([
     {
@@ -569,7 +569,8 @@ test("Add to Event rows keep customer quote and platform credits distinct", () =
       platformCostEstimate: { unit: "CREDITS", status: "KNOWN", amount: 8 },
     },
     {
-      eventName: "Unknown credits", platform: "addtoevent", resultStatus: "MANUAL_REVIEW", finalPrice: 350,
+      _id: "manual-review-id", eventName: "Unknown credits", platform: "addtoevent", resultStatus: "MANUAL_REVIEW", finalPrice: 350,
+      recordVersion: 1, manualSelectionEligible: false,
       platformCostEstimate: { unit: "CREDITS", status: "UNKNOWN" },
     },
   ]);
@@ -579,6 +580,8 @@ test("Add to Event rows keep customer quote and platform credits distinct", () =
   assert.equal(rows[0].children[8].textContent, "8 credits");
   assert.match(rows[1].children[7].textContent, /£350\.00/);
   assert.equal(rows[1].children[8].textContent, "UNKNOWN");
+  assert.equal(rows[1].children[0].children[0].disabled, true);
+  assert.equal(rows[1].children[11].children[1].textContent, "Edit Quote");
   rows[1].children[11].children[0].click();
   const detailText = flattenText(context.documentRef.elements.salesAgentDetailsContent);
   assert.match(detailText, /Customer quote\s+£350\.00/);

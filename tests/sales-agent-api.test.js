@@ -594,6 +594,47 @@ test("opportunity edit requires exact ID/version, rejects operators, and increme
   assert.equal((await stale.json()).code, "OPPORTUNITY_VERSION_CONFLICT");
 }));
 
+test("manual Add to Event quote override resolves review and becomes selectable at the new version", () => withServer(async ({ request, state }) => {
+  state.results.push(eligibleAddToEvent({
+    resultStatus: "MANUAL_REVIEW",
+    analysisStatus: "MANUAL_REVIEW",
+    approvalStatus: "NEEDS_REVIEW",
+    blockingReasons: ["RELIABLE_PRICE_UNAVAILABLE"],
+    reviewCodes: ["UNSUPPORTED_ROLE"],
+    selectedVersion: 1,
+  }));
+
+  const response = await request(
+    "/api/admin/sales-agent/opportunities/64f000000000000000000001",
+    jsonOptions("admin", "PATCH", {
+      expectedVersion: 1,
+      saveAndApprove: true,
+      staffBreakdown: [{ role: "Bartender", quantity: 2 }],
+      durationHours: 6,
+      travelCharge: 45,
+      finalPrice: 575,
+    })
+  );
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.opportunity.resultStatus, "READY");
+  assert.equal(body.opportunity.analysisStatus, "QUOTE_READY");
+  assert.equal(body.opportunity.approvalStatus, "APPROVED");
+  assert.equal(body.opportunity.recordVersion, 2);
+  assert.equal(body.opportunity.selectedVersion, null);
+  assert.equal(body.opportunity.manualOverrideApplied, true);
+  assert.equal(body.opportunity.manualOverrides.durationHours, 6);
+  assert.equal(body.opportunity.manualOverrides.travelCharge, 45);
+  assert.equal(body.opportunity.manualOverrides.finalPrice, 575);
+  assert.deepEqual(body.opportunity.blockingReasons, []);
+  assert.deepEqual(body.opportunity.reviewCodes, []);
+  assert.deepEqual(body.opportunity.resolvedBlockingReasons, ["RELIABLE_PRICE_UNAVAILABLE"]);
+  assert.deepEqual(body.opportunity.resolvedReviewCodes, ["UNSUPPORTED_ROLE"]);
+  assert.equal(body.opportunity.manualSelectionEligible, true);
+  assert.equal(state.triggerCalls.length, 0);
+}));
+
 test("bulk selection rejects duplicate IDs and Togather while updating eligible Add to Event records", () => withServer(async ({ request, state }) => {
   const addToEvent = eligibleAddToEvent();
   const togather = eligibleAddToEvent({ _id: "64f000000000000000000002", platform: "togather", opportunityId: "TOG-1" });
