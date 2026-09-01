@@ -599,6 +599,7 @@ test("manual Add to Event quote override resolves review and becomes selectable 
     resultStatus: "MANUAL_REVIEW",
     analysisStatus: "MANUAL_REVIEW",
     approvalStatus: "NEEDS_REVIEW",
+    manualSubmissionEligible: false,
     blockingReasons: ["RELIABLE_PRICE_UNAVAILABLE"],
     reviewCodes: ["UNSUPPORTED_ROLE"],
     selectedVersion: 1,
@@ -624,6 +625,8 @@ test("manual Add to Event quote override resolves review and becomes selectable 
   assert.equal(body.opportunity.recordVersion, 2);
   assert.equal(body.opportunity.selectedVersion, null);
   assert.equal(body.opportunity.manualOverrideApplied, true);
+  assert.equal(body.opportunity.manualApprovedVersion, 2);
+  assert.equal(body.opportunity.manualSubmissionEligible, true);
   assert.equal(body.opportunity.manualOverrides.durationHours, 6);
   assert.equal(body.opportunity.manualOverrides.travelCharge, 45);
   assert.equal(body.opportunity.manualOverrides.finalPrice, 575);

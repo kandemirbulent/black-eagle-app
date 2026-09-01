@@ -527,6 +527,8 @@ function createSalesAgentRouter({
       set.manualOverrideApplied = true;
       set.manualApprovedAt = editedAt;
       set.manualApprovedBy = String(req.adminUser._id);
+      set.manualApprovedVersion = validation.expectedVersion + 1;
+      set.manualSubmissionEligible = true;
       set.approvalStatus = "APPROVED";
       set.resultStatus = "READY";
       set.analysisStatus = "QUOTE_READY";

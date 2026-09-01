@@ -588,6 +588,50 @@ test("Add to Event manual-review rows stay unselectable but expose the shared qu
   assert.match(detailText, /Credits required\s+UNKNOWN/);
 });
 
+test("manual quote editor prefills canonical values and PATCHes only non-empty changes", async () => {
+  const opportunity = {
+    _id: "manual-review-id",
+    platform: "addtoevent",
+    resultStatus: "MANUAL_REVIEW",
+    recordVersion: 3,
+    guestCount: 80,
+    startTime: "17:00",
+    endTime: "23:00",
+    workingHours: 6,
+    staffBreakdown: [{ role: "Bartender", quantity: 2 }],
+    travelLabour: 20,
+    vehicleCost: 15,
+    parkingCost: 5,
+    accommodationCost: 0,
+    finalPrice: 600,
+    quoteSnapshot: { calculatedPrice: 625 },
+    manualOverrides: {},
+  };
+  const context = controller({ responses: [
+    response(200, { success: true, opportunity }),
+    response(200, { success: true, opportunity: { ...opportunity, resultStatus: "READY", recordVersion: 4 } }),
+    response(200, { success: true, runs: [] }),
+    response(200, { success: true, run: null }),
+  ] });
+
+  await context.instance.editOpportunity(opportunity);
+  const form = context.documentRef.elements.salesAgentDetailsContent.children.at(-1);
+  const inputs = form.children.slice(0, -1).map((label) => label.children[0]);
+  assert.equal(inputs[1].value, "17:00");
+  assert.equal(inputs[2].value, "23:00");
+  assert.equal(inputs[3].value, 6);
+  assert.equal(inputs[4].value, "Bartender");
+  assert.equal(inputs[5].value, "Bartender: 2");
+  assert.equal(inputs[6].value, 40);
+  assert.equal(inputs[7].value, 625);
+
+  inputs[1].value = "";
+  inputs[3].value = "7";
+  await form.listeners.submit({ preventDefault() {} });
+  const patchBody = JSON.parse(context.calls[1].options.body);
+  assert.deepEqual(patchBody, { expectedVersion: 3, saveAndApprove: true, durationHours: 7 });
+});
+
 test("selection checkboxes persist, survive rerender/list reload, remain visible, and unselect cleanly", async () => {
   const context = controller({ responses: [
     response(200, { success: true, selected: true, opportunity: { selectedVersion: 1 } }),

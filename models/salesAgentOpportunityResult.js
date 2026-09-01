@@ -101,6 +101,7 @@ const salesAgentOpportunityResultSchema = new mongoose.Schema(
     manualOverrideApplied: { type: Boolean, default: false },
     manualApprovedAt: { type: Date, default: null },
     manualApprovedBy: { type: String, trim: true, default: "" },
+    manualApprovedVersion: { type: Number, min: 1, default: null },
     resolvedBlockingReasons: { type: [String], default: [] },
     resolvedReviewCodes: { type: [String], default: [] },
     manualOverrides: { type: manualOverridesSchema, default: () => ({}) },

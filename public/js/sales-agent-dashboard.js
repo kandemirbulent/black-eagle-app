@@ -641,16 +641,42 @@
         ["discountType", "Discount type", "text"], ["discountValue", "Discount amount/percentage", "number"],
         ["discountReason", "Discount reason", "text"], ["customerMessage", "Customer message", "text"]
       ];
+      const manual = opportunity.manualOverrides || {};
+      const canonicalStaff = Array.isArray(opportunity.staffBreakdown) ? opportunity.staffBreakdown : [];
+      const currentValue = (key) => {
+        if (key === "requestedRoles") {
+          return Array.isArray(manual.requestedRoles) && manual.requestedRoles.length
+            ? manual.requestedRoles
+            : canonicalStaff.map((item) => item.role).filter(Boolean);
+        }
+        if (key === "staffBreakdown") {
+          return Array.isArray(manual.staffBreakdown) && manual.staffBreakdown.length
+            ? manual.staffBreakdown
+            : canonicalStaff;
+        }
+        if (manual[key] !== undefined && manual[key] !== null && manual[key] !== "") return manual[key];
+        if (key === "durationHours") return opportunity.workingHours ?? "";
+        if (key === "travelCharge") {
+          if (opportunity.travelCharge !== undefined && opportunity.travelCharge !== null) return opportunity.travelCharge;
+          return ["travelLabour", "vehicleCost", "parkingCost", "accommodationCost"]
+            .map((field) => Number(opportunity[field]))
+            .filter(Number.isFinite)
+            .reduce((total, value) => total + value, 0);
+        }
+        if (key === "finalPrice") return opportunity.quoteSnapshot?.calculatedPrice || opportunity.finalPrice || "";
+        return opportunity[key] ?? "";
+      };
       const inputs = {};
       for (const [key, label, type] of fields) {
         const wrapper = createElement("label", label);
         const input = documentRef.createElement(key === "customerMessage" ? "textarea" : "input");
         input.type = type;
+        const value = currentValue(key);
         input.value = key === "requestedRoles"
-          ? (opportunity.manualOverrides?.requestedRoles || []).join(", ")
+          ? value.join(", ")
           : key === "staffBreakdown"
-            ? (opportunity.manualOverrides?.staffBreakdown || opportunity.staffBreakdown || []).map((item) => `${item.role}: ${item.quantity}`).join(", ")
-            : opportunity.manualOverrides?.[key] ?? (key === "finalPrice" ? opportunity.finalPrice : "");
+            ? value.map((item) => `${item.role}: ${item.quantity}`).join(", ")
+            : value;
         wrapper.appendChild(input);
         form.appendChild(wrapper);
         inputs[key] = input;
@@ -663,7 +689,8 @@
         const body = { expectedVersion: Number(opportunity.recordVersion) };
         if (saveAndApprove) body.saveAndApprove = true;
         for (const [key, , type] of fields) {
-          const value = inputs[key].value;
+          const value = String(inputs[key].value ?? "").trim();
+          if (!value) continue;
           const parsed = key === "requestedRoles"
             ? value.split(",").map((item) => item.trim()).filter(Boolean)
             : key === "staffBreakdown"
@@ -672,11 +699,7 @@
                   return { role: String(role || "").trim(), quantity: Number(quantity) };
                 }).filter((item) => item.role && Number.isFinite(item.quantity) && item.quantity >= 0)
               : type === "number" && value !== "" ? Number(value) : value;
-          const original = key === "requestedRoles"
-            ? (opportunity.manualOverrides?.requestedRoles || [])
-            : key === "staffBreakdown"
-              ? (opportunity.manualOverrides?.staffBreakdown || opportunity.staffBreakdown || [])
-              : opportunity.manualOverrides?.[key] ?? (key === "finalPrice" ? opportunity.finalPrice : "");
+          const original = currentValue(key);
           if (JSON.stringify(parsed) !== JSON.stringify(original)) body[key] = parsed;
         }
         if (Object.keys(body).length === (saveAndApprove ? 2 : 1)) { showMessage("No quote changes were made.", "error"); return; }
@@ -1188,6 +1211,7 @@
       submitSelectedOpportunities,
       updateSelectedStatus,
       editSelectedOpportunity,
+      editOpportunity,
       startPolling,
       stopPolling,
       getCurrentRunId: () => currentRunId,
