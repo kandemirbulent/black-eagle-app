@@ -9,13 +9,17 @@
   const idOf = (item) => String(item?._id || item?.id || "");
   const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const eligibility = (contact = {}) => contact.eligibilityStatus || (!String(contact.decisionMakerName || "").trim() ? "PROSPECT_RESEARCH_REQUIRED" : ["VERIFIED", "VALID"].includes(String(contact.verificationStatus || "").toUpperCase()) && EMAIL_PATTERN.test(String(contact.businessEmail || "").trim()) && String(contact.role || "").trim() ? "SEND_ELIGIBLE" : "CONTACT_REVIEW_REQUIRED");
-  const blocked = (contact) => eligibility(contact) !== "SEND_ELIGIBLE" || contact?.optOut === true || contact?.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(String(contact?.bounceStatus || "").toUpperCase());
-  const eligibilityLabel = (contact) => ({ PROSPECT_RESEARCH_REQUIRED: "Prospect – Research Required", CONTACT_REVIEW_REQUIRED: "Review Required", CONTACT_VERIFIED: "Verified Contact", SEND_ELIGIBLE: "Send Eligible" })[eligibility(contact)] || "Review Required";
+  const selectable = (contact = {}) => EMAIL_PATTERN.test(String(contact.businessEmail || "").trim().toLowerCase()) && contact.optOut !== true && contact.doNotContact !== true && !["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"].includes(String(contact.bounceStatus || "").toUpperCase());
+  const blocked = (contact) => !selectable(contact);
+  const eligibilityLabel = (contact) => selectable(contact) ? "Selectable" : ({ PROSPECT_RESEARCH_REQUIRED: "Prospect – Research Required", CONTACT_REVIEW_REQUIRED: "Review Required", CONTACT_VERIFIED: "Verified Contact", SEND_ELIGIBLE: "Send Eligible" })[eligibility(contact)] || "Not Selectable";
   const selectionBlockedReason = (contact = {}) => {
-    if (contact.optOut === true || contact.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(String(contact.bounceStatus || "").toUpperCase())) return "Not send eligible — contact is blocked.";
-    if (eligibility(contact) === "PROSPECT_RESEARCH_REQUIRED") return "Not send eligible — decision maker research required.";
-    if (!String(contact.businessEmail || "").trim() || !["VERIFIED", "VALID"].includes(String(contact.verificationStatus || "").toUpperCase())) return "Not send eligible — business email verification required.";
-    return "Not send eligible — contact review required.";
+    if (contact.doNotContact === true) return "Not selectable — do not contact.";
+    if (contact.optOut === true) return "Not selectable — contact opted out.";
+    const bounce = String(contact.bounceStatus || "").toUpperCase();
+    if (bounce === "HARD_BOUNCE") return "Not selectable — previous hard bounce.";
+    if (["BLOCKED", "INVALID", "INVALID_EMAIL"].includes(bounce)) return "Not selectable — contact is blocked.";
+    if (!EMAIL_PATTERN.test(String(contact.businessEmail || "").trim().toLowerCase())) return "Not selectable — business email required.";
+    return "Not selectable — contact review required.";
   };
 
   function createController({ authFetch, showMessage, documentRef = document, windowRef = typeof window !== "undefined" ? window : { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport, operationOverride }) {

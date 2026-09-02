@@ -13,7 +13,7 @@ function harness(items) {
   const operations = async (name, payload) => {
     calls.push({ name, payload });
     const filtered = items.filter((item) => !payload?.segment || item.segment === payload.segment);
-    const eligible = filtered.filter((item) => item.eligibilityStatus === "SEND_ELIGIBLE" && !item.optOut && !item.doNotContact && !["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(item.bounceStatus));
+    const eligible = filtered.filter((item) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.businessEmail) && !item.optOut && !item.doNotContact && !["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"].includes(item.bounceStatus));
     if (name === "LIST_CONTACTS") return { items: filtered, total: filtered.length, selectedCount: items.filter((item) => item.selectedAt).length, eligibleCount: eligible.length, selectedEligibleCount: eligible.filter((item) => item.selectedAt).length };
     if (name === "SELECT_CONTACT") { const item = items.find((entry) => entry._id === payload.contactId); item.selectedAt = new Date(); return item; }
     if (name === "DESELECT_CONTACT") { const item = items.find((entry) => entry._id === payload.contactId); item.selectedAt = null; return item; }
@@ -26,7 +26,7 @@ function harness(items) {
 }
 
 test("current page selects and deselects eligible contacts but never blocked contacts", async () => {
-  const items = [contact("1"), contact("2"), contact("3", { eligibilityStatus: "PROSPECT_RESEARCH_REQUIRED", decisionMakerName: "", optOut: true })];
+  const items = [contact("1", { verificationStatus: "REQUIRES_REVIEW", eligibilityStatus: "CONTACT_REVIEW_REQUIRED" }), contact("2", { decisionMakerName: "", role: "", businessEmail: "events@real.example", verificationStatus: "NOT_VERIFIED", eligibilityStatus: "PROSPECT_RESEARCH_REQUIRED" }), contact("3", { eligibilityStatus: "PROSPECT_RESEARCH_REQUIRED", decisionMakerName: "", businessEmail: "EMAIL RESEARCH REQUIRED" })];
   const { controller, calls } = harness(items);
   await controller.selectCurrentPage(true);
   assert.deepEqual(calls.filter((call) => call.name === "SELECT_CONTACT").map((call) => call.payload.contactId), ["1", "2"]);
@@ -80,10 +80,11 @@ test("pointer drag resizes within minimum and viewport bounds then stops", () =>
 });
 
 test("disabled checkbox explanations are deterministic and top-level help is present", () => {
-  assert.match(selectionBlockedReason(contact("1", { eligibilityStatus: "PROSPECT_RESEARCH_REQUIRED", decisionMakerName: "" })), /decision maker research required/i);
-  assert.match(selectionBlockedReason(contact("2", { eligibilityStatus: "CONTACT_REVIEW_REQUIRED", verificationStatus: "NOT_VERIFIED" })), /email verification required/i);
-  assert.match(selectionBlockedReason(contact("3", { optOut: true })), /contact is blocked/i);
-  const html = fs.readFileSync(path.join(__dirname, "../public/dashboard.html"), "utf8"); assert.match(html, /Only Send Eligible contacts are selectable\./);
+  assert.match(selectionBlockedReason(contact("1", { eligibilityStatus: "PROSPECT_RESEARCH_REQUIRED", decisionMakerName: "", businessEmail: "EMAIL RESEARCH REQUIRED" })), /business email required/i);
+  assert.match(selectionBlockedReason(contact("2", { doNotContact: true })), /do not contact/i);
+  assert.match(selectionBlockedReason(contact("3", { optOut: true })), /opted out/i);
+  assert.match(selectionBlockedReason(contact("4", { bounceStatus: "HARD_BOUNCE" })), /previous hard bounce/i);
+  const html = fs.readFileSync(path.join(__dirname, "../public/dashboard.html"), "utf8"); assert.match(html, /Only contacts with a valid business email and no safety blockers are selectable\./);
 });
 
 test("interactive tooltip opens on hover/focus or tap and closes outside or on Escape", () => {
