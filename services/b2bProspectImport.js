@@ -19,6 +19,16 @@ const aliases = {
 const headerKey = (value) => String(value || "").trim().toLowerCase().replace(/\s*\/\s*/g, " / ").replace(/\s+/g, " ");
 for (const [field, names] of Object.entries(aliases)) for (const name of names) FIELD_ALIASES.set(headerKey(name), field);
 const clean = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+function classifyContact(contact = {}) {
+  const named = Boolean(clean(contact.decisionMakerName));
+  const role = Boolean(clean(contact.role));
+  const emailValid = EMAIL_PATTERN.test(clean(contact.businessEmail).toLowerCase());
+  const verified = ["VERIFIED", "VALID"].includes(String(contact.verificationStatus || "").toUpperCase());
+  if (!named) return "PROSPECT_RESEARCH_REQUIRED";
+  if (verified && emailValid && role) return "SEND_ELIGIBLE";
+  if (verified && emailValid) return "CONTACT_VERIFIED";
+  return "CONTACT_REVIEW_REQUIRED";
+}
 
 function normalizeSegment(value) {
   const text = clean(value).toLowerCase();
@@ -70,7 +80,8 @@ function parseWorkbook(buffer, fileName = "") {
     if (!contact.role) { importStatus = "REVIEW_REQUIRED"; reasons.push("ROLE_REVIEW_REQUIRED"); }
     if (!["VERIFIED", "VALID"].includes(contact.verificationStatus)) { importStatus = "REVIEW_REQUIRED"; reasons.push("VERIFICATION_REQUIRED"); }
     if (contact.segment === "UNKNOWN") { importStatus = "REVIEW_REQUIRED"; reasons.push("SEGMENT_REVIEW_REQUIRED"); }
-    contact.outreachStatus = importStatus === "NEW" ? "READY" : "REVIEW_REQUIRED";
+    contact.eligibilityStatus = classifyContact(contact);
+    contact.outreachStatus = contact.eligibilityStatus === "SEND_ELIGIBLE" ? "READY" : "REVIEW_REQUIRED";
     return { row: index + 2, contact, importStatus, importable, reasons, hasSourceValue };
   }).filter((row) => row.hasSourceValue).map(({ hasSourceValue: _ignored, ...row }) => row);
   return { sourceFileName: clean(fileName), sheetNames: sheets.map((sheet) => sheet.name), selectedSheet: selected.name, rows };
@@ -80,19 +91,19 @@ async function applyDuplicateStatus(parsed, contactsCollection) {
   const filters = [];
   for (const row of parsed.rows) {
     const normalizedCompany = row.contact.companyName.toLowerCase();
-    const normalizedPersonCompany = `${row.contact.decisionMakerName.toLowerCase()}|${normalizedCompany}`;
+    const normalizedPersonCompany = row.contact.decisionMakerName ? `${row.contact.decisionMakerName.toLowerCase()}|${normalizedCompany}` : "";
     row.normalizedEmail = row.contact.businessEmail || "";
     row.normalizedPersonCompany = normalizedPersonCompany;
     if (row.normalizedEmail) filters.push({ normalizedEmail: row.normalizedEmail });
-    if (normalizedCompany) filters.push({ normalizedPersonCompany });
+    if (normalizedPersonCompany) filters.push({ normalizedPersonCompany });
   }
   const existing = filters.length ? await contactsCollection.find({ $or: filters }, { projection: { normalizedEmail: 1, normalizedPersonCompany: 1 } }).toArray() : [];
   const emails = new Set(existing.map((item) => item.normalizedEmail).filter(Boolean));
   const people = new Set(existing.map((item) => item.normalizedPersonCompany).filter(Boolean));
   for (const row of parsed.rows) {
-    const duplicateReason = row.normalizedEmail && emails.has(row.normalizedEmail) ? "DUPLICATE_EMAIL" : people.has(row.normalizedPersonCompany) ? "DUPLICATE_PERSON_COMPANY" : "";
+    const duplicateReason = row.normalizedEmail && emails.has(row.normalizedEmail) ? "DUPLICATE_EMAIL" : row.normalizedPersonCompany && people.has(row.normalizedPersonCompany) ? "DUPLICATE_PERSON_COMPANY" : "";
     if (duplicateReason) { row.importStatus = "DUPLICATE"; row.importable = false; row.reasons = [duplicateReason]; }
-    else { if (row.normalizedEmail) emails.add(row.normalizedEmail); people.add(row.normalizedPersonCompany); }
+    else { if (row.normalizedEmail) emails.add(row.normalizedEmail); if (row.normalizedPersonCompany) people.add(row.normalizedPersonCompany); }
     delete row.normalizedEmail; delete row.normalizedPersonCompany;
   }
   return parsed;
@@ -100,7 +111,7 @@ async function applyDuplicateStatus(parsed, contactsCollection) {
 
 function summarize(rows) {
   const count = (status) => rows.filter((row) => row.importStatus === status).length;
-  return { totalRows: rows.length, new: count("NEW"), duplicates: count("DUPLICATE"), reviewRequired: count("REVIEW_REQUIRED"), invalid: count("INVALID"), readyToImport: rows.filter((row) => row.importable).length };
+  return { totalRows: rows.length, prospectResearchRequired: rows.filter((row) => row.importStatus !== "DUPLICATE" && row.contact.eligibilityStatus === "PROSPECT_RESEARCH_REQUIRED").length, contactReviewRequired: rows.filter((row) => row.importStatus !== "DUPLICATE" && row.contact.eligibilityStatus === "CONTACT_REVIEW_REQUIRED").length, contactVerified: rows.filter((row) => row.importStatus !== "DUPLICATE" && row.contact.eligibilityStatus === "CONTACT_VERIFIED").length, sendEligible: rows.filter((row) => row.importStatus !== "DUPLICATE" && row.contact.eligibilityStatus === "SEND_ELIGIBLE").length, duplicates: count("DUPLICATE"), invalid: count("INVALID"), importable: rows.filter((row) => row.importable).length, new: count("NEW"), reviewRequired: count("REVIEW_REQUIRED"), readyToImport: rows.filter((row) => row.importable).length };
 }
 
 function createPreviewBatchStore({ ttlMs = 15 * 60 * 1000, now = () => new Date(), randomBytes = crypto.randomBytes } = {}) {
@@ -112,4 +123,4 @@ function createPreviewBatchStore({ ttlMs = 15 * 60 * 1000, now = () => new Date(
   };
 }
 
-module.exports = { aliases, normalizeSegment, normalizeVerification, parseWorkbook, applyDuplicateStatus, summarize, createPreviewBatchStore };
+module.exports = { aliases, normalizeSegment, normalizeVerification, classifyContact, parseWorkbook, applyDuplicateStatus, summarize, createPreviewBatchStore };

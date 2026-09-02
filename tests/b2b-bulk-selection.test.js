@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createController } = require("../public/js/b2b-outreach-dashboard");
 
-function contact(id, overrides = {}) { return { _id: id, recordVersion: 1, companyName: `Company ${id}`, selectedAt: null, optOut: false, doNotContact: false, bounceStatus: "", ...overrides }; }
+function contact(id, overrides = {}) { return { _id: id, recordVersion: 1, companyName: `Company ${id}`, decisionMakerName: `Person ${id}`, role: "Manager", businessEmail: `person${id}@real.example`, verificationStatus: "VERIFIED", eligibilityStatus: "SEND_ELIGIBLE", selectedAt: null, optOut: false, doNotContact: false, bounceStatus: "", ...overrides }; }
 function element() { return { textContent: "", disabled: false, checked: false, indeterminate: false, value: "", replaceChildren() {}, addEventListener() {}, appendChild() {}, append() {}, insertCell() { return element(); }, insertRow() { return element(); } }; }
 function harness(items) {
   const calls = [];
@@ -21,7 +21,7 @@ function harness(items) {
 }
 
 test("current page selects and deselects eligible contacts but never blocked contacts", async () => {
-  const items = [contact("1"), contact("2"), contact("3", { optOut: true })];
+  const items = [contact("1"), contact("2"), contact("3", { eligibilityStatus: "PROSPECT_RESEARCH_REQUIRED", decisionMakerName: "", optOut: true })];
   const { controller, calls } = harness(items);
   await controller.selectCurrentPage(true);
   assert.deepEqual(calls.filter((call) => call.name === "SELECT_CONTACT").map((call) => call.payload.contactId), ["1", "2"]);

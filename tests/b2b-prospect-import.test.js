@@ -19,9 +19,9 @@ test("xlsx parsing normalizes supported columns, segments and verification witho
   assert.equal(parsed.selectedSheet, "Prospects");
   assert.equal(parsed.rows[0].contact.segment, "HOTELS"); assert.equal(parsed.rows[0].contact.verificationStatus, "VERIFIED");
   assert.deepEqual(parsed.rows[0].contact.personalisationFacts, [{ fact: "Hosts corporate events", verified: true }]);
-  assert.equal(parsed.rows[1].contact.businessEmail, ""); assert.ok(parsed.rows[1].reasons.includes("EMAIL_RESEARCH_REQUIRED")); assert.equal(parsed.rows[1].contact.segment, "FACILITIES_MANAGEMENT");
+  assert.equal(parsed.rows[1].contact.businessEmail, ""); assert.ok(parsed.rows[1].reasons.includes("EMAIL_RESEARCH_REQUIRED")); assert.equal(parsed.rows[1].contact.segment, "FACILITIES_MANAGEMENT"); assert.equal(parsed.rows[1].contact.eligibilityStatus, "PROSPECT_RESEARCH_REQUIRED");
   assert.equal(parsed.rows[1].contact.personalisationFacts[0].verified, false);
-  assert.equal(parsed.rows[2].importStatus, "REVIEW_REQUIRED"); assert.equal(parsed.rows[2].importable, false); assert.ok(parsed.rows[2].reasons.includes("INVALID_EMAIL"));
+  assert.equal(parsed.rows[0].contact.eligibilityStatus, "SEND_ELIGIBLE"); assert.equal(parsed.rows[2].importStatus, "REVIEW_REQUIRED"); assert.equal(parsed.rows[2].importable, false); assert.ok(parsed.rows[2].reasons.includes("INVALID_EMAIL"));
 });
 
 test("duplicate email and person-company rows are skipped in preview without contact mutation", async () => {
@@ -29,7 +29,15 @@ test("duplicate email and person-company rows are skipped in preview without con
   const parsed = parseWorkbook(workbookBuffer([["Company", "Name", "Email"], ["Email Duplicate", "One", "existing@real.example"], ["Real Hotel", "Ada Smith", "new@real.example"], ["Fresh Ltd", "Fresh Person", "fresh@real.example"], ["Fresh Ltd", "Fresh Person", "second@real.example"]]));
   await applyDuplicateStatus(parsed, collection);
   assert.deepEqual(parsed.rows.map((row) => row.importStatus), ["DUPLICATE", "DUPLICATE", "REVIEW_REQUIRED", "DUPLICATE"]);
-  assert.equal(collection.writes, 0); assert.deepEqual(summarize(parsed.rows), { totalRows: 4, new: 0, duplicates: 3, reviewRequired: 1, invalid: 0, readyToImport: 1 });
+  assert.equal(collection.writes, 0); const summary = summarize(parsed.rows); assert.equal(summary.duplicates, 3); assert.equal(summary.contactReviewRequired, 1); assert.equal(summary.importable, 1);
+});
+
+test("company prospect and named contact coexist while true duplicates remain duplicates", async () => {
+  const parsed = parseWorkbook(workbookBuffer([["Company", "Name", "Role", "Email", "Verification"], ["Example Hotel", "", "Public framework contact", "info@example.com", "Verified"], ["Example Hotel", "John Smith", "F&B Manager", "john@example.com", "Verified"], ["Example Hotel", "John Smith", "F&B Manager", "john@example.com", "Verified"]]));
+  await applyDuplicateStatus(parsed, contacts());
+  assert.equal(parsed.rows[0].contact.eligibilityStatus, "PROSPECT_RESEARCH_REQUIRED"); assert.notEqual(parsed.rows[0].importStatus, "DUPLICATE");
+  assert.equal(parsed.rows[1].contact.eligibilityStatus, "SEND_ELIGIBLE"); assert.notEqual(parsed.rows[1].importStatus, "DUPLICATE"); assert.equal(parsed.rows[2].importStatus, "DUPLICATE");
+  const summary = summarize(parsed.rows); assert.equal(summary.prospectResearchRequired, 1); assert.equal(summary.sendEligible, 1); assert.equal(summary.duplicates, 1); assert.equal(summary.importable, 2);
 });
 
 function routeHarness({ authenticated = true } = {}) {

@@ -7,7 +7,10 @@
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const value = (item) => item === null || item === undefined || item === "" ? "—" : String(item);
   const idOf = (item) => String(item?._id || item?.id || "");
-  const blocked = (contact) => contact?.optOut === true || contact?.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(String(contact?.bounceStatus || "").toUpperCase());
+  const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const eligibility = (contact = {}) => contact.eligibilityStatus || (!String(contact.decisionMakerName || "").trim() ? "PROSPECT_RESEARCH_REQUIRED" : ["VERIFIED", "VALID"].includes(String(contact.verificationStatus || "").toUpperCase()) && EMAIL_PATTERN.test(String(contact.businessEmail || "").trim()) && String(contact.role || "").trim() ? "SEND_ELIGIBLE" : "CONTACT_REVIEW_REQUIRED");
+  const blocked = (contact) => eligibility(contact) !== "SEND_ELIGIBLE" || contact?.optOut === true || contact?.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(String(contact?.bounceStatus || "").toUpperCase());
+  const eligibilityLabel = (contact) => ({ PROSPECT_RESEARCH_REQUIRED: "Prospect – Research Required", CONTACT_REVIEW_REQUIRED: "Review Required", CONTACT_VERIFIED: "Verified Contact", SEND_ELIGIBLE: "Send Eligible" })[eligibility(contact)] || "Review Required";
 
   function createController({ authFetch, showMessage, documentRef = document, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport, operationOverride }) {
     const el = (id) => documentRef.getElementById(id);
@@ -55,7 +58,7 @@
 
     function filters() {
       const payload = { page: state.page, limit: state.limit };
-      for (const [field, elementId] of [["search", "b2bSearch"], ["segment", "b2bSegment"], ["outreachStatus", "b2bStatus"]]) if (el(elementId)?.value.trim()) payload[field] = el(elementId).value.trim();
+      for (const [field, elementId] of [["search", "b2bSearch"], ["segment", "b2bSegment"], ["outreachStatus", "b2bStatus"], ["eligibilityStatus", "b2bEligibility"]]) if (el(elementId)?.value.trim()) payload[field] = el(elementId).value.trim();
       for (const [field, elementId] of [["hasEmail", "b2bHasEmail"], ["namedContact", "b2bNamedContact"], ["replied", "b2bReplied"]]) if (el(elementId)?.value) payload[field] = el(elementId).value === "true";
       return payload;
     }
@@ -74,14 +77,14 @@
     function renderContacts() {
       const tbody = el("b2bContactsTable");
       tbody.replaceChildren();
-      if (!state.contacts.length) { const row = tbody.insertRow(); const cell = row.insertCell(); cell.colSpan = 12; cell.textContent = "No B2B contacts available."; return; }
+      if (!state.contacts.length) { const row = tbody.insertRow(); const cell = row.insertCell(); cell.colSpan = 13; cell.textContent = "No B2B contacts available."; return; }
       for (const contact of state.contacts) {
         const row = tbody.insertRow();
         const suppressed = blocked(contact);
         const checkbox = documentRef.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = Boolean(contact.selectedAt); checkbox.disabled = suppressed;
         checkbox.addEventListener("change", () => toggleContact(contact, checkbox.checked).catch(handleError));
         row.insertCell().appendChild(checkbox);
-        const fields = [contact.decisionMakerName, contact.companyName, contact.role, contact.businessEmail || "EMAIL RESEARCH REQUIRED", contact.segment, contact.bestBlackEagleOffer, contact.verificationStatus, suppressed ? [contact.optOut && "OPT OUT", contact.doNotContact && "DO NOT CONTACT", contact.bounceStatus].filter(Boolean).join(" / ") : contact.outreachStatus, contact.lastEmailSentAt ? new Date(contact.lastEmailSentAt).toLocaleString() : "Never", contact.replied ? `Replied ${contact.repliedAt ? new Date(contact.repliedAt).toLocaleString() : ""}` : "Not replied"];
+        const fields = [contact.decisionMakerName, contact.companyName, contact.role, contact.businessEmail || "EMAIL RESEARCH REQUIRED", contact.segment, contact.bestBlackEagleOffer, contact.verificationStatus, eligibilityLabel(contact), suppressed ? [contact.optOut && "OPT OUT", contact.doNotContact && "DO NOT CONTACT", contact.bounceStatus].filter(Boolean).join(" / ") || contact.outreachStatus : contact.outreachStatus, contact.lastEmailSentAt ? new Date(contact.lastEmailSentAt).toLocaleString() : "Never", contact.replied ? `Replied ${contact.repliedAt ? new Date(contact.repliedAt).toLocaleString() : ""}` : "Not replied"];
         for (const field of fields) row.insertCell().textContent = value(field);
         const action = documentRef.createElement("button"); action.type = "button"; action.className = "btn btn-secondary"; action.textContent = "Generate Draft"; action.disabled = !contact.selectedAt || suppressed; action.addEventListener("click", () => generate(contact).catch(handleError)); row.insertCell().appendChild(action);
       }
@@ -153,11 +156,11 @@
       state.importBatchId = data.batchId;
       el("b2bImportSheetInfo").textContent = `Selected sheet: ${value(data.selectedSheet)} · Workbook sheets: ${(data.sheetNames || []).join(", ")}`;
       const summary = data.summary || {}; el("b2bImportSummary").replaceChildren();
-      for (const [label, count] of [["Total rows", summary.totalRows], ["New", summary.new], ["Duplicates", summary.duplicates], ["Review required", summary.reviewRequired], ["Invalid", summary.invalid], ["Ready to import", summary.readyToImport]]) { const card = documentRef.createElement("div"); card.className = "stat-card"; const title = documentRef.createElement("span"); title.textContent = label; const strong = documentRef.createElement("strong"); strong.textContent = String(count || 0); card.append(title, strong); el("b2bImportSummary").appendChild(card); }
+      for (const [label, count] of [["Total rows", summary.totalRows], ["Prospect Research Required", summary.prospectResearchRequired], ["Contact Review Required", summary.contactReviewRequired], ["Verified Contact", summary.contactVerified], ["Send Eligible", summary.sendEligible], ["Duplicates", summary.duplicates], ["Invalid", summary.invalid], ["Importable (not mail-ready)", summary.importable]]) { const card = documentRef.createElement("div"); card.className = "stat-card"; const title = documentRef.createElement("span"); title.textContent = label; const strong = documentRef.createElement("strong"); strong.textContent = String(count || 0); card.append(title, strong); el("b2bImportSummary").appendChild(card); }
       const tbody = el("b2bImportPreview"); tbody.replaceChildren(); const visible = (data.rows || []).slice(0, 200);
-      for (const row of visible) { const tr = tbody.insertRow(); for (const item of [row.row, row.contact?.companyName, row.contact?.decisionMakerName, row.contact?.role, row.contact?.businessEmail || "EMAIL RESEARCH REQUIRED", row.contact?.segment, row.contact?.verificationStatus, row.importStatus, (row.reasons || []).join(", ")]) tr.insertCell().textContent = value(item); }
+      for (const row of visible) { const tr = tbody.insertRow(); for (const item of [row.row, row.contact?.companyName, row.contact?.decisionMakerName, row.contact?.role, row.contact?.businessEmail || "EMAIL RESEARCH REQUIRED", row.contact?.segment, row.contact?.verificationStatus, eligibilityLabel(row.contact), row.importStatus, (row.reasons || []).join(", ")]) tr.insertCell().textContent = value(item); }
       el("b2bImportPreviewLimit").textContent = (data.rows || []).length > visible.length ? `Showing first ${visible.length} of ${data.rows.length} rows.` : "";
-      el("b2bConfirmImport").disabled = !state.importBatchId || Number(summary.readyToImport || 0) === 0;
+      el("b2bConfirmImport").disabled = !state.importBatchId || Number(summary.importable || 0) === 0;
     }
     async function previewImport() { const file = el("b2bImportFile").files?.[0]; if (!file) return; const body = new FormData(); body.append("file", file); status("Parsing import file..."); const data = await json("/api/admin/b2b-outreach/import/preview", { method: "POST", body }); renderImportPreview(data); status("Preview ready. No contacts have been imported."); }
     async function confirmImport() {
