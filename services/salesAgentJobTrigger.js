@@ -1,7 +1,8 @@
 const WORKER_COMMAND = "npm run worker:once";
 const MANUAL_REVIEW_WORKER_COMMAND = "npm run worker:submit-manual-review";
 const ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND = "npm run worker:submit-addtoevent";
-const ALLOWED_WORKER_COMMANDS = new Set([WORKER_COMMAND, MANUAL_REVIEW_WORKER_COMMAND, ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND]);
+const B2B_OUTREACH_WORKER_COMMAND = "npm run b2b:request";
+const ALLOWED_WORKER_COMMANDS = new Set([WORKER_COMMAND, MANUAL_REVIEW_WORKER_COMMAND, ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND, B2B_OUTREACH_WORKER_COMMAND]);
 const DEFAULT_RENDER_API_BASE_URL = "https://api.render.com/v1";
 const RENDER_TRIGGER_STAGE = "RENDER_TRIGGER";
 
@@ -78,7 +79,7 @@ function createRenderSalesAgentTrigger({
   timeoutMs = 15000,
   now = () => new Date(),
 } = {}) {
-  return async function triggerSalesAgentRun({ startCommand = WORKER_COMMAND, sourceRunId = "", persistedSourceRunId = "" } = {}) {
+  return async function triggerSalesAgentRun({ startCommand = WORKER_COMMAND, sourceRunId = "", persistedSourceRunId = "", b2bRequestId = "" } = {}) {
     const requestTimestamp = now().toISOString();
     if (typeof fetchFn !== "function") {
       throw new RenderTriggerError("Render job trigger is unavailable.", {
@@ -105,8 +106,16 @@ function createRenderSalesAgentTrigger({
           requestTimestamp,
         });
       }
+      if (startCommand === B2B_OUTREACH_WORKER_COMMAND && !/^[a-f\d]{24}$/i.test(String(b2bRequestId))) {
+        throw new RenderTriggerError("B2B outreach request ID is invalid.", {
+          errorCode: "B2B_REQUEST_ID_INVALID",
+          requestTimestamp,
+        });
+      }
       const effectiveStartCommand = startCommand === ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND
         ? `ADD_TO_EVENT_SUBMIT_ENABLED=true ${startCommand}`
+        : startCommand === B2B_OUTREACH_WORKER_COMMAND
+          ? `B2B_OUTREACH_REQUEST_ID=${b2bRequestId} ${startCommand}`
         : startCommand;
       const body = { startCommand: effectiveStartCommand };
       const planId = String(env.RENDER_SALES_AGENT_JOB_PLAN_ID || "").trim();
@@ -301,6 +310,7 @@ module.exports = {
   RenderTriggerError,
   MANUAL_REVIEW_WORKER_COMMAND,
   ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND,
+  B2B_OUTREACH_WORKER_COMMAND,
   WORKER_COMMAND,
   createRenderSalesAgentTrigger,
   createRenderSalesAgentJobStatusClient,

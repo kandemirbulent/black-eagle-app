@@ -25,6 +25,7 @@ const SalesAgentOpportunityResult = require("./models/salesAgentOpportunityResul
 const SalesAgentSettings = require("./models/salesAgentSettings");
 const staffEvents = require("./routes/staffEvents");
 const { createSalesAgentRouter } = require("./routes/salesAgentRoutes");
+const { createB2BOutreachRouter } = require("./routes/b2bOutreachRoutes");
 const {
   normalizeEmail,
   getBaseUrl,
@@ -779,6 +780,13 @@ app.use(
     SalesAgentRun,
     SalesAgentOpportunityResult,
     SalesAgentSettings,
+  })
+);
+app.use(
+  "/api",
+  createB2BOutreachRouter({
+    requireAdminAuth,
+    getRequestsCollection: () => mongoose.connection.db.collection("b2boutreachrequests"),
   })
 );
 

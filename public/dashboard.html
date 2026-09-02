@@ -499,6 +499,7 @@
       <button type="button" data-target="ordersSection">Orders</button>
       <button type="button" data-target="staffReportsSection">Staff Reports</button>
       <button type="button" data-target="salesAgentSection">Sales Agent</button>
+      <button type="button" id="b2bOutreachNavButton" data-target="b2bOutreachSection">B2B Outreach</button>
       <button type="button" id="manualOpsNavButton" class="hidden" data-target="manualOperationsSection">Manual Operations</button>
       <button type="button" id="supportMessagesNavButton" class="hidden" data-target="supportMessagesSection">Support Messages</button>
       <button type="button" id="adminNavButton" class="hidden" data-target="adminManagementSection">Admin Management</button>
@@ -550,6 +551,31 @@
               </tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+      <section id="b2bOutreachSection" class="section">
+        <h2>B2B Outreach</h2>
+        <p class="subtle" style="margin-bottom:14px;">Select verified contacts, generate personalised drafts, review, edit and approve them. Email transport is not enabled.</p>
+        <div id="b2bJobStatus" class="message">Ready</div>
+        <div class="filters">
+          <div><label for="b2bSearch">Search</label><input id="b2bSearch" type="search" placeholder="Decision maker, company or email" /></div>
+          <div><label for="b2bSegment">Segment</label><select id="b2bSegment"><option value="">All segments</option><option value="HOTELS">Hotels</option><option value="CATERING">Catering</option><option value="EVENT_VENUES">Event Venues</option><option value="FACILITIES_MANAGEMENT">Facilities Management</option><option value="PROPERTY_MANAGEMENT">Property Management</option><option value="CORPORATE">Corporate</option></select></div>
+          <div><label for="b2bStatus">Outreach Status</label><input id="b2bStatus" type="text" placeholder="e.g. READY" /></div>
+          <div><label for="b2bHasEmail">Email</label><select id="b2bHasEmail"><option value="">All</option><option value="true">Has Email</option><option value="false">Email Required</option></select></div>
+          <div><label for="b2bNamedContact">Named Contact</label><select id="b2bNamedContact"><option value="">All</option><option value="true">Named only</option></select></div>
+          <div><label for="b2bReplied">Reply</label><select id="b2bReplied"><option value="">All</option><option value="true">Replied</option><option value="false">Not Replied</option></select></div>
+        </div>
+        <div class="btn-row" style="margin-bottom:14px;"><button type="button" class="btn btn-primary" id="b2bApplyFilters">Apply Filters</button><button type="button" class="btn btn-secondary" id="b2bGenerateSelected" disabled>Generate Drafts</button><span class="subtle" id="b2bSelectedCount">0 selected</span></div>
+        <div class="table-wrap"><table class="table"><thead><tr><th>Select</th><th>Decision Maker</th><th>Company</th><th>Role</th><th>Business Email</th><th>Segment</th><th>Best Offer</th><th>Verification</th><th>Outreach Status</th><th>Last Sent</th><th>Reply</th><th>Actions</th></tr></thead><tbody id="b2bContactsTable"><tr><td colspan="12">Load B2B contacts to begin.</td></tr></tbody></table></div>
+        <div class="btn-row" style="margin-top:14px;align-items:center;"><button type="button" class="btn btn-secondary" id="b2bPreviousPage">Previous</button><span class="subtle" id="b2bPageSummary">Page 1</span><button type="button" class="btn btn-secondary" id="b2bNextPage">Next</button></div>
+        <div id="b2bDraftPanel" class="section hidden" style="margin-top:18px;background:#f8fafc;">
+          <h3>Draft Preview</h3>
+          <div class="form-grid" style="margin-top:12px;"><div><label>To</label><div id="b2bDraftTo" class="support-detail-card"></div></div><div><label>Decision Maker / Company / Role</label><div id="b2bDraftContact" class="support-detail-card"></div></div><div><label>Status</label><div id="b2bDraftStatus" class="support-detail-card"></div></div><div><label>Review / Deliverability</label><div id="b2bDraftReview" class="support-detail-card"></div></div></div>
+          <label for="b2bDraftSubject">Subject</label><input id="b2bDraftSubject" type="text" />
+          <label for="b2bDraftBody" style="margin-top:12px;">Email Body</label><textarea id="b2bDraftBody" rows="12"></textarea>
+          <div id="b2bVerifiedContext" class="support-message-full" style="margin-top:12px;"></div>
+          <div class="btn-row" style="margin-top:14px;"><button type="button" class="btn btn-secondary" id="b2bSaveDraft">Save Edit</button><button type="button" class="btn btn-success" id="b2bApproveDraft">Approve</button><button type="button" class="btn btn-primary" id="b2bSendApproved" disabled>Send Approved</button></div>
         </div>
       </section>
 
@@ -1096,6 +1122,7 @@
   </div>
 
   <script src="/js/sales-agent-dashboard.js"></script>
+  <script src="/js/b2b-outreach-dashboard.js"></script>
   <script>
     const token = localStorage.getItem("adminToken");
     const pageMessage = document.getElementById("pageMessage");
@@ -1132,6 +1159,7 @@
     let activeManualMode = "customer";
     let activeManualCustomerForOrderId = "";
     let salesAgentDashboard = null;
+    let b2bOutreachDashboard = null;
 
     const MANUAL_ORDER_VAT_RATE = 0.2;
     const MANUAL_FORM_STORAGE_KEYS = {
@@ -2619,6 +2647,8 @@
           confirmFn: window.confirm.bind(window)
         });
         await salesAgentDashboard.init();
+        b2bOutreachDashboard = window.B2BOutreachDashboard.createController({ authFetch, showMessage, documentRef: document });
+        await b2bOutreachDashboard.init();
         await refreshAll();
       } catch (error) {
         showMessage(error.message || "Failed to load dashboard.", "error");
