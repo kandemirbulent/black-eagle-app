@@ -136,7 +136,7 @@
       const batchId = state.importBatchId;
       if (!batchId) { state.importConfirming = true; status("Import failed: Import preview was not found. Preview the file again.", "error"); state.importConfirming = false; return; }
       state.importConfirming = true;
-      const button = el("b2bConfirmImport"); button.disabled = true;
+      const button = el("b2bConfirmImport"); button.disabled = true; button.textContent = "Importing...";
       let completed = false;
       try {
         status("Confirming import...");
@@ -149,11 +149,15 @@
         completed = true;
         state.importConfirming = false;
         await (refreshAfterImport ? refreshAfterImport() : loadContacts());
+        await sleep(1000);
+        closeImport();
+        status("Import completed successfully.");
       } catch (error) {
         const safeMessage = error?.message || "B2B operation failed.";
         status(`Import failed: ${safeMessage}`, "error");
       } finally {
         state.importConfirming = false;
+        button.textContent = "Confirm Import";
         button.disabled = completed || !state.importBatchId;
       }
     }
