@@ -9,13 +9,15 @@
   const idOf = (item) => String(item?._id || item?.id || "");
   const blocked = (contact) => contact?.optOut === true || contact?.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(String(contact?.bounceStatus || "").toUpperCase());
 
-  function createController({ authFetch, showMessage, documentRef = document, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000 }) {
+  function createController({ authFetch, showMessage, documentRef = document, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport }) {
     const el = (id) => documentRef.getElementById(id);
-    const state = { page: 1, limit: 25, total: 0, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "" };
+    const state = { page: 1, limit: 25, total: 0, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "", importConfirming: false };
 
     function status(message, type = "success") {
       const target = el("b2bJobStatus");
       if (target) { target.className = `message show ${type}`; target.textContent = message; }
+      const importTarget = el("b2bImportStatus");
+      if (importTarget && state.importConfirming) { importTarget.className = `message show ${type}`; importTarget.textContent = message; }
     }
 
     async function json(url, options = {}) {
@@ -116,7 +118,7 @@
     async function saveDraft() { const draft = await operation("UPDATE_DRAFT", { draftId: idOf(state.draft), subject: el("b2bDraftSubject").value, body: el("b2bDraftBody").value }); state.draft = draft; await openDraft(idOf(draft), state.draftContact); }
     async function approveDraft() { await operation("APPROVE_DRAFT", { draftId: idOf(state.draft) }); await openDraft(idOf(state.draft), state.draftContact); }
     async function sendApproved() { try { await operation("SEND_APPROVED", { draftId: idOf(state.draft) }); } catch (error) { if (error.code === "B2B_OUTREACH_SEND_DISABLED") { status("Email sending is not enabled yet.", "error"); return; } throw error; } }
-    function openImport() { state.importBatchId = ""; el("b2bImportFile").value = ""; el("b2bConfirmImport").disabled = true; el("b2bImportModal").classList.remove("hidden"); }
+    function openImport() { state.importBatchId = ""; state.importConfirming = false; el("b2bImportFile").value = ""; el("b2bConfirmImport").disabled = true; const target = el("b2bImportStatus"); if (target) { target.className = "message"; target.textContent = ""; } el("b2bImportModal").classList.remove("hidden"); }
     function closeImport() { el("b2bImportModal").classList.add("hidden"); }
     function renderImportPreview(data) {
       state.importBatchId = data.batchId;
@@ -129,12 +131,37 @@
       el("b2bConfirmImport").disabled = !state.importBatchId || Number(summary.readyToImport || 0) === 0;
     }
     async function previewImport() { const file = el("b2bImportFile").files?.[0]; if (!file) return; const body = new FormData(); body.append("file", file); status("Parsing import file..."); const data = await json("/api/admin/b2b-outreach/import/preview", { method: "POST", body }); renderImportPreview(data); status("Preview ready. No contacts have been imported."); }
-    async function confirmImport() { if (!state.importBatchId) return; el("b2bConfirmImport").disabled = true; status("Confirming import..."); const result = await json("/api/admin/b2b-outreach/import/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ batchId: state.importBatchId }) }); const imported = result.completed ? result.result : await waitForRequest(result); status(`Imported: ${imported.imported || 0} · Skipped duplicates: ${imported.skippedDuplicates || 0} · Review required: ${imported.reviewRequired || 0} · Invalid: ${imported.invalid || 0}`); state.importBatchId = ""; closeImport(); await loadContacts(); }
+    async function confirmImport() {
+      if (state.importConfirming) return;
+      const batchId = state.importBatchId;
+      if (!batchId) { state.importConfirming = true; status("Import failed: Import preview was not found. Preview the file again.", "error"); state.importConfirming = false; return; }
+      state.importConfirming = true;
+      const button = el("b2bConfirmImport"); button.disabled = true;
+      let completed = false;
+      try {
+        status("Confirming import...");
+        const result = await json("/api/admin/b2b-outreach/import/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ batchId }) });
+        const imported = result.completed ? result.result : await waitForRequest(result);
+        status("Completed");
+        const summary = `Imported: ${imported?.imported || 0} · Skipped duplicates: ${imported?.skippedDuplicates || 0} · Review required: ${imported?.reviewRequired || 0} · Invalid: ${imported?.invalid || 0}`;
+        status(summary);
+        state.importBatchId = "";
+        completed = true;
+        state.importConfirming = false;
+        await (refreshAfterImport ? refreshAfterImport() : loadContacts());
+      } catch (error) {
+        const safeMessage = error?.message || "B2B operation failed.";
+        status(`Import failed: ${safeMessage}`, "error");
+      } finally {
+        state.importConfirming = false;
+        button.disabled = completed || !state.importBatchId;
+      }
+    }
     function handleError(error) { const message = error?.code === "B2B_OUTREACH_SEND_DISABLED" ? "Email sending is not enabled yet." : error?.message || "B2B operation failed."; status(message, "error"); showMessage(message, "error"); }
 
     async function init() {
       el("b2bApplyFilters").addEventListener("click", () => { state.page = 1; loadContacts().catch(handleError); }); el("b2bGenerateSelected").addEventListener("click", () => generateSelected().catch(handleError)); el("b2bPreviousPage").addEventListener("click", () => { if (state.page > 1) { state.page--; loadContacts().catch(handleError); } }); el("b2bNextPage").addEventListener("click", () => { state.page++; loadContacts().catch(handleError); }); el("b2bSaveDraft").addEventListener("click", () => saveDraft().catch(handleError)); el("b2bApproveDraft").addEventListener("click", () => approveDraft().catch(handleError)); el("b2bSendApproved").addEventListener("click", () => sendApproved().catch(handleError));
-      el("b2bImportExcel").addEventListener("click", openImport); el("b2bImportClose").addEventListener("click", closeImport); el("b2bImportFile").addEventListener("change", () => previewImport().catch(handleError)); el("b2bConfirmImport").addEventListener("click", () => confirmImport().catch(handleError)); el("b2bImportModal").addEventListener("click", (event) => { if (event.target === el("b2bImportModal")) closeImport(); });
+      el("b2bImportExcel").addEventListener("click", openImport); el("b2bImportClose").addEventListener("click", closeImport); el("b2bImportFile").addEventListener("change", () => previewImport().catch(handleError)); el("b2bConfirmImport").addEventListener("click", confirmImport); el("b2bImportModal").addEventListener("click", (event) => { if (event.target === el("b2bImportModal")) closeImport(); });
       let loaded = false;
       el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; loadContacts().catch((error) => { loaded = false; handleError(error); }); } });
       return null;

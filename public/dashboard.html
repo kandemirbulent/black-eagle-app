@@ -582,7 +582,9 @@
             <input id="b2bImportFile" type="file" accept=".xlsx,.xls,.csv" />
             <p id="b2bImportSheetInfo" class="subtle" style="margin:10px 0;"></p><div id="b2bImportSummary" class="stats-grid" style="margin:12px 0;"></div>
             <div class="table-wrap"><table class="table"><thead><tr><th>Row</th><th>Company</th><th>Decision Maker</th><th>Role</th><th>Email</th><th>Segment</th><th>Verification</th><th>Import Status</th><th>Reason</th></tr></thead><tbody id="b2bImportPreview"><tr><td colspan="9">Choose a file to preview.</td></tr></tbody></table></div>
-            <p id="b2bImportPreviewLimit" class="subtle" style="margin-top:8px;"></p><div class="btn-row" style="margin-top:14px;"><button type="button" class="btn btn-success" id="b2bConfirmImport" disabled>Confirm Import</button></div>
+            <p id="b2bImportPreviewLimit" class="subtle" style="margin-top:8px;"></p>
+            <div id="b2bImportStatus" class="message" role="status" aria-live="polite"></div>
+            <div class="btn-row" style="margin-top:14px;"><button type="button" class="btn btn-success" id="b2bConfirmImport" disabled>Confirm Import</button></div>
           </div>
         </div>
       </section>
