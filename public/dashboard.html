@@ -301,6 +301,35 @@
       padding: 20px;
     }
 
+    #b2bImportModal .b2b-import-panel {
+      width: min(92vw, 1400px);
+      height: min(82vh, 900px);
+      min-width: min(720px, calc(100vw - 32px));
+      min-height: 420px;
+      max-width: calc(100vw - 32px);
+      max-height: calc(100vh - 32px);
+      resize: both;
+      overflow: auto;
+    }
+
+    #b2bImportModal .modal-header {
+      position: sticky;
+      top: -20px;
+      z-index: 3;
+      background: #fff;
+      padding-top: 20px;
+    }
+
+    @media (max-width: 700px) {
+      #b2bImportModal .b2b-import-panel {
+        width: 100%;
+        height: min(90vh, 860px);
+        min-width: 0;
+        min-height: 0;
+        resize: none;
+      }
+    }
+
     .modal-header {
       display: flex;
       justify-content: space-between;
@@ -579,7 +608,7 @@
           <div class="btn-row" style="margin-top:14px;"><button type="button" class="btn btn-secondary" id="b2bSaveDraft">Save Edit</button><button type="button" class="btn btn-success" id="b2bApproveDraft">Approve</button><button type="button" class="btn btn-primary" id="b2bSendApproved" disabled>Send Approved</button></div>
         </div>
         <div id="b2bImportModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="b2bImportTitle">
-          <div class="modal-panel sales-agent-details-panel"><div class="modal-header"><div><h3 id="b2bImportTitle" class="modal-title">Import B2B Prospects</h3><p class="subtle">Upload an Excel or CSV file, review every row, then confirm the import.</p></div><button type="button" class="icon-button" id="b2bImportClose" aria-label="Close import modal">&times;</button></div>
+          <div class="modal-panel sales-agent-details-panel b2b-import-panel"><div class="modal-header"><div><h3 id="b2bImportTitle" class="modal-title">Import B2B Prospects</h3><p class="subtle">Upload an Excel or CSV file, review every row, then confirm the import.</p></div><button type="button" class="icon-button" id="b2bImportClose" aria-label="Close import modal">&times;</button></div>
             <input id="b2bImportFile" type="file" accept=".xlsx,.xls,.csv" />
             <p id="b2bImportSheetInfo" class="subtle" style="margin:10px 0;"></p><div id="b2bImportSummary" class="stats-grid" style="margin:12px 0;"></div>
             <div class="table-wrap"><table class="table"><thead><tr><th>Row</th><th>Company</th><th>Decision Maker</th><th>Role</th><th>Email</th><th>Segment</th><th>Verification</th><th>Eligibility</th><th>Import Status</th><th>Reason</th></tr></thead><tbody id="b2bImportPreview"><tr><td colspan="10">Choose a file to preview.</td></tr></tbody></table></div>

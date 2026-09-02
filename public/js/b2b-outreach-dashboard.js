@@ -14,7 +14,7 @@
 
   function createController({ authFetch, showMessage, documentRef = document, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport, operationOverride }) {
     const el = (id) => documentRef.getElementById(id);
-    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "", importConfirming: false };
+    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, allResultsSelected: false, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "", importConfirming: false };
 
     function status(message, type = "success") {
       const target = el("b2bJobStatus");
@@ -72,6 +72,7 @@
       pageCheckbox.checked = eligible.length > 0 && selectedOnPage === eligible.length;
       pageCheckbox.indeterminate = selectedOnPage > 0 && selectedOnPage < eligible.length;
       pageCheckbox.disabled = eligible.length === 0;
+      el("b2bSelectAllResults").textContent = state.allResultsSelected ? "Deselect All Results" : "Select All Results";
     }
 
     function renderContacts() {
@@ -94,7 +95,7 @@
 
     async function loadContacts() {
       const data = await operation("LIST_CONTACTS", filters());
-      state.contacts = Array.isArray(data?.items) ? data.items : []; state.total = Number(data?.total || 0); state.selectedCount = Number(data?.selectedCount || 0);
+      state.contacts = Array.isArray(data?.items) ? data.items : []; state.total = Number(data?.total || 0); state.selectedCount = Number(data?.selectedCount || 0); state.allResultsSelected = Number(data?.eligibleCount || 0) > 0 && Number(data?.selectedEligibleCount || 0) === Number(data?.eligibleCount || 0);
       state.selected.clear(); for (const contact of state.contacts) if (contact.selectedAt) state.selected.set(idOf(contact), contact);
       renderContacts();
     }
@@ -119,7 +120,7 @@
       const result = await operation("BULK_SELECT_CONTACTS", filters());
       state.unavailableCount = Number(result?.unavailable || 0);
       await loadContacts();
-      status(`${result?.selected || 0} eligible contacts selected${state.unavailableCount ? ` · ${state.unavailableCount} unavailable` : ""}.`);
+      status(result?.action === "DESELECTED" ? `${result?.eligibleCount || 0} filtered contacts deselected.` : `${result?.selected || 0} eligible contacts selected${state.unavailableCount ? ` · ${state.unavailableCount} unavailable` : ""}.`);
     }
 
     async function clearSelection() {

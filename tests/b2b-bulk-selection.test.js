@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const { createController } = require("../public/js/b2b-outreach-dashboard");
 
 function contact(id, overrides = {}) { return { _id: id, recordVersion: 1, companyName: `Company ${id}`, decisionMakerName: `Person ${id}`, role: "Manager", businessEmail: `person${id}@real.example`, verificationStatus: "VERIFIED", eligibilityStatus: "SEND_ELIGIBLE", selectedAt: null, optOut: false, doNotContact: false, bounceStatus: "", ...overrides }; }
@@ -9,10 +11,12 @@ function harness(items) {
   const elements = new Proxy({}, { get(target, key) { if (!target[key]) target[key] = element(); return target[key]; } });
   const operations = async (name, payload) => {
     calls.push({ name, payload });
-    if (name === "LIST_CONTACTS") return { items, total: items.length, selectedCount: items.filter((item) => item.selectedAt).length };
+    const filtered = items.filter((item) => !payload?.segment || item.segment === payload.segment);
+    const eligible = filtered.filter((item) => item.eligibilityStatus === "SEND_ELIGIBLE" && !item.optOut && !item.doNotContact && !["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(item.bounceStatus));
+    if (name === "LIST_CONTACTS") return { items: filtered, total: filtered.length, selectedCount: items.filter((item) => item.selectedAt).length, eligibleCount: eligible.length, selectedEligibleCount: eligible.filter((item) => item.selectedAt).length };
     if (name === "SELECT_CONTACT") { const item = items.find((entry) => entry._id === payload.contactId); item.selectedAt = new Date(); return item; }
     if (name === "DESELECT_CONTACT") { const item = items.find((entry) => entry._id === payload.contactId); item.selectedAt = null; return item; }
-    if (name === "BULK_SELECT_CONTACTS") { items.filter((item) => !item.optOut && !item.doNotContact && !["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(item.bounceStatus)).forEach((item) => { item.selectedAt = new Date(); }); return { selected: 2, unavailable: 1, selectedCount: 2 }; }
+    if (name === "BULK_SELECT_CONTACTS") { const deselect = eligible.length > 0 && eligible.every((item) => item.selectedAt); eligible.forEach((item) => { item.selectedAt = deselect ? null : new Date(); }); return { action: deselect ? "DESELECTED" : "SELECTED", selected: deselect ? 0 : eligible.length, eligibleCount: eligible.length, unavailable: filtered.length - eligible.length, selectedCount: items.filter((item) => item.selectedAt).length }; }
     if (name === "CLEAR_CONTACT_SELECTION") { items.forEach((item) => { item.selectedAt = null; }); return { selectedCount: 0 }; }
   };
   const controller = createController({ authFetch: async () => {}, showMessage() {}, documentRef: { getElementById: (id) => elements[id], createElement: () => element() }, operationOverride: operations });
@@ -31,14 +35,28 @@ test("current page selects and deselects eligible contacts but never blocked con
 });
 
 test("select all results passes active filters, persists count, and triggers no send", async () => {
-  const items = [contact("1"), contact("2"), contact("3", { bounceStatus: "HARD_BOUNCE" })];
+  const items = [contact("1", { segment: "HOTELS" }), contact("2", { segment: "HOTELS" }), contact("3", { segment: "HOTELS", bounceStatus: "HARD_BOUNCE" }), contact("4", { segment: "CATERING", selectedAt: new Date() })];
   const { controller, calls, elements } = harness(items);
   elements.b2bSearch.value = "Hotel"; elements.b2bSegment.value = "HOTELS";
   await controller.selectAllResults();
   const bulk = calls.find((call) => call.name === "BULK_SELECT_CONTACTS");
   assert.equal(bulk.payload.search, "Hotel"); assert.equal(bulk.payload.segment, "HOTELS");
-  assert.equal(controller.state.selectedCount, 2); assert.match(elements.b2bSelectedCount.textContent, /2 contacts selected.*1 unavailable/);
+  assert.equal(controller.state.selectedCount, 3); assert.match(elements.b2bSelectedCount.textContent, /3 contacts selected.*1 unavailable/); assert.equal(elements.b2bSelectAllResults.textContent, "Deselect All Results");
+  await controller.selectAllResults();
+  assert.equal(items[0].selectedAt, null); assert.equal(items[1].selectedAt, null); assert.ok(items[3].selectedAt); assert.equal(elements.b2bSelectAllResults.textContent, "Select All Results");
   assert.equal(calls.some((call) => call.name === "SEND_APPROVED"), false);
+});
+
+test("page checkbox state is checked for all and indeterminate for partial selection", async () => {
+  const items = [contact("1", { selectedAt: new Date() }), contact("2", { selectedAt: new Date() })];
+  const { controller, elements } = harness(items); await controller.loadContacts(); assert.equal(elements.b2bSelectPage.checked, true); assert.equal(elements.b2bSelectPage.indeterminate, false);
+  items[1].selectedAt = null; await controller.loadContacts(); assert.equal(elements.b2bSelectPage.checked, false); assert.equal(elements.b2bSelectPage.indeterminate, true);
+});
+
+test("import modal has desktop resize, viewport bounds, internal scroll and mobile fallback", () => {
+  const html = fs.readFileSync(path.join(__dirname, "../public/dashboard.html"), "utf8");
+  assert.match(html, /#b2bImportModal \.b2b-import-panel[\s\S]*resize:\s*both[\s\S]*overflow:\s*auto/);
+  assert.match(html, /max-width:\s*calc\(100vw - 32px\)/); assert.match(html, /max-height:\s*calc\(100vh - 32px\)/); assert.match(html, /@media \(max-width: 700px\)[\s\S]*resize:\s*none/);
 });
 
 test("clear selection persists through reload and reports zero selected", async () => {
