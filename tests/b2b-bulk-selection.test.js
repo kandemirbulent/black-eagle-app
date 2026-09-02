@@ -2,10 +2,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { createController } = require("../public/js/b2b-outreach-dashboard");
+const { createController, selectionBlockedReason } = require("../public/js/b2b-outreach-dashboard");
 
 function contact(id, overrides = {}) { return { _id: id, recordVersion: 1, companyName: `Company ${id}`, decisionMakerName: `Person ${id}`, role: "Manager", businessEmail: `person${id}@real.example`, verificationStatus: "VERIFIED", eligibilityStatus: "SEND_ELIGIBLE", selectedAt: null, optOut: false, doNotContact: false, bounceStatus: "", ...overrides }; }
-function element() { return { textContent: "", disabled: false, checked: false, indeterminate: false, value: "", replaceChildren() {}, addEventListener() {}, appendChild() {}, append() {}, insertCell() { return element(); }, insertRow() { return element(); } }; }
+function element() { return { textContent: "", disabled: false, checked: false, indeterminate: false, value: "", replaceChildren() {}, addEventListener() {}, setAttribute() {}, appendChild() {}, append() {}, insertCell() { return element(); }, insertRow() { return element(); } }; }
 function harness(items) {
   const calls = [];
   const elements = new Proxy({}, { get(target, key) { if (!target[key]) target[key] = element(); return target[key]; } });
@@ -55,17 +55,18 @@ test("page checkbox state is checked for all and indeterminate for partial selec
 
 test("import modal has desktop resize, viewport bounds, internal scroll and mobile fallback", () => {
   const html = fs.readFileSync(path.join(__dirname, "../public/dashboard.html"), "utf8");
-  assert.match(html, /id="b2bImportResizeHandle"/); assert.match(html, /cursor:\s*nwse-resize/); assert.match(html, /#b2bImportModal \.b2b-import-panel[\s\S]*overflow:\s*auto/);
+  assert.match(html, /id="b2bImportResizeHandle"/); assert.match(html, /position:\s*absolute[\s\S]*cursor:\s*nwse-resize[\s\S]*pointer-events:\s*auto/); assert.match(html, /\.b2b-import-body[^}]*overflow:\s*auto/);
   assert.match(html, /max-width:\s*calc\(100vw - 32px\)/); assert.match(html, /max-height:\s*calc\(100vh - 32px\)/); assert.match(html, /@media \(max-width: 700px\)[\s\S]*resize:\s*none/);
 });
 
 test("pointer drag resizes within minimum and viewport bounds then stops", () => {
   const panel = { style: {}, getBoundingClientRect: () => ({ width: 900, height: 600 }) };
-  const elements = { b2bImportPanel: panel };
+  let captured = 0, released = 0;
+  const handle = { setPointerCapture: () => { captured++; }, releasePointerCapture: () => { released++; } };
+  const elements = { b2bImportPanel: panel, b2bImportResizeHandle: handle };
   const windowRef = { innerWidth: 1200, innerHeight: 800, addEventListener() {} };
   const controller = createController({ authFetch: async () => {}, showMessage() {}, documentRef: { getElementById: (id) => elements[id] }, windowRef });
-  let captured = 0, released = 0;
-  const target = { setPointerCapture: () => { captured++; }, releasePointerCapture: () => { released++; } };
+  const target = {};
   controller.startImportResize({ pointerId: 1, clientX: 100, clientY: 100, currentTarget: target, preventDefault() {} });
   controller.moveImportResize({ pointerId: 1, clientX: 600, clientY: 600 });
   assert.equal(panel.style.width, "1168px"); assert.equal(panel.style.height, "768px");
@@ -75,6 +76,13 @@ test("pointer drag resizes within minimum and viewport bounds then stops", () =>
   const stoppedWidth = panel.style.width; controller.moveImportResize({ pointerId: 1, clientX: 500, clientY: 500 });
   assert.equal(panel.style.width, stoppedWidth); assert.equal(captured, 1); assert.equal(released, 1);
   windowRef.innerWidth = 650; controller.clampImportModal(); assert.equal(panel.style.width, ""); assert.equal(panel.style.height, "");
+});
+
+test("disabled checkbox explanations are deterministic and top-level help is present", () => {
+  assert.match(selectionBlockedReason(contact("1", { eligibilityStatus: "PROSPECT_RESEARCH_REQUIRED", decisionMakerName: "" })), /decision maker research required/i);
+  assert.match(selectionBlockedReason(contact("2", { eligibilityStatus: "CONTACT_REVIEW_REQUIRED", verificationStatus: "NOT_VERIFIED" })), /email verification required/i);
+  assert.match(selectionBlockedReason(contact("3", { optOut: true })), /contact is blocked/i);
+  const html = fs.readFileSync(path.join(__dirname, "../public/dashboard.html"), "utf8"); assert.match(html, /Only Send Eligible contacts are selectable\./);
 });
 
 test("clear selection persists through reload and reports zero selected", async () => {

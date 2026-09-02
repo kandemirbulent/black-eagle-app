@@ -11,6 +11,12 @@
   const eligibility = (contact = {}) => contact.eligibilityStatus || (!String(contact.decisionMakerName || "").trim() ? "PROSPECT_RESEARCH_REQUIRED" : ["VERIFIED", "VALID"].includes(String(contact.verificationStatus || "").toUpperCase()) && EMAIL_PATTERN.test(String(contact.businessEmail || "").trim()) && String(contact.role || "").trim() ? "SEND_ELIGIBLE" : "CONTACT_REVIEW_REQUIRED");
   const blocked = (contact) => eligibility(contact) !== "SEND_ELIGIBLE" || contact?.optOut === true || contact?.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(String(contact?.bounceStatus || "").toUpperCase());
   const eligibilityLabel = (contact) => ({ PROSPECT_RESEARCH_REQUIRED: "Prospect – Research Required", CONTACT_REVIEW_REQUIRED: "Review Required", CONTACT_VERIFIED: "Verified Contact", SEND_ELIGIBLE: "Send Eligible" })[eligibility(contact)] || "Review Required";
+  const selectionBlockedReason = (contact = {}) => {
+    if (contact.optOut === true || contact.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(String(contact.bounceStatus || "").toUpperCase())) return "Not send eligible — contact is blocked.";
+    if (eligibility(contact) === "PROSPECT_RESEARCH_REQUIRED") return "Not send eligible — decision maker research required.";
+    if (!String(contact.businessEmail || "").trim() || !["VERIFIED", "VALID"].includes(String(contact.verificationStatus || "").toUpperCase())) return "Not send eligible — business email verification required.";
+    return "Not send eligible — contact review required.";
+  };
 
   function createController({ authFetch, showMessage, documentRef = document, windowRef = typeof window !== "undefined" ? window : { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport, operationOverride }) {
     const el = (id) => documentRef.getElementById(id);
@@ -84,7 +90,7 @@
         const suppressed = blocked(contact);
         const checkbox = documentRef.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = Boolean(contact.selectedAt); checkbox.disabled = suppressed;
         checkbox.addEventListener("change", () => toggleContact(contact, checkbox.checked).catch(handleError));
-        row.insertCell().appendChild(checkbox);
+        const checkboxWrap = documentRef.createElement("span"); checkboxWrap.appendChild(checkbox); if (suppressed) { checkboxWrap.title = selectionBlockedReason(contact); checkboxWrap.tabIndex = 0; checkboxWrap.setAttribute("aria-label", checkboxWrap.title); const info = documentRef.createElement("span"); info.textContent = " ⓘ"; info.setAttribute("aria-hidden", "true"); checkboxWrap.appendChild(info); } row.insertCell().appendChild(checkboxWrap);
         const fields = [contact.decisionMakerName, contact.companyName, contact.role, contact.businessEmail || "EMAIL RESEARCH REQUIRED", contact.segment, contact.bestBlackEagleOffer, contact.verificationStatus, eligibilityLabel(contact), suppressed ? [contact.optOut && "OPT OUT", contact.doNotContact && "DO NOT CONTACT", contact.bounceStatus].filter(Boolean).join(" / ") || contact.outreachStatus : contact.outreachStatus, contact.lastEmailSentAt ? new Date(contact.lastEmailSentAt).toLocaleString() : "Never", contact.replied ? `Replied ${contact.repliedAt ? new Date(contact.repliedAt).toLocaleString() : ""}` : "Not replied"];
         for (const field of fields) row.insertCell().textContent = value(field);
         const action = documentRef.createElement("button"); action.type = "button"; action.className = "btn btn-secondary"; action.textContent = "Generate Draft"; action.disabled = !contact.selectedAt || suppressed; action.addEventListener("click", () => generate(contact).catch(handleError)); row.insertCell().appendChild(action);
@@ -159,9 +165,9 @@
       panel.style.width = `${next.width}px`; panel.style.height = `${next.height}px`; return next;
     }
     function resetImportModalSize() { return importModalSize(windowRef.innerWidth * 0.92, windowRef.innerHeight * 0.86); }
-    function startImportResize(event) { if (windowRef.innerWidth <= 700) return; const panel = el("b2bImportPanel"), rect = panel.getBoundingClientRect(); state.importResize = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, width: rect.width, height: rect.height }; event.currentTarget?.setPointerCapture?.(event.pointerId); event.preventDefault?.(); }
+    function startImportResize(event) { if (windowRef.innerWidth <= 700) return; const panel = el("b2bImportPanel"), rect = panel.getBoundingClientRect(); state.importResize = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, width: rect.width, height: rect.height }; el("b2bImportResizeHandle")?.setPointerCapture?.(event.pointerId); event.preventDefault?.(); event.stopPropagation?.(); }
     function moveImportResize(event) { if (!state.importResize || event.pointerId !== state.importResize.pointerId) return; importModalSize(state.importResize.width + event.clientX - state.importResize.startX, state.importResize.height + event.clientY - state.importResize.startY); }
-    function stopImportResize(event) { if (!state.importResize || event.pointerId !== state.importResize.pointerId) return; event.currentTarget?.releasePointerCapture?.(event.pointerId); state.importResize = null; }
+    function stopImportResize(event) { if (!state.importResize || event.pointerId !== state.importResize.pointerId) return; el("b2bImportResizeHandle")?.releasePointerCapture?.(event.pointerId); state.importResize = null; event.stopPropagation?.(); }
     function clampImportModal() { const panel = el("b2bImportPanel"); if (!panel) return; const rect = panel.getBoundingClientRect(); importModalSize(rect.width, rect.height); }
     function openImport() { state.importBatchId = ""; state.importConfirming = false; el("b2bImportFile").value = ""; el("b2bConfirmImport").disabled = true; const target = el("b2bImportStatus"); if (target) { target.className = "message"; target.textContent = ""; } el("b2bImportModal").classList.remove("hidden"); resetImportModalSize(); }
     function closeImport() { el("b2bImportModal").classList.add("hidden"); }
@@ -211,12 +217,12 @@
     async function init() {
       el("b2bApplyFilters").addEventListener("click", () => { state.page = 1; state.unavailableCount = 0; loadContacts().catch(handleError); }); el("b2bGenerateSelected").addEventListener("click", () => generateSelected().catch(handleError)); el("b2bSelectPage").addEventListener("change", (event) => selectCurrentPage(event.target.checked).catch(handleError)); el("b2bSelectAllResults").addEventListener("click", () => selectAllResults().catch(handleError)); el("b2bClearSelection").addEventListener("click", () => clearSelection().catch(handleError)); el("b2bPreviousPage").addEventListener("click", () => { if (state.page > 1) { state.page--; loadContacts().catch(handleError); } }); el("b2bNextPage").addEventListener("click", () => { state.page++; loadContacts().catch(handleError); }); el("b2bSaveDraft").addEventListener("click", () => saveDraft().catch(handleError)); el("b2bApproveDraft").addEventListener("click", () => approveDraft().catch(handleError)); el("b2bSendApproved").addEventListener("click", () => sendApproved().catch(handleError));
       el("b2bImportExcel").addEventListener("click", openImport); el("b2bImportClose").addEventListener("click", closeImport); el("b2bImportFile").addEventListener("change", () => previewImport().catch(handleError)); el("b2bConfirmImport").addEventListener("click", confirmImport); el("b2bImportModal").addEventListener("click", (event) => { if (event.target === el("b2bImportModal")) closeImport(); });
-      const resizeHandle = el("b2bImportResizeHandle"); resizeHandle.addEventListener("pointerdown", startImportResize); resizeHandle.addEventListener("pointermove", moveImportResize); resizeHandle.addEventListener("pointerup", stopImportResize); resizeHandle.addEventListener("pointercancel", stopImportResize); windowRef.addEventListener("resize", clampImportModal);
+      const resizeHandle = el("b2bImportResizeHandle"); resizeHandle.addEventListener("pointerdown", startImportResize); resizeHandle.addEventListener("pointermove", moveImportResize); resizeHandle.addEventListener("pointerup", stopImportResize); resizeHandle.addEventListener("pointercancel", stopImportResize); windowRef.addEventListener("pointermove", moveImportResize); windowRef.addEventListener("pointerup", stopImportResize); windowRef.addEventListener("pointercancel", stopImportResize); windowRef.addEventListener("resize", clampImportModal);
       let loaded = false;
       el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; loadContacts().catch((error) => { loaded = false; handleError(error); }); } });
       return null;
     }
     return { init, operation, loadContacts, toggleContact, selectCurrentPage, selectAllResults, clearSelection, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, state };
   }
-  return { createController };
+  return { createController, selectionBlockedReason };
 });
