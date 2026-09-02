@@ -5,7 +5,8 @@ const path = require("node:path");
 const { createController, selectionBlockedReason } = require("../public/js/b2b-outreach-dashboard");
 
 function contact(id, overrides = {}) { return { _id: id, recordVersion: 1, companyName: `Company ${id}`, decisionMakerName: `Person ${id}`, role: "Manager", businessEmail: `person${id}@real.example`, verificationStatus: "VERIFIED", eligibilityStatus: "SEND_ELIGIBLE", selectedAt: null, optOut: false, doNotContact: false, bounceStatus: "", ...overrides }; }
-function element() { return { textContent: "", disabled: false, checked: false, indeterminate: false, value: "", replaceChildren() {}, addEventListener() {}, setAttribute() {}, appendChild() {}, append() {}, insertCell() { return element(); }, insertRow() { return element(); } }; }
+function classList() { const values = new Set(["hidden"]); return { add: (value) => values.add(value), remove: (value) => values.delete(value), contains: (value) => values.has(value) }; }
+function element() { return { textContent: "", disabled: false, checked: false, indeterminate: false, value: "", dataset: {}, style: {}, classList: classList(), replaceChildren() {}, addEventListener() {}, setAttribute(name, value) { this[name] = value; }, appendChild() {}, append() {}, getBoundingClientRect() { return { left: 100, top: 100, right: 124, bottom: 124, width: 24, height: 24 }; }, insertCell() { return element(); }, insertRow() { return element(); } }; }
 function harness(items) {
   const calls = [];
   const elements = new Proxy({}, { get(target, key) { if (!target[key]) target[key] = element(); return target[key]; } });
@@ -83,6 +84,17 @@ test("disabled checkbox explanations are deterministic and top-level help is pre
   assert.match(selectionBlockedReason(contact("2", { eligibilityStatus: "CONTACT_REVIEW_REQUIRED", verificationStatus: "NOT_VERIFIED" })), /email verification required/i);
   assert.match(selectionBlockedReason(contact("3", { optOut: true })), /contact is blocked/i);
   const html = fs.readFileSync(path.join(__dirname, "../public/dashboard.html"), "utf8"); assert.match(html, /Only Send Eligible contacts are selectable\./);
+});
+
+test("interactive tooltip opens on hover/focus or tap and closes outside or on Escape", () => {
+  const tooltip = element(); tooltip.getBoundingClientRect = () => ({ width: 220, height: 44 });
+  const control = element(); control.dataset.tooltip = "Not send eligible — verification required.";
+  const controller = createController({ authFetch: async () => {}, showMessage() {}, documentRef: { getElementById: (id) => id === "b2bEligibilityTooltip" ? tooltip : null }, windowRef: { innerWidth: 800, innerHeight: 600, addEventListener() {} } });
+  controller.showEligibilityTooltip(control); assert.equal(tooltip.classList.contains("hidden"), false); assert.equal(tooltip.textContent, control.dataset.tooltip); assert.equal(control["aria-expanded"], "true");
+  controller.hideEligibilityTooltip(); assert.equal(tooltip.classList.contains("hidden"), true);
+  controller.toggleEligibilityTooltip(control); assert.equal(controller.state.tooltipPinned, true); controller.hideEligibilityTooltip(); assert.equal(tooltip.classList.contains("hidden"), false);
+  controller.handleEligibilityOutsideClick({ target: { closest: () => null } }); assert.equal(tooltip.classList.contains("hidden"), true);
+  controller.toggleEligibilityTooltip(control); controller.handleEligibilityKeydown({ key: "Escape" }); assert.equal(tooltip.classList.contains("hidden"), true);
 });
 
 test("clear selection persists through reload and reports zero selected", async () => {

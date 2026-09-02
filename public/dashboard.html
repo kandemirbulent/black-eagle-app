@@ -333,6 +333,36 @@
 
     .b2b-import-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding-bottom: 24px; }
 
+    .b2b-eligibility-info {
+      width: 24px;
+      min-width: 24px;
+      height: 24px;
+      margin-left: 4px;
+      padding: 0;
+      border: 1px solid #94a3b8;
+      border-radius: 50%;
+      background: #f8fafc;
+      color: #475569;
+      cursor: help;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .b2b-eligibility-tooltip {
+      position: fixed;
+      z-index: 3000;
+      width: max-content;
+      max-width: min(320px, calc(100vw - 24px));
+      padding: 9px 11px;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #fff;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.3);
+      font-size: 13px;
+      line-height: 1.35;
+      pointer-events: none;
+    }
+
     #b2bImportModal .modal-header {
       flex: 0 0 auto;
       z-index: 3;
@@ -618,6 +648,7 @@
         </div>
         <div class="btn-row" style="margin-bottom:8px;"><button type="button" class="btn btn-primary" id="b2bApplyFilters">Apply Filters</button><button type="button" class="btn btn-secondary" id="b2bImportExcel">Import Excel</button><button type="button" class="btn btn-secondary" id="b2bSelectAllResults">Select All Results</button><button type="button" class="btn btn-secondary" id="b2bClearSelection">Clear Selection</button><button type="button" class="btn btn-secondary" id="b2bGenerateSelected" disabled>Generate Drafts</button><span class="subtle" id="b2bSelectedCount">0 contacts selected</span></div>
         <p class="subtle" id="b2bSelectionHelp" style="margin:0 0 14px;">Only Send Eligible contacts are selectable.</p>
+        <div id="b2bEligibilityTooltip" class="b2b-eligibility-tooltip hidden" role="tooltip"></div>
         <div class="table-wrap"><table class="table"><thead><tr><th><label><input type="checkbox" id="b2bSelectPage" aria-label="Select all eligible contacts on this page" /> Select</label></th><th>Decision Maker</th><th>Company</th><th>Role</th><th>Business Email</th><th>Segment</th><th>Best Offer</th><th>Verification</th><th>Eligibility</th><th>Outreach Status</th><th>Last Sent</th><th>Reply</th><th>Actions</th></tr></thead><tbody id="b2bContactsTable"><tr><td colspan="13">Load B2B contacts to begin.</td></tr></tbody></table></div>
         <div class="btn-row" style="margin-top:14px;align-items:center;"><button type="button" class="btn btn-secondary" id="b2bPreviousPage">Previous</button><span class="subtle" id="b2bPageSummary">Page 1</span><button type="button" class="btn btn-secondary" id="b2bNextPage">Next</button></div>
         <div id="b2bDraftPanel" class="section hidden" style="margin-top:18px;background:#f8fafc;">

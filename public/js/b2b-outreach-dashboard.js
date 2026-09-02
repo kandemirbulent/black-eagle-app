@@ -20,7 +20,7 @@
 
   function createController({ authFetch, showMessage, documentRef = document, windowRef = typeof window !== "undefined" ? window : { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport, operationOverride }) {
     const el = (id) => documentRef.getElementById(id);
-    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, allResultsSelected: false, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "", importConfirming: false, importResize: null };
+    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, allResultsSelected: false, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "", importConfirming: false, importResize: null, tooltipControl: null, tooltipPinned: false };
 
     function status(message, type = "success") {
       const target = el("b2bJobStatus");
@@ -81,6 +81,26 @@
       el("b2bSelectAllResults").textContent = state.allResultsSelected ? "Deselect All Results" : "Select All Results";
     }
 
+    function showEligibilityTooltip(control, pinned = false) {
+      const tooltip = el("b2bEligibilityTooltip"), reason = control?.dataset?.tooltip;
+      if (!tooltip || !reason) return;
+      state.tooltipControl = control; state.tooltipPinned = pinned;
+      tooltip.textContent = reason; tooltip.classList.remove("hidden");
+      control.setAttribute("aria-expanded", "true");
+      const anchor = control.getBoundingClientRect(), box = tooltip.getBoundingClientRect(), margin = 12;
+      const left = Math.min(windowRef.innerWidth - box.width - margin, Math.max(margin, anchor.left + anchor.width / 2 - box.width / 2));
+      const below = anchor.bottom + 8, top = below + box.height <= windowRef.innerHeight - margin ? below : Math.max(margin, anchor.top - box.height - 8);
+      tooltip.style.left = `${left}px`; tooltip.style.top = `${top}px`;
+    }
+    function hideEligibilityTooltip(force = false) {
+      if (state.tooltipPinned && !force) return;
+      const tooltip = el("b2bEligibilityTooltip"); if (tooltip) tooltip.classList.add("hidden");
+      state.tooltipControl?.setAttribute?.("aria-expanded", "false"); state.tooltipControl = null; state.tooltipPinned = false;
+    }
+    function toggleEligibilityTooltip(control) { if (state.tooltipPinned && state.tooltipControl === control) hideEligibilityTooltip(true); else showEligibilityTooltip(control, true); }
+    function handleEligibilityOutsideClick(event) { if (!event.target.closest?.(".b2b-eligibility-info")) hideEligibilityTooltip(true); }
+    function handleEligibilityKeydown(event) { if (event.key === "Escape") hideEligibilityTooltip(true); }
+
     function renderContacts() {
       const tbody = el("b2bContactsTable");
       tbody.replaceChildren();
@@ -90,7 +110,7 @@
         const suppressed = blocked(contact);
         const checkbox = documentRef.createElement("input"); checkbox.type = "checkbox"; checkbox.checked = Boolean(contact.selectedAt); checkbox.disabled = suppressed;
         checkbox.addEventListener("change", () => toggleContact(contact, checkbox.checked).catch(handleError));
-        const checkboxWrap = documentRef.createElement("span"); checkboxWrap.appendChild(checkbox); if (suppressed) { checkboxWrap.title = selectionBlockedReason(contact); checkboxWrap.tabIndex = 0; checkboxWrap.setAttribute("aria-label", checkboxWrap.title); const info = documentRef.createElement("span"); info.textContent = " ⓘ"; info.setAttribute("aria-hidden", "true"); checkboxWrap.appendChild(info); } row.insertCell().appendChild(checkboxWrap);
+        const checkboxWrap = documentRef.createElement("span"); checkboxWrap.appendChild(checkbox); if (suppressed) { const reason = selectionBlockedReason(contact), info = documentRef.createElement("button"); info.type = "button"; info.className = "b2b-eligibility-info"; info.textContent = "i"; info.dataset.tooltip = reason; info.setAttribute("aria-label", reason); info.setAttribute("aria-describedby", "b2bEligibilityTooltip"); info.setAttribute("aria-expanded", "false"); info.addEventListener("mouseenter", () => showEligibilityTooltip(info)); info.addEventListener("mouseleave", () => hideEligibilityTooltip()); info.addEventListener("focus", () => showEligibilityTooltip(info)); info.addEventListener("blur", () => hideEligibilityTooltip()); info.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); toggleEligibilityTooltip(info); }); checkboxWrap.appendChild(info); } row.insertCell().appendChild(checkboxWrap);
         const fields = [contact.decisionMakerName, contact.companyName, contact.role, contact.businessEmail || "EMAIL RESEARCH REQUIRED", contact.segment, contact.bestBlackEagleOffer, contact.verificationStatus, eligibilityLabel(contact), suppressed ? [contact.optOut && "OPT OUT", contact.doNotContact && "DO NOT CONTACT", contact.bounceStatus].filter(Boolean).join(" / ") || contact.outreachStatus : contact.outreachStatus, contact.lastEmailSentAt ? new Date(contact.lastEmailSentAt).toLocaleString() : "Never", contact.replied ? `Replied ${contact.repliedAt ? new Date(contact.repliedAt).toLocaleString() : ""}` : "Not replied"];
         for (const field of fields) row.insertCell().textContent = value(field);
         const action = documentRef.createElement("button"); action.type = "button"; action.className = "btn btn-secondary"; action.textContent = "Generate Draft"; action.disabled = !contact.selectedAt || suppressed; action.addEventListener("click", () => generate(contact).catch(handleError)); row.insertCell().appendChild(action);
@@ -218,11 +238,12 @@
       el("b2bApplyFilters").addEventListener("click", () => { state.page = 1; state.unavailableCount = 0; loadContacts().catch(handleError); }); el("b2bGenerateSelected").addEventListener("click", () => generateSelected().catch(handleError)); el("b2bSelectPage").addEventListener("change", (event) => selectCurrentPage(event.target.checked).catch(handleError)); el("b2bSelectAllResults").addEventListener("click", () => selectAllResults().catch(handleError)); el("b2bClearSelection").addEventListener("click", () => clearSelection().catch(handleError)); el("b2bPreviousPage").addEventListener("click", () => { if (state.page > 1) { state.page--; loadContacts().catch(handleError); } }); el("b2bNextPage").addEventListener("click", () => { state.page++; loadContacts().catch(handleError); }); el("b2bSaveDraft").addEventListener("click", () => saveDraft().catch(handleError)); el("b2bApproveDraft").addEventListener("click", () => approveDraft().catch(handleError)); el("b2bSendApproved").addEventListener("click", () => sendApproved().catch(handleError));
       el("b2bImportExcel").addEventListener("click", openImport); el("b2bImportClose").addEventListener("click", closeImport); el("b2bImportFile").addEventListener("change", () => previewImport().catch(handleError)); el("b2bConfirmImport").addEventListener("click", confirmImport); el("b2bImportModal").addEventListener("click", (event) => { if (event.target === el("b2bImportModal")) closeImport(); });
       const resizeHandle = el("b2bImportResizeHandle"); resizeHandle.addEventListener("pointerdown", startImportResize); resizeHandle.addEventListener("pointermove", moveImportResize); resizeHandle.addEventListener("pointerup", stopImportResize); resizeHandle.addEventListener("pointercancel", stopImportResize); windowRef.addEventListener("pointermove", moveImportResize); windowRef.addEventListener("pointerup", stopImportResize); windowRef.addEventListener("pointercancel", stopImportResize); windowRef.addEventListener("resize", clampImportModal);
+      documentRef.addEventListener("click", handleEligibilityOutsideClick); documentRef.addEventListener("keydown", handleEligibilityKeydown);
       let loaded = false;
       el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; loadContacts().catch((error) => { loaded = false; handleError(error); }); } });
       return null;
     }
-    return { init, operation, loadContacts, toggleContact, selectCurrentPage, selectAllResults, clearSelection, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, state };
+    return { init, operation, loadContacts, toggleContact, selectCurrentPage, selectAllResults, clearSelection, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, state };
   }
   return { createController, selectionBlockedReason };
 });
