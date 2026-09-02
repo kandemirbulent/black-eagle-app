@@ -9,9 +9,9 @@
   const idOf = (item) => String(item?._id || item?.id || "");
   const blocked = (contact) => contact?.optOut === true || contact?.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(String(contact?.bounceStatus || "").toUpperCase());
 
-  function createController({ authFetch, showMessage, documentRef = document, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport }) {
+  function createController({ authFetch, showMessage, documentRef = document, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport, operationOverride }) {
     const el = (id) => documentRef.getElementById(id);
-    const state = { page: 1, limit: 25, total: 0, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "", importConfirming: false };
+    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "", importConfirming: false };
 
     function status(message, type = "success") {
       const target = el("b2bJobStatus");
@@ -47,6 +47,7 @@
     }
 
     async function operation(operationName, payload = {}) {
+      if (operationOverride) return operationOverride(operationName, payload);
       status("Creating request...");
       const queued = await json("/api/admin/b2b-outreach/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: operationName, payload }) });
       return waitForRequest(queued);
@@ -60,8 +61,14 @@
     }
 
     function updateSelection() {
-      el("b2bSelectedCount").textContent = `${state.selected.size} selected`;
-      el("b2bGenerateSelected").disabled = state.selected.size === 0;
+      el("b2bSelectedCount").textContent = `${state.selectedCount} contacts selected${state.unavailableCount ? ` · ${state.unavailableCount} unavailable` : ""}`;
+      el("b2bGenerateSelected").disabled = state.selectedCount === 0;
+      const eligible = state.contacts.filter((contact) => !blocked(contact));
+      const selectedOnPage = eligible.filter((contact) => Boolean(contact.selectedAt)).length;
+      const pageCheckbox = el("b2bSelectPage");
+      pageCheckbox.checked = eligible.length > 0 && selectedOnPage === eligible.length;
+      pageCheckbox.indeterminate = selectedOnPage > 0 && selectedOnPage < eligible.length;
+      pageCheckbox.disabled = eligible.length === 0;
     }
 
     function renderContacts() {
@@ -84,17 +91,39 @@
 
     async function loadContacts() {
       const data = await operation("LIST_CONTACTS", filters());
-      state.contacts = Array.isArray(data?.items) ? data.items : []; state.total = Number(data?.total || 0);
+      state.contacts = Array.isArray(data?.items) ? data.items : []; state.total = Number(data?.total || 0); state.selectedCount = Number(data?.selectedCount || 0);
       state.selected.clear(); for (const contact of state.contacts) if (contact.selectedAt) state.selected.set(idOf(contact), contact);
       renderContacts();
     }
 
-    async function toggleContact(contact, selected) {
+    async function toggleContact(contact, selected, reload = true) {
       await operation(selected ? "SELECT_CONTACT" : "DESELECT_CONTACT", selected ? { contactId: idOf(contact), expectedVersion: Number(contact.recordVersion) } : { contactId: idOf(contact) });
       if (selected) state.selected.set(idOf(contact), contact); else state.selected.delete(idOf(contact));
-      await loadContacts();
+      if (reload) await loadContacts();
       const companies = [...state.selected.values()].map((item) => String(item.normalizedCompany || item.companyName || "").toLowerCase()).filter(Boolean);
       if (new Set(companies).size < companies.length) showMessage("Multiple contacts from the same company are selected. Sales Agent company cooldown remains authoritative.", "error");
+    }
+
+    async function selectCurrentPage(selected) {
+      const candidates = state.contacts.filter((contact) => !blocked(contact) && Boolean(contact.selectedAt) !== selected);
+      el("b2bSelectPage").disabled = true;
+      for (const contact of candidates) await toggleContact(contact, selected, false);
+      state.unavailableCount = state.contacts.filter(blocked).length;
+      await loadContacts();
+    }
+
+    async function selectAllResults() {
+      const result = await operation("BULK_SELECT_CONTACTS", filters());
+      state.unavailableCount = Number(result?.unavailable || 0);
+      await loadContacts();
+      status(`${result?.selected || 0} eligible contacts selected${state.unavailableCount ? ` · ${state.unavailableCount} unavailable` : ""}.`);
+    }
+
+    async function clearSelection() {
+      await operation("CLEAR_CONTACT_SELECTION");
+      state.unavailableCount = 0;
+      await loadContacts();
+      status("Contact selection cleared.");
     }
 
     async function generate(contact) {
@@ -164,13 +193,13 @@
     function handleError(error) { const message = error?.code === "B2B_OUTREACH_SEND_DISABLED" ? "Email sending is not enabled yet." : error?.message || "B2B operation failed."; status(message, "error"); showMessage(message, "error"); }
 
     async function init() {
-      el("b2bApplyFilters").addEventListener("click", () => { state.page = 1; loadContacts().catch(handleError); }); el("b2bGenerateSelected").addEventListener("click", () => generateSelected().catch(handleError)); el("b2bPreviousPage").addEventListener("click", () => { if (state.page > 1) { state.page--; loadContacts().catch(handleError); } }); el("b2bNextPage").addEventListener("click", () => { state.page++; loadContacts().catch(handleError); }); el("b2bSaveDraft").addEventListener("click", () => saveDraft().catch(handleError)); el("b2bApproveDraft").addEventListener("click", () => approveDraft().catch(handleError)); el("b2bSendApproved").addEventListener("click", () => sendApproved().catch(handleError));
+      el("b2bApplyFilters").addEventListener("click", () => { state.page = 1; state.unavailableCount = 0; loadContacts().catch(handleError); }); el("b2bGenerateSelected").addEventListener("click", () => generateSelected().catch(handleError)); el("b2bSelectPage").addEventListener("change", (event) => selectCurrentPage(event.target.checked).catch(handleError)); el("b2bSelectAllResults").addEventListener("click", () => selectAllResults().catch(handleError)); el("b2bClearSelection").addEventListener("click", () => clearSelection().catch(handleError)); el("b2bPreviousPage").addEventListener("click", () => { if (state.page > 1) { state.page--; loadContacts().catch(handleError); } }); el("b2bNextPage").addEventListener("click", () => { state.page++; loadContacts().catch(handleError); }); el("b2bSaveDraft").addEventListener("click", () => saveDraft().catch(handleError)); el("b2bApproveDraft").addEventListener("click", () => approveDraft().catch(handleError)); el("b2bSendApproved").addEventListener("click", () => sendApproved().catch(handleError));
       el("b2bImportExcel").addEventListener("click", openImport); el("b2bImportClose").addEventListener("click", closeImport); el("b2bImportFile").addEventListener("change", () => previewImport().catch(handleError)); el("b2bConfirmImport").addEventListener("click", confirmImport); el("b2bImportModal").addEventListener("click", (event) => { if (event.target === el("b2bImportModal")) closeImport(); });
       let loaded = false;
       el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; loadContacts().catch((error) => { loaded = false; handleError(error); }); } });
       return null;
     }
-    return { init, operation, loadContacts, toggleContact, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, state };
+    return { init, operation, loadContacts, toggleContact, selectCurrentPage, selectAllResults, clearSelection, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, state };
   }
   return { createController };
 });
