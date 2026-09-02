@@ -787,6 +787,7 @@ app.use(
   createB2BOutreachRouter({
     requireAdminAuth,
     getRequestsCollection: () => mongoose.connection.db.collection("b2boutreachrequests"),
+    getContactsCollection: () => mongoose.connection.db.collection("b2boutreachcontacts"),
   })
 );
 

@@ -11,7 +11,7 @@
 
   function createController({ authFetch, showMessage, documentRef = document, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000 }) {
     const el = (id) => documentRef.getElementById(id);
-    const state = { page: 1, limit: 25, total: 0, contacts: [], selected: new Map(), draft: null, draftContact: null };
+    const state = { page: 1, limit: 25, total: 0, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "" };
 
     function status(message, type = "success") {
       const target = el("b2bJobStatus");
@@ -25,9 +25,7 @@
       return body.data;
     }
 
-    async function operation(operationName, payload = {}) {
-      status("Creating request...");
-      const queued = await json("/api/admin/b2b-outreach/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: operationName, payload }) });
+    async function waitForRequest(queued) {
       status("Queued...");
       const started = Date.now();
       while (Date.now() - started < timeoutMs) {
@@ -44,6 +42,12 @@
       }
       status("Timed out while waiting for the Sales Agent.", "error");
       throw Object.assign(new Error("B2B operation timed out."), { code: "B2B_REQUEST_TIMEOUT" });
+    }
+
+    async function operation(operationName, payload = {}) {
+      status("Creating request...");
+      const queued = await json("/api/admin/b2b-outreach/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: operationName, payload }) });
+      return waitForRequest(queued);
     }
 
     function filters() {
@@ -112,15 +116,30 @@
     async function saveDraft() { const draft = await operation("UPDATE_DRAFT", { draftId: idOf(state.draft), subject: el("b2bDraftSubject").value, body: el("b2bDraftBody").value }); state.draft = draft; await openDraft(idOf(draft), state.draftContact); }
     async function approveDraft() { await operation("APPROVE_DRAFT", { draftId: idOf(state.draft) }); await openDraft(idOf(state.draft), state.draftContact); }
     async function sendApproved() { try { await operation("SEND_APPROVED", { draftId: idOf(state.draft) }); } catch (error) { if (error.code === "B2B_OUTREACH_SEND_DISABLED") { status("Email sending is not enabled yet.", "error"); return; } throw error; } }
+    function openImport() { state.importBatchId = ""; el("b2bImportFile").value = ""; el("b2bConfirmImport").disabled = true; el("b2bImportModal").classList.remove("hidden"); }
+    function closeImport() { el("b2bImportModal").classList.add("hidden"); }
+    function renderImportPreview(data) {
+      state.importBatchId = data.batchId;
+      el("b2bImportSheetInfo").textContent = `Selected sheet: ${value(data.selectedSheet)} · Workbook sheets: ${(data.sheetNames || []).join(", ")}`;
+      const summary = data.summary || {}; el("b2bImportSummary").replaceChildren();
+      for (const [label, count] of [["Total rows", summary.totalRows], ["New", summary.new], ["Duplicates", summary.duplicates], ["Review required", summary.reviewRequired], ["Invalid", summary.invalid], ["Ready to import", summary.readyToImport]]) { const card = documentRef.createElement("div"); card.className = "stat-card"; const title = documentRef.createElement("span"); title.textContent = label; const strong = documentRef.createElement("strong"); strong.textContent = String(count || 0); card.append(title, strong); el("b2bImportSummary").appendChild(card); }
+      const tbody = el("b2bImportPreview"); tbody.replaceChildren(); const visible = (data.rows || []).slice(0, 200);
+      for (const row of visible) { const tr = tbody.insertRow(); for (const item of [row.row, row.contact?.companyName, row.contact?.decisionMakerName, row.contact?.role, row.contact?.businessEmail || "EMAIL RESEARCH REQUIRED", row.contact?.segment, row.contact?.verificationStatus, row.importStatus, (row.reasons || []).join(", ")]) tr.insertCell().textContent = value(item); }
+      el("b2bImportPreviewLimit").textContent = (data.rows || []).length > visible.length ? `Showing first ${visible.length} of ${data.rows.length} rows.` : "";
+      el("b2bConfirmImport").disabled = !state.importBatchId || Number(summary.readyToImport || 0) === 0;
+    }
+    async function previewImport() { const file = el("b2bImportFile").files?.[0]; if (!file) return; const body = new FormData(); body.append("file", file); status("Parsing import file..."); const data = await json("/api/admin/b2b-outreach/import/preview", { method: "POST", body }); renderImportPreview(data); status("Preview ready. No contacts have been imported."); }
+    async function confirmImport() { if (!state.importBatchId) return; el("b2bConfirmImport").disabled = true; status("Confirming import..."); const result = await json("/api/admin/b2b-outreach/import/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ batchId: state.importBatchId }) }); const imported = result.completed ? result.result : await waitForRequest(result); status(`Imported: ${imported.imported || 0} · Skipped duplicates: ${imported.skippedDuplicates || 0} · Review required: ${imported.reviewRequired || 0} · Invalid: ${imported.invalid || 0}`); state.importBatchId = ""; closeImport(); await loadContacts(); }
     function handleError(error) { const message = error?.code === "B2B_OUTREACH_SEND_DISABLED" ? "Email sending is not enabled yet." : error?.message || "B2B operation failed."; status(message, "error"); showMessage(message, "error"); }
 
     async function init() {
       el("b2bApplyFilters").addEventListener("click", () => { state.page = 1; loadContacts().catch(handleError); }); el("b2bGenerateSelected").addEventListener("click", () => generateSelected().catch(handleError)); el("b2bPreviousPage").addEventListener("click", () => { if (state.page > 1) { state.page--; loadContacts().catch(handleError); } }); el("b2bNextPage").addEventListener("click", () => { state.page++; loadContacts().catch(handleError); }); el("b2bSaveDraft").addEventListener("click", () => saveDraft().catch(handleError)); el("b2bApproveDraft").addEventListener("click", () => approveDraft().catch(handleError)); el("b2bSendApproved").addEventListener("click", () => sendApproved().catch(handleError));
+      el("b2bImportExcel").addEventListener("click", openImport); el("b2bImportClose").addEventListener("click", closeImport); el("b2bImportFile").addEventListener("change", () => previewImport().catch(handleError)); el("b2bConfirmImport").addEventListener("click", () => confirmImport().catch(handleError)); el("b2bImportModal").addEventListener("click", (event) => { if (event.target === el("b2bImportModal")) closeImport(); });
       let loaded = false;
       el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; loadContacts().catch((error) => { loaded = false; handleError(error); }); } });
       return null;
     }
-    return { init, operation, loadContacts, toggleContact, generate, saveDraft, approveDraft, sendApproved, state };
+    return { init, operation, loadContacts, toggleContact, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, state };
   }
   return { createController };
 });

@@ -3,6 +3,7 @@ const crypto = require("node:crypto");
 const OPERATIONS = new Set([
   "LIST_CONTACTS", "GET_CONTACT", "SELECT_CONTACT", "DESELECT_CONTACT", "GENERATE_DRAFT",
   "GET_DRAFT", "UPDATE_DRAFT", "APPROVE_DRAFT", "SEND_APPROVED",
+  "IMPORT_CONTACTS",
 ]);
 
 function canonicalRequest(request = {}) {
