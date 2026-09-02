@@ -55,8 +55,26 @@ test("page checkbox state is checked for all and indeterminate for partial selec
 
 test("import modal has desktop resize, viewport bounds, internal scroll and mobile fallback", () => {
   const html = fs.readFileSync(path.join(__dirname, "../public/dashboard.html"), "utf8");
-  assert.match(html, /#b2bImportModal \.b2b-import-panel[\s\S]*resize:\s*both[\s\S]*overflow:\s*auto/);
+  assert.match(html, /id="b2bImportResizeHandle"/); assert.match(html, /cursor:\s*nwse-resize/); assert.match(html, /#b2bImportModal \.b2b-import-panel[\s\S]*overflow:\s*auto/);
   assert.match(html, /max-width:\s*calc\(100vw - 32px\)/); assert.match(html, /max-height:\s*calc\(100vh - 32px\)/); assert.match(html, /@media \(max-width: 700px\)[\s\S]*resize:\s*none/);
+});
+
+test("pointer drag resizes within minimum and viewport bounds then stops", () => {
+  const panel = { style: {}, getBoundingClientRect: () => ({ width: 900, height: 600 }) };
+  const elements = { b2bImportPanel: panel };
+  const windowRef = { innerWidth: 1200, innerHeight: 800, addEventListener() {} };
+  const controller = createController({ authFetch: async () => {}, showMessage() {}, documentRef: { getElementById: (id) => elements[id] }, windowRef });
+  let captured = 0, released = 0;
+  const target = { setPointerCapture: () => { captured++; }, releasePointerCapture: () => { released++; } };
+  controller.startImportResize({ pointerId: 1, clientX: 100, clientY: 100, currentTarget: target, preventDefault() {} });
+  controller.moveImportResize({ pointerId: 1, clientX: 600, clientY: 600 });
+  assert.equal(panel.style.width, "1168px"); assert.equal(panel.style.height, "768px");
+  controller.moveImportResize({ pointerId: 1, clientX: -500, clientY: -500 });
+  assert.equal(panel.style.width, "700px"); assert.equal(panel.style.height, "450px");
+  controller.stopImportResize({ pointerId: 1, currentTarget: target });
+  const stoppedWidth = panel.style.width; controller.moveImportResize({ pointerId: 1, clientX: 500, clientY: 500 });
+  assert.equal(panel.style.width, stoppedWidth); assert.equal(captured, 1); assert.equal(released, 1);
+  windowRef.innerWidth = 650; controller.clampImportModal(); assert.equal(panel.style.width, ""); assert.equal(panel.style.height, "");
 });
 
 test("clear selection persists through reload and reports zero selected", async () => {

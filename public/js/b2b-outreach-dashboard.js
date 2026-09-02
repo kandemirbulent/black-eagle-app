@@ -12,9 +12,9 @@
   const blocked = (contact) => eligibility(contact) !== "SEND_ELIGIBLE" || contact?.optOut === true || contact?.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID"].includes(String(contact?.bounceStatus || "").toUpperCase());
   const eligibilityLabel = (contact) => ({ PROSPECT_RESEARCH_REQUIRED: "Prospect – Research Required", CONTACT_REVIEW_REQUIRED: "Review Required", CONTACT_VERIFIED: "Verified Contact", SEND_ELIGIBLE: "Send Eligible" })[eligibility(contact)] || "Review Required";
 
-  function createController({ authFetch, showMessage, documentRef = document, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport, operationOverride }) {
+  function createController({ authFetch, showMessage, documentRef = document, windowRef = typeof window !== "undefined" ? window : { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport, operationOverride }) {
     const el = (id) => documentRef.getElementById(id);
-    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, allResultsSelected: false, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "", importConfirming: false };
+    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, allResultsSelected: false, contacts: [], selected: new Map(), draft: null, draftContact: null, importBatchId: "", importConfirming: false, importResize: null };
 
     function status(message, type = "success") {
       const target = el("b2bJobStatus");
@@ -151,7 +151,19 @@
     async function saveDraft() { const draft = await operation("UPDATE_DRAFT", { draftId: idOf(state.draft), subject: el("b2bDraftSubject").value, body: el("b2bDraftBody").value }); state.draft = draft; await openDraft(idOf(draft), state.draftContact); }
     async function approveDraft() { await operation("APPROVE_DRAFT", { draftId: idOf(state.draft) }); await openDraft(idOf(state.draft), state.draftContact); }
     async function sendApproved() { try { await operation("SEND_APPROVED", { draftId: idOf(state.draft) }); } catch (error) { if (error.code === "B2B_OUTREACH_SEND_DISABLED") { status("Email sending is not enabled yet.", "error"); return; } throw error; } }
-    function openImport() { state.importBatchId = ""; state.importConfirming = false; el("b2bImportFile").value = ""; el("b2bConfirmImport").disabled = true; const target = el("b2bImportStatus"); if (target) { target.className = "message"; target.textContent = ""; } el("b2bImportModal").classList.remove("hidden"); }
+    function importModalSize(width, height) {
+      const panel = el("b2bImportPanel");
+      if (!panel || windowRef.innerWidth <= 700) { if (panel) { panel.style.width = ""; panel.style.height = ""; } return null; }
+      const maxWidth = Math.max(0, windowRef.innerWidth - 32), maxHeight = Math.max(0, windowRef.innerHeight - 32);
+      const next = { width: Math.min(maxWidth, Math.max(Math.min(700, maxWidth), width)), height: Math.min(maxHeight, Math.max(Math.min(450, maxHeight), height)) };
+      panel.style.width = `${next.width}px`; panel.style.height = `${next.height}px`; return next;
+    }
+    function resetImportModalSize() { return importModalSize(windowRef.innerWidth * 0.92, windowRef.innerHeight * 0.86); }
+    function startImportResize(event) { if (windowRef.innerWidth <= 700) return; const panel = el("b2bImportPanel"), rect = panel.getBoundingClientRect(); state.importResize = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, width: rect.width, height: rect.height }; event.currentTarget?.setPointerCapture?.(event.pointerId); event.preventDefault?.(); }
+    function moveImportResize(event) { if (!state.importResize || event.pointerId !== state.importResize.pointerId) return; importModalSize(state.importResize.width + event.clientX - state.importResize.startX, state.importResize.height + event.clientY - state.importResize.startY); }
+    function stopImportResize(event) { if (!state.importResize || event.pointerId !== state.importResize.pointerId) return; event.currentTarget?.releasePointerCapture?.(event.pointerId); state.importResize = null; }
+    function clampImportModal() { const panel = el("b2bImportPanel"); if (!panel) return; const rect = panel.getBoundingClientRect(); importModalSize(rect.width, rect.height); }
+    function openImport() { state.importBatchId = ""; state.importConfirming = false; el("b2bImportFile").value = ""; el("b2bConfirmImport").disabled = true; const target = el("b2bImportStatus"); if (target) { target.className = "message"; target.textContent = ""; } el("b2bImportModal").classList.remove("hidden"); resetImportModalSize(); }
     function closeImport() { el("b2bImportModal").classList.add("hidden"); }
     function renderImportPreview(data) {
       state.importBatchId = data.batchId;
@@ -199,11 +211,12 @@
     async function init() {
       el("b2bApplyFilters").addEventListener("click", () => { state.page = 1; state.unavailableCount = 0; loadContacts().catch(handleError); }); el("b2bGenerateSelected").addEventListener("click", () => generateSelected().catch(handleError)); el("b2bSelectPage").addEventListener("change", (event) => selectCurrentPage(event.target.checked).catch(handleError)); el("b2bSelectAllResults").addEventListener("click", () => selectAllResults().catch(handleError)); el("b2bClearSelection").addEventListener("click", () => clearSelection().catch(handleError)); el("b2bPreviousPage").addEventListener("click", () => { if (state.page > 1) { state.page--; loadContacts().catch(handleError); } }); el("b2bNextPage").addEventListener("click", () => { state.page++; loadContacts().catch(handleError); }); el("b2bSaveDraft").addEventListener("click", () => saveDraft().catch(handleError)); el("b2bApproveDraft").addEventListener("click", () => approveDraft().catch(handleError)); el("b2bSendApproved").addEventListener("click", () => sendApproved().catch(handleError));
       el("b2bImportExcel").addEventListener("click", openImport); el("b2bImportClose").addEventListener("click", closeImport); el("b2bImportFile").addEventListener("change", () => previewImport().catch(handleError)); el("b2bConfirmImport").addEventListener("click", confirmImport); el("b2bImportModal").addEventListener("click", (event) => { if (event.target === el("b2bImportModal")) closeImport(); });
+      const resizeHandle = el("b2bImportResizeHandle"); resizeHandle.addEventListener("pointerdown", startImportResize); resizeHandle.addEventListener("pointermove", moveImportResize); resizeHandle.addEventListener("pointerup", stopImportResize); resizeHandle.addEventListener("pointercancel", stopImportResize); windowRef.addEventListener("resize", clampImportModal);
       let loaded = false;
       el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; loadContacts().catch((error) => { loaded = false; handleError(error); }); } });
       return null;
     }
-    return { init, operation, loadContacts, toggleContact, selectCurrentPage, selectAllResults, clearSelection, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, state };
+    return { init, operation, loadContacts, toggleContact, selectCurrentPage, selectAllResults, clearSelection, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, state };
   }
   return { createController };
 });
