@@ -163,6 +163,20 @@
       status("Contact selection cleared.");
     }
 
+    async function researchSelected() {
+      const contactIds = [...state.selected.keys()];
+      if (!contactIds.length) throw new Error("Select research-required prospects first.");
+      const result = await operation("RESEARCH_BATCH", { contactIds });
+      status(`Completed · ${result?.completed || 0} enriched · ${result?.researchRequired || 0} research required · ${result?.failed || 0} failed`);
+      await loadContacts();
+    }
+
+    async function researchCurrentResults() {
+      const result = await operation("RESEARCH_BATCH", filters());
+      status(`Completed · ${result?.completed || 0} enriched · ${result?.researchRequired || 0} research required · ${result?.failed || 0} failed`);
+      await loadContacts();
+    }
+
     async function generate(contact) {
       const drafts = await operation("GENERATE_DRAFT", { contactId: idOf(contact) });
       const generated = Array.isArray(drafts) ? drafts[0] : drafts;
@@ -243,6 +257,9 @@
 
     async function init() {
       if (isSuperadmin) el("b2bSelectionHelp").textContent = "Contacts with a business email can be selected. Sending safety checks are applied before email delivery.";
+      const researchSelectedButton = el("b2bResearchSelected"), researchResultsButton = el("b2bResearchResults");
+      if (researchSelectedButton) { researchSelectedButton.hidden = !isSuperadmin; researchSelectedButton.addEventListener("click", () => researchSelected().catch(handleError)); }
+      if (researchResultsButton) { researchResultsButton.hidden = !isSuperadmin; researchResultsButton.addEventListener("click", () => researchCurrentResults().catch(handleError)); }
       el("b2bApplyFilters").addEventListener("click", () => { state.page = 1; state.unavailableCount = 0; loadContacts().catch(handleError); }); el("b2bGenerateSelected").addEventListener("click", () => generateSelected().catch(handleError)); el("b2bSelectPage").addEventListener("change", (event) => selectCurrentPage(event.target.checked).catch(handleError)); el("b2bSelectAllResults").addEventListener("click", () => selectAllResults().catch(handleError)); el("b2bClearSelection").addEventListener("click", () => clearSelection().catch(handleError)); el("b2bPreviousPage").addEventListener("click", () => { if (state.page > 1) { state.page--; loadContacts().catch(handleError); } }); el("b2bNextPage").addEventListener("click", () => { state.page++; loadContacts().catch(handleError); }); el("b2bSaveDraft").addEventListener("click", () => saveDraft().catch(handleError)); el("b2bApproveDraft").addEventListener("click", () => approveDraft().catch(handleError)); el("b2bSendApproved").addEventListener("click", () => sendApproved().catch(handleError));
       el("b2bImportExcel").addEventListener("click", openImport); el("b2bImportClose").addEventListener("click", closeImport); el("b2bImportFile").addEventListener("change", () => previewImport().catch(handleError)); el("b2bConfirmImport").addEventListener("click", confirmImport); el("b2bImportModal").addEventListener("click", (event) => { if (event.target === el("b2bImportModal")) closeImport(); });
       const resizeHandle = el("b2bImportResizeHandle"); resizeHandle.addEventListener("pointerdown", startImportResize); resizeHandle.addEventListener("pointermove", moveImportResize); resizeHandle.addEventListener("pointerup", stopImportResize); resizeHandle.addEventListener("pointercancel", stopImportResize); windowRef.addEventListener("pointermove", moveImportResize); windowRef.addEventListener("pointerup", stopImportResize); windowRef.addEventListener("pointercancel", stopImportResize); windowRef.addEventListener("resize", clampImportModal);
@@ -251,7 +268,7 @@
       el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; loadContacts().catch((error) => { loaded = false; handleError(error); }); } });
       return null;
     }
-    return { init, operation, loadContacts, toggleContact, selectCurrentPage, selectAllResults, clearSelection, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, isContactSelectionBlocked: selectionBlocked, state };
+    return { init, operation, loadContacts, toggleContact, selectCurrentPage, selectAllResults, clearSelection, researchSelected, researchCurrentResults, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, isContactSelectionBlocked: selectionBlocked, state };
   }
   return { createController, selectionBlockedReason };
 });
