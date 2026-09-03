@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { createController, selectionBlockedReason } = require("../public/js/b2b-outreach-dashboard");
+const { createController, selectionBlockedReason, researchSelectable } = require("../public/js/b2b-outreach-dashboard");
 
 function contact(id, overrides = {}) { return { _id: id, recordVersion: 1, companyName: `Company ${id}`, decisionMakerName: `Person ${id}`, role: "Manager", businessEmail: `person${id}@real.example`, verificationStatus: "VERIFIED", eligibilityStatus: "SEND_ELIGIBLE", selectedAt: null, optOut: false, doNotContact: false, bounceStatus: "", ...overrides }; }
 function classList() { const values = new Set(["hidden"]); return { add: (value) => values.add(value), remove: (value) => values.delete(value), contains: (value) => values.has(value) }; }
@@ -113,4 +113,24 @@ test("clear selection persists through reload and reports zero selected", async 
   await controller.clearSelection();
   assert.equal(calls.some((call) => call.name === "CLEAR_CONTACT_SELECTION"), true);
   assert.equal(controller.state.selectedCount, 0); assert.equal(elements.b2bSelectedCount.textContent, "0 contacts selected");
+});
+
+test("research selection is separate from email-gated outreach selection", async () => {
+  const prospect = contact("research-1", { decisionMakerName: "", role: "", businessEmail: "EMAIL RESEARCH REQUIRED", verificationStatus: "NOT_VERIFIED", eligibilityStatus: "PROSPECT_RESEARCH_REQUIRED", outreachStatus: "REVIEW_REQUIRED" });
+  const eligible = contact("outreach-1", { selectedAt: new Date() });
+  const { controller, calls, elements } = harness([prospect, eligible], "SUPERADMIN");
+  assert.equal(researchSelectable(prospect), true); assert.equal(controller.isContactSelectionBlocked(prospect), true);
+  assert.equal(controller.toggleResearchContact(prospect, true), true); assert.deepEqual([...controller.state.researchSelected], ["research-1"]); assert.equal(controller.state.selected.has("research-1"), false);
+  await assert.rejects(() => controller.generate(prospect), /business email/i);
+  await controller.researchSelected();
+  const research = calls.find((call) => call.name === "RESEARCH_BATCH"); assert.deepEqual(research.payload.contactIds, ["research-1"]);
+  assert.equal(calls.some((call) => ["GENERATE_DRAFT", "SEND_APPROVED"].includes(call.name)), false); assert.equal(elements.b2bResearchSelected.disabled, true);
+  assert.equal(controller.isContactSelectionBlocked(eligible), false);
+});
+
+test("non-superadmin cannot create research selection and bulk selection never starts research", async () => {
+  const prospect = contact("research-1", { businessEmail: "EMAIL RESEARCH REQUIRED", eligibilityStatus: "EMAIL_RESEARCH_REQUIRED" });
+  const { controller, calls } = harness([prospect], "ADMIN");
+  assert.equal(controller.toggleResearchContact(prospect, true), false); assert.equal(controller.state.researchSelected.size, 0);
+  await controller.selectAllResults(); assert.equal(calls.some((call) => call.name === "RESEARCH_BATCH"), false);
 });
