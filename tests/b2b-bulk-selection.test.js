@@ -51,7 +51,7 @@ test("select all results passes active filters, persists count, and triggers no 
   await controller.selectAllResults();
   const bulk = calls.find((call) => call.name === "BULK_SELECT_CONTACTS");
   assert.equal(bulk.payload.search, "Hotel"); assert.equal(bulk.payload.segment, "HOTELS");
-  assert.equal(controller.state.selectedCount, 3); assert.match(elements.b2bSelectedCount.textContent, /3 contacts selected.*1 unavailable/); assert.equal(elements.b2bSelectAllResults.textContent, "Deselect All Results");
+  assert.equal(controller.state.selectedCount, 3); assert.match(elements.b2bSelectedCount.textContent, /3 outreach selected · 0 selected for research.*1 unavailable/); assert.equal(elements.b2bSelectAllResults.textContent, "Deselect All Results");
   await controller.selectAllResults();
   assert.equal(items[0].selectedAt, null); assert.equal(items[1].selectedAt, null); assert.ok(items[3].selectedAt); assert.equal(elements.b2bSelectAllResults.textContent, "Select All Results");
   assert.equal(calls.some((call) => call.name === "SEND_APPROVED"), false);
@@ -112,7 +112,7 @@ test("clear selection persists through reload and reports zero selected", async 
   const { controller, calls, elements } = harness(items);
   await controller.clearSelection();
   assert.equal(calls.some((call) => call.name === "CLEAR_CONTACT_SELECTION"), true);
-  assert.equal(controller.state.selectedCount, 0); assert.equal(elements.b2bSelectedCount.textContent, "0 contacts selected");
+  assert.equal(controller.state.selectedCount, 0); assert.equal(elements.b2bSelectedCount.textContent, "0 outreach selected · 0 selected for research");
 });
 
 test("research selection is separate from email-gated outreach selection", async () => {
@@ -121,6 +121,9 @@ test("research selection is separate from email-gated outreach selection", async
   const { controller, calls, elements } = harness([prospect, eligible], "SUPERADMIN");
   assert.equal(researchSelectable(prospect), true); assert.equal(controller.isContactSelectionBlocked(prospect), true);
   assert.equal(controller.toggleResearchContact(prospect, true), true); assert.deepEqual([...controller.state.researchSelected], ["research-1"]); assert.equal(controller.state.selected.has("research-1"), false);
+  assert.equal(elements.b2bSelectedCount.textContent, "0 outreach selected · 1 selected for research"); assert.equal(elements.b2bResearchSelected.textContent, "Research Selected (1)");
+  controller.toggleResearchContact(prospect, false); assert.equal(elements.b2bSelectedCount.textContent, "0 outreach selected · 0 selected for research"); assert.equal(elements.b2bResearchSelected.textContent, "Research Selected");
+  controller.toggleResearchContact(prospect, true);
   await assert.rejects(() => controller.generate(prospect), /business email/i);
   await controller.researchSelected();
   const research = calls.find((call) => call.name === "RESEARCH_BATCH"); assert.deepEqual(research.payload.contactIds, ["research-1"]);

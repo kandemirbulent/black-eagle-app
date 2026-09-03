@@ -78,7 +78,7 @@
     }
 
     function updateSelection() {
-      el("b2bSelectedCount").textContent = `${state.selectedCount} contacts selected${state.unavailableCount ? ` · ${state.unavailableCount} unavailable` : ""}`;
+      el("b2bSelectedCount").textContent = `${state.selectedCount} outreach selected · ${state.researchSelected.size} selected for research${state.unavailableCount ? ` · ${state.unavailableCount} unavailable` : ""}`;
       el("b2bGenerateSelected").disabled = state.selectedCount === 0;
       const eligible = state.contacts.filter((contact) => !selectionBlocked(contact));
       const selectedOnPage = eligible.filter((contact) => Boolean(contact.selectedAt)).length;
