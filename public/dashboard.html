@@ -2741,7 +2741,7 @@
           confirmFn: window.confirm.bind(window)
         });
         await salesAgentDashboard.init();
-        b2bOutreachDashboard = window.B2BOutreachDashboard.createController({ authFetch, showMessage, documentRef: document });
+        b2bOutreachDashboard = window.B2BOutreachDashboard.createController({ authFetch, showMessage, actorRole: currentAdmin?.role || "ADMIN", documentRef: document });
         await b2bOutreachDashboard.init();
         await refreshAll();
       } catch (error) {

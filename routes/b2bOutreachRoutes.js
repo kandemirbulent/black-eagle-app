@@ -10,8 +10,8 @@ function createB2BOutreachRouter({ requireAdminAuth, getRequestsCollection, getC
   const router = express.Router();
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 }, fileFilter(_req, file, done) { const extension = path.extname(file.originalname || "").toLowerCase(); done(extension && [".xlsx", ".xls", ".csv"].includes(extension) ? null : Object.assign(new Error("Only .xlsx, .xls and .csv files are supported."), { code: "B2B_IMPORT_FILE_TYPE_INVALID" }), Boolean(extension && [".xlsx", ".xls", ".csv"].includes(extension))); } });
 
-  async function enqueue(operation, payload, actorId) {
-    const document = buildSignedRequest({ operation, payload, actorId, secret: env.B2B_OUTREACH_INTERNAL_API_KEY, now });
+  async function enqueue(operation, payload, actorId, actorRole) {
+    const document = buildSignedRequest({ operation, payload, actorId, actorRole, secret: env.B2B_OUTREACH_INTERNAL_API_KEY, now });
     const collection = getRequestsCollection();
     const inserted = await collection.insertOne(document);
     const job = await triggerJob({ startCommand: B2B_OUTREACH_WORKER_COMMAND, b2bRequestId: String(inserted.insertedId) });
@@ -22,7 +22,7 @@ function createB2BOutreachRouter({ requireAdminAuth, getRequestsCollection, getC
   router.post("/admin/b2b-outreach/operations", requireAdminAuth, async (req, res) => {
     let insertedId;
     try {
-      insertedId = await enqueue(String(req.body?.operation || "").toUpperCase(), req.body?.payload || {}, req.adminUser?._id);
+      insertedId = await enqueue(String(req.body?.operation || "").toUpperCase(), req.body?.payload || {}, req.adminUser?._id, req.adminUser?.role);
       return res.status(202).json({ ok: true, data: { requestId: String(insertedId), status: "QUEUED" } });
     } catch (error) {
       const code = error?.code || "B2B_REQUEST_CREATE_FAILED";
@@ -65,7 +65,7 @@ function createB2BOutreachRouter({ requireAdminAuth, getRequestsCollection, getC
       const confirmedSummary = summarize(parsed.rows);
       const contacts = parsed.rows.filter((row) => row.importable).map((row) => row.contact);
       if (!contacts.length) return res.json({ ok: true, data: { completed: true, result: { imported: 0, skippedDuplicates: parsed.rows.filter((row) => row.importStatus === "DUPLICATE").length, reviewRequired: 0, invalid: parsed.rows.filter((row) => !row.importable && row.importStatus !== "DUPLICATE").length } } });
-      insertedId = await enqueue("IMPORT_CONTACTS", { contacts, importMeta: { sourceFileName: parsed.sourceFileName, importBatchId: String(req.body.batchId), previewSkippedDuplicates: confirmedSummary.duplicates, previewInvalid: confirmedSummary.invalid + parsed.rows.filter((row) => row.importStatus === "REVIEW_REQUIRED" && !row.importable).length } }, req.adminUser._id);
+      insertedId = await enqueue("IMPORT_CONTACTS", { contacts, importMeta: { sourceFileName: parsed.sourceFileName, importBatchId: String(req.body.batchId), previewSkippedDuplicates: confirmedSummary.duplicates, previewInvalid: confirmedSummary.invalid + parsed.rows.filter((row) => row.importStatus === "REVIEW_REQUIRED" && !row.importable).length } }, req.adminUser._id, req.adminUser?.role);
       return res.status(202).json({ ok: true, data: { requestId: String(insertedId), status: "QUEUED" } });
     } catch (error) {
       const code = error?.code || "B2B_IMPORT_CONFIRM_FAILED";

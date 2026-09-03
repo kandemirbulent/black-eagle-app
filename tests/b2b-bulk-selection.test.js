@@ -7,20 +7,20 @@ const { createController, selectionBlockedReason } = require("../public/js/b2b-o
 function contact(id, overrides = {}) { return { _id: id, recordVersion: 1, companyName: `Company ${id}`, decisionMakerName: `Person ${id}`, role: "Manager", businessEmail: `person${id}@real.example`, verificationStatus: "VERIFIED", eligibilityStatus: "SEND_ELIGIBLE", selectedAt: null, optOut: false, doNotContact: false, bounceStatus: "", ...overrides }; }
 function classList() { const values = new Set(["hidden"]); return { add: (value) => values.add(value), remove: (value) => values.delete(value), contains: (value) => values.has(value) }; }
 function element() { return { textContent: "", disabled: false, checked: false, indeterminate: false, value: "", dataset: {}, style: {}, classList: classList(), replaceChildren() {}, addEventListener() {}, setAttribute(name, value) { this[name] = value; }, appendChild() {}, append() {}, getBoundingClientRect() { return { left: 100, top: 100, right: 124, bottom: 124, width: 24, height: 24 }; }, insertCell() { return element(); }, insertRow() { return element(); } }; }
-function harness(items) {
+function harness(items, actorRole = "ADMIN") {
   const calls = [];
   const elements = new Proxy({}, { get(target, key) { if (!target[key]) target[key] = element(); return target[key]; } });
   const operations = async (name, payload) => {
     calls.push({ name, payload });
     const filtered = items.filter((item) => !payload?.segment || item.segment === payload.segment);
-    const eligible = filtered.filter((item) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.businessEmail) && !item.optOut && !item.doNotContact && !["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"].includes(item.bounceStatus));
+    const eligible = filtered.filter((item) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(item.businessEmail) && (actorRole === "SUPERADMIN" || (!item.optOut && !item.doNotContact && !["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"].includes(item.bounceStatus))));
     if (name === "LIST_CONTACTS") return { items: filtered, total: filtered.length, selectedCount: items.filter((item) => item.selectedAt).length, eligibleCount: eligible.length, selectedEligibleCount: eligible.filter((item) => item.selectedAt).length };
     if (name === "SELECT_CONTACT") { const item = items.find((entry) => entry._id === payload.contactId); item.selectedAt = new Date(); return item; }
     if (name === "DESELECT_CONTACT") { const item = items.find((entry) => entry._id === payload.contactId); item.selectedAt = null; return item; }
     if (name === "BULK_SELECT_CONTACTS") { const deselect = eligible.length > 0 && eligible.every((item) => item.selectedAt); eligible.forEach((item) => { item.selectedAt = deselect ? null : new Date(); }); return { action: deselect ? "DESELECTED" : "SELECTED", selected: deselect ? 0 : eligible.length, eligibleCount: eligible.length, unavailable: filtered.length - eligible.length, selectedCount: items.filter((item) => item.selectedAt).length }; }
     if (name === "CLEAR_CONTACT_SELECTION") { items.forEach((item) => { item.selectedAt = null; }); return { selectedCount: 0 }; }
   };
-  const controller = createController({ authFetch: async () => {}, showMessage() {}, documentRef: { getElementById: (id) => elements[id], createElement: () => element() }, operationOverride: operations });
+  const controller = createController({ authFetch: async () => {}, showMessage() {}, actorRole, documentRef: { getElementById: (id) => elements[id], createElement: () => element() }, operationOverride: operations });
   controller.state.contacts = items;
   return { controller, calls, elements };
 }
@@ -33,6 +33,15 @@ test("current page selects and deselects eligible contacts but never blocked con
   assert.equal(items[2].selectedAt, null);
   await controller.selectCurrentPage(false);
   assert.deepEqual(calls.filter((call) => call.name === "DESELECT_CONTACT").map((call) => call.payload.contactId), ["1", "2"]);
+});
+
+test("superadmin can select any real-email contact while missing email stays blocked", async () => {
+  const items = [contact("1", { verificationStatus: "REQUIRES_REVIEW", doNotContact: true }), contact("2", { verificationStatus: "NOT_VERIFIED", optOut: true }), contact("3", { decisionMakerName: "", role: "", bounceStatus: "HARD_BOUNCE" }), contact("4", { businessEmail: "EMAIL RESEARCH REQUIRED" })];
+  const { controller, calls } = harness(items, "SUPERADMIN");
+  assert.equal(controller.isContactSelectionBlocked(items[0]), false); assert.equal(controller.isContactSelectionBlocked(items[1]), false); assert.equal(controller.isContactSelectionBlocked(items[2]), false); assert.equal(controller.isContactSelectionBlocked(items[3]), true);
+  await controller.selectCurrentPage(true);
+  assert.deepEqual(calls.filter((call) => call.name === "SELECT_CONTACT").map((call) => call.payload.contactId), ["1", "2", "3"]);
+  assert.equal(calls.some((call) => ["GENERATE_DRAFT", "SEND_APPROVED"].includes(call.name)), false);
 });
 
 test("select all results passes active filters, persists count, and triggers no send", async () => {

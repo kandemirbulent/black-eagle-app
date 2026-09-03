@@ -11,6 +11,7 @@ function canonicalRequest(request = {}) {
     operation: request.operation,
     payload: request.payload || {},
     actorId: request.actorId,
+    actorRole: request.actorRole,
     requestedAt: request.requestedAt,
     nonce: request.nonce,
   });
@@ -20,7 +21,7 @@ function signRequest(request, secret) {
   return crypto.createHmac("sha256", String(secret || "")).update(canonicalRequest(request)).digest("hex");
 }
 
-function buildSignedRequest({ operation, payload = {}, actorId, secret, now = () => new Date(), randomBytes = crypto.randomBytes }) {
+function buildSignedRequest({ operation, payload = {}, actorId, actorRole = "ADMIN", secret, now = () => new Date(), randomBytes = crypto.randomBytes }) {
   if (!OPERATIONS.has(operation)) throw Object.assign(new Error("Unsupported B2B operation."), { code: "B2B_OPERATION_NOT_SUPPORTED" });
   if (!String(actorId || "").trim()) throw Object.assign(new Error("Authenticated admin is required."), { code: "B2B_ACTOR_REQUIRED" });
   if (!String(secret || "").trim()) throw Object.assign(new Error("B2B integration secret is not configured."), { code: "B2B_AUTH_NOT_CONFIGURED" });
@@ -28,6 +29,7 @@ function buildSignedRequest({ operation, payload = {}, actorId, secret, now = ()
     operation,
     payload: payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {},
     actorId: String(actorId),
+    actorRole: String(actorRole || "ADMIN").toUpperCase(),
     requestedAt: now().toISOString(),
     nonce: randomBytes(24).toString("hex"),
     status: "QUEUED",
