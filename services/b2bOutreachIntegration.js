@@ -55,6 +55,8 @@ function safeResponse(document = {}) {
     partialSuccess: document.partialSuccess || 0,
     researchRequired: document.researchRequired || 0,
     reviewRequired: document.reviewRequired || 0,
+    noContactFound: document.noContactFound || 0,
+    contactsFound: document.contactsFound || 0,
     failed: document.failed || 0,
     lastProgressAt: document.lastProgressAt || null,
   };

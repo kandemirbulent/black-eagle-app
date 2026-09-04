@@ -25,7 +25,7 @@
 
   function createController({ authFetch, showMessage, actorRole = "ADMIN", documentRef = document, windowRef = typeof window !== "undefined" ? window : { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport, operationOverride }) {
     const el = (id) => documentRef.getElementById(id);
-    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, allResultsSelected: false, contacts: [], selected: new Map(), researchSelected: new Set(), draft: null, draftContact: null, importBatchId: "", importConfirming: false, importResize: null, tooltipControl: null, tooltipPinned: false };
+    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, allResultsSelected: false, contacts: [], selected: new Map(), researchSelected: new Set(), activeResearchRequestId: "", researchPollTimer: null, draft: null, draftContact: null, importBatchId: "", importConfirming: false, importResize: null, tooltipControl: null, tooltipPinned: false };
     const isSuperadmin = String(actorRole || "").toUpperCase() === "SUPERADMIN";
     const selectionBlocked = (contact) => isSuperadmin ? !EMAIL_PATTERN.test(String(contact?.businessEmail || "").trim().toLowerCase()) : !selectable(contact);
     const sendSafetyBlocked = (contact) => contact?.optOut === true || contact?.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"].includes(String(contact?.bounceStatus || "").toUpperCase());
@@ -73,14 +73,35 @@
     async function queueResearch(payload = {}) {
       status("Creating research request...");
       const queued = (operationOverride ? await operationOverride("RESEARCH_BATCH", payload) : await json("/api/admin/b2b-outreach/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "RESEARCH_BATCH", payload }) })) || {};
-      const count = Array.isArray(payload.contactIds) ? payload.contactIds.length : null;
+      const count = Number(queued.totalProspects || (Array.isArray(payload.contactIds) ? payload.contactIds.length : 0));
       status(queued.duplicate ? "Research already queued/running." : `Research queued${count ? ` for ${count} prospects` : ""}.`);
+      if (queued.requestId && windowRef.setTimeout) startResearchTracking(queued.requestId);
       return queued;
     }
+
+    function researchStatusText(request) {
+      const processed = Number(request.processedProspects || 0), total = Number(request.totalProspects || 0), found = Number(request.contactsFound || request.completed || 0), noContact = Number(request.noContactFound || 0), required = Number(request.researchRequired || 0), failed = Number(request.failed || 0);
+      if (request.status === "QUEUED") return `Research queued${total ? ` for ${total} prospects` : ""}.`;
+      if (request.status === "RUNNING") return `Research in progress · ${processed} / ${total || "?"} processed · ${found} contacts found`;
+      if (request.status === "COMPLETED") return `Research completed · ${processed} / ${total || processed} processed · ${found} contacts found · ${noContact} no contact · ${required} research required · ${failed} failed`;
+      if (request.status === "PARTIAL") return `Research completed with issues · ${processed} / ${total || processed} processed · ${found} contacts found · ${noContact} no contact · ${required} research required · ${failed} failed`;
+      return `Research failed · ${processed} / ${total || "?"} processed`;
+    }
+
+    function startResearchTracking(requestId) {
+      if (!requestId || state.activeResearchRequestId === requestId && state.researchPollTimer) return;
+      if (state.researchPollTimer && windowRef.clearTimeout) windowRef.clearTimeout(state.researchPollTimer);
+      state.activeResearchRequestId = requestId;
+      const poll = async () => { try { const request = await json(`/api/admin/b2b-outreach/requests/${encodeURIComponent(requestId)}`); status(researchStatusText(request), request.status === "FAILED" ? "error" : request.status === "PARTIAL" ? "warning" : "success"); if (TERMINAL.has(request.status)) { state.activeResearchRequestId = ""; state.researchPollTimer = null; if (["COMPLETED", "PARTIAL"].includes(request.status)) await loadContacts(); return; } } catch (error) { handleError(error); state.activeResearchRequestId = ""; state.researchPollTimer = null; return; } state.researchPollTimer = windowRef.setTimeout(poll, pollIntervalMs); };
+      state.researchPollTimer = windowRef.setTimeout(poll, pollIntervalMs);
+    }
+
+    async function recoverResearchTracking() { const active = await json("/api/admin/b2b-outreach/research/active"); if (active?.requestId) { status(researchStatusText(active)); startResearchTracking(active.requestId); } return active; }
 
     function filters() {
       const payload = { page: state.page, limit: state.limit };
       for (const [field, elementId] of [["search", "b2bSearch"], ["segment", "b2bSegment"], ["outreachStatus", "b2bStatus"], ["eligibilityStatus", "b2bEligibility"]]) if (el(elementId)?.value.trim()) payload[field] = el(elementId).value.trim();
+      payload.recordView = el("b2bRecordView")?.value || "ACTIVE";
       for (const [field, elementId] of [["hasEmail", "b2bHasEmail"], ["namedContact", "b2bNamedContact"], ["replied", "b2bReplied"]]) if (el(elementId)?.value) payload[field] = el(elementId).value === "true";
       return payload;
     }
@@ -121,7 +142,7 @@
     function renderContacts() {
       const tbody = el("b2bContactsTable");
       tbody.replaceChildren();
-      if (!state.contacts.length) { const row = tbody.insertRow(); const cell = row.insertCell(); cell.colSpan = 13; cell.textContent = "No B2B contacts available."; return; }
+      if (!state.contacts.length) { const row = tbody.insertRow(); const cell = row.insertCell(); cell.colSpan = 15; cell.textContent = "No B2B contacts available."; return; }
       for (const contact of state.contacts) {
         const row = tbody.insertRow();
         const suppressed = selectionBlocked(contact), warning = suppressed || (isSuperadmin && sendSafetyBlocked(contact));
@@ -129,8 +150,8 @@
         checkbox.addEventListener("change", () => toggleContact(contact, checkbox.checked).catch(handleError));
         const checkboxWrap = documentRef.createElement("span"); checkboxWrap.appendChild(checkbox); if (warning) { const reason = isSuperadmin && !suppressed ? sendSafetyWarningReason(contact) : selectionBlockedReason(contact), info = documentRef.createElement("button"); info.type = "button"; info.className = "b2b-eligibility-info"; info.textContent = "i"; info.dataset.tooltip = reason; info.setAttribute("aria-label", reason); info.setAttribute("aria-describedby", "b2bEligibilityTooltip"); info.setAttribute("aria-expanded", "false"); info.addEventListener("mouseenter", () => showEligibilityTooltip(info)); info.addEventListener("mouseleave", () => hideEligibilityTooltip()); info.addEventListener("focus", () => showEligibilityTooltip(info)); info.addEventListener("blur", () => hideEligibilityTooltip()); info.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); toggleEligibilityTooltip(info); }); checkboxWrap.appendChild(info); } row.insertCell().appendChild(checkboxWrap);
         if (isSuperadmin && researchSelectable(contact)) { const research = documentRef.createElement("input"); research.type = "checkbox"; research.className = "b2b-research-checkbox"; research.checked = state.researchSelected.has(idOf(contact)); research.setAttribute("aria-label", `Select ${value(contact.companyName)} for research`); research.addEventListener("change", () => toggleResearchContact(contact, research.checked)); checkboxWrap.appendChild(research); const marker = documentRef.createElement("span"); marker.className = "subtle"; marker.textContent = "Research"; checkboxWrap.appendChild(marker); }
-        const fields = [contact.decisionMakerName, contact.companyName, contact.role, contact.businessEmail || "EMAIL RESEARCH REQUIRED", contact.segment, contact.bestBlackEagleOffer, contact.verificationStatus, eligibilityLabel(contact), suppressed ? [contact.optOut && "OPT OUT", contact.doNotContact && "DO NOT CONTACT", contact.bounceStatus].filter(Boolean).join(" / ") || contact.outreachStatus : contact.outreachStatus, contact.lastEmailSentAt ? new Date(contact.lastEmailSentAt).toLocaleString() : "Never", contact.replied ? `Replied ${contact.repliedAt ? new Date(contact.repliedAt).toLocaleString() : ""}` : "Not replied"];
-        for (const field of fields) row.insertCell().textContent = value(field);
+        const fields = [contact.decisionMakerName, contact.companyName, contact.role, contact.businessEmail || "EMAIL RESEARCH REQUIRED", contact.phone, contact.officialWebsite, contact.segment, contact.bestBlackEagleOffer, contact.verificationStatus, eligibilityLabel(contact), suppressed ? [contact.optOut && "OPT OUT", contact.doNotContact && "DO NOT CONTACT", contact.bounceStatus].filter(Boolean).join(" / ") || contact.outreachStatus : contact.outreachStatus, contact.lastEmailSentAt ? new Date(contact.lastEmailSentAt).toLocaleString() : "Never", contact.replied ? `Replied ${contact.repliedAt ? new Date(contact.repliedAt).toLocaleString() : ""}` : "Not replied"];
+        for (const [index, field] of fields.entries()) { const cell = row.insertCell(); if (index === 5 && /^https?:\/\//i.test(String(field || ""))) { const link = documentRef.createElement("a"); link.href = field; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Official website"; cell.appendChild(link); } else cell.textContent = value(field); }
         const action = documentRef.createElement("button"); action.type = "button"; action.className = "btn btn-secondary"; action.textContent = "Generate Draft"; action.disabled = !contact.selectedAt || selectionBlocked(contact); action.addEventListener("click", () => generate(contact).catch(handleError)); row.insertCell().appendChild(action);
       }
       const pages = Math.max(1, Math.ceil(state.total / state.limit)); el("b2bPageSummary").textContent = `Page ${state.page} of ${pages} · ${state.total} contacts`; el("b2bPreviousPage").disabled = state.page <= 1; el("b2bNextPage").disabled = state.page >= pages;
@@ -190,6 +211,8 @@
     async function researchCurrentResults() {
       return queueResearch(filters());
     }
+
+    async function researchAll() { return queueResearch({ recordView: "ACTIVE" }); }
 
     async function generate(contact) {
       if (selectionBlocked(contact)) throw new Error("A valid business email is required to generate a draft.");
@@ -272,18 +295,19 @@
 
     async function init() {
       if (isSuperadmin) el("b2bSelectionHelp").textContent = "Outreach selection requires a business email. Research-required prospects can be selected separately for research. Sending safety checks are applied before email delivery.";
-      const researchSelectedButton = el("b2bResearchSelected"), researchResultsButton = el("b2bResearchResults");
+      const researchSelectedButton = el("b2bResearchSelected"), researchResultsButton = el("b2bResearchResults"), researchAllButton = el("b2bResearchAll");
       if (researchSelectedButton) { researchSelectedButton.hidden = !isSuperadmin; researchSelectedButton.addEventListener("click", () => researchSelected().catch(handleError)); }
       if (researchResultsButton) { researchResultsButton.hidden = !isSuperadmin; researchResultsButton.addEventListener("click", () => researchCurrentResults().catch(handleError)); }
+      if (researchAllButton) { researchAllButton.hidden = !isSuperadmin; researchAllButton.addEventListener("click", () => researchAll().catch(handleError)); }
       el("b2bApplyFilters").addEventListener("click", () => { state.page = 1; state.unavailableCount = 0; loadContacts().catch(handleError); }); el("b2bGenerateSelected").addEventListener("click", () => generateSelected().catch(handleError)); el("b2bSelectPage").addEventListener("change", (event) => selectCurrentPage(event.target.checked).catch(handleError)); el("b2bSelectAllResults").addEventListener("click", () => selectAllResults().catch(handleError)); el("b2bClearSelection").addEventListener("click", () => clearSelection().catch(handleError)); el("b2bPreviousPage").addEventListener("click", () => { if (state.page > 1) { state.page--; loadContacts().catch(handleError); } }); el("b2bNextPage").addEventListener("click", () => { state.page++; loadContacts().catch(handleError); }); el("b2bSaveDraft").addEventListener("click", () => saveDraft().catch(handleError)); el("b2bApproveDraft").addEventListener("click", () => approveDraft().catch(handleError)); el("b2bSendApproved").addEventListener("click", () => sendApproved().catch(handleError));
       el("b2bImportExcel").addEventListener("click", openImport); el("b2bImportClose").addEventListener("click", closeImport); el("b2bImportFile").addEventListener("change", () => previewImport().catch(handleError)); el("b2bConfirmImport").addEventListener("click", confirmImport); el("b2bImportModal").addEventListener("click", (event) => { if (event.target === el("b2bImportModal")) closeImport(); });
       const resizeHandle = el("b2bImportResizeHandle"); resizeHandle.addEventListener("pointerdown", startImportResize); resizeHandle.addEventListener("pointermove", moveImportResize); resizeHandle.addEventListener("pointerup", stopImportResize); resizeHandle.addEventListener("pointercancel", stopImportResize); windowRef.addEventListener("pointermove", moveImportResize); windowRef.addEventListener("pointerup", stopImportResize); windowRef.addEventListener("pointercancel", stopImportResize); windowRef.addEventListener("resize", clampImportModal);
       documentRef.addEventListener("click", handleEligibilityOutsideClick); documentRef.addEventListener("keydown", handleEligibilityKeydown);
       let loaded = false;
-      el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; loadContacts().catch((error) => { loaded = false; handleError(error); }); } });
+      el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; Promise.all([loadContacts(), isSuperadmin ? recoverResearchTracking() : null]).catch((error) => { loaded = false; handleError(error); }); } });
       return null;
     }
-    return { init, operation, queueResearch, loadContacts, toggleContact, toggleResearchContact, selectCurrentPage, selectAllResults, clearSelection, researchSelected, researchCurrentResults, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, isContactSelectionBlocked: selectionBlocked, state };
+    return { init, operation, queueResearch, startResearchTracking, recoverResearchTracking, researchStatusText, loadContacts, toggleContact, toggleResearchContact, selectCurrentPage, selectAllResults, clearSelection, researchSelected, researchCurrentResults, researchAll, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, isContactSelectionBlocked: selectionBlocked, state };
   }
   return { createController, selectionBlockedReason, researchSelectable };
 });

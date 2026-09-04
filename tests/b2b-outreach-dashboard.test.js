@@ -19,7 +19,8 @@ function collectionHarness() {
       async findOne(filter) { return documents.find((item) => {
         if (filter._id && String(item._id) !== String(filter._id)) return false;
         if (filter.actorId && item.actorId !== filter.actorId) return false;
-        if (filter.operation && item.operation !== filter.operation) return false;
+        if (filter.operation?.$in && !filter.operation.$in.includes(item.operation)) return false;
+        if (typeof filter.operation === "string" && item.operation !== filter.operation) return false;
         if (filter.requestFingerprint && item.requestFingerprint !== filter.requestFingerprint) return false;
         if (filter.status?.$in && !filter.status.$in.includes(item.status)) return false;
         if (filter.createdAt?.$gte && new Date(item.createdAt) < filter.createdAt.$gte) return false;
@@ -107,6 +108,21 @@ test("dashboard research action does not poll a long-running request", async () 
   const controller = dashboard.createController({ authFetch: async (url) => { calls.push(url); return { ok: true, json: async () => ({ ok: true, data: { requestId: "64b000000000000000000099", status: "QUEUED" } }) }; }, showMessage() {}, documentRef: { getElementById: (id) => id === "b2bJobStatus" ? statusElement : null } });
   const queued = await controller.queueResearch({ contactIds: ["one", "two"] });
   assert.equal(queued.status, "QUEUED"); assert.deepEqual(calls, ["/api/admin/b2b-outreach/operations"]); assert.equal(statusElement.textContent, "Research queued for 2 prospects.");
+});
+
+test("Research All queues the server-side active set rather than current-page IDs", async () => {
+  const calls = [], statusElement = { className: "", textContent: "" };
+  const controller = dashboard.createController({ authFetch: async () => {}, showMessage() {}, actorRole: "SUPERADMIN", documentRef: { getElementById: (id) => id === "b2bJobStatus" ? statusElement : null }, operationOverride: async (name, payload) => { calls.push({ name, payload }); return { requestId: "request-1", status: "QUEUED", totalProspects: 582 }; } });
+  await controller.researchAll();
+  assert.deepEqual(calls, [{ name: "RESEARCH_BATCH", payload: { recordView: "ACTIVE" } }]); assert.equal(statusElement.textContent, "Research queued for 582 prospects.");
+});
+
+test("research progress renders terminal state, refreshes contacts and stops polling", async () => {
+  const timers = [], elements = new Proxy({}, { get(target, key) { if (!target[key]) target[key] = { textContent: "", className: "", disabled: false, checked: false, indeterminate: false, value: "", replaceChildren() {}, insertRow() { return { insertCell() { return {}; } }; } }; return target[key]; } });
+  let requestReads = 0, listReads = 0;
+  const controller = dashboard.createController({ authFetch: async (url) => ({ ok: true, json: async () => ({ ok: true, data: url.endsWith("/research/active") ? { requestId: "request-1", status: "RUNNING", processedProspects: 10, totalProspects: 25, contactsFound: 3 } : { requestId: "request-1", status: "COMPLETED", processedProspects: 25, totalProspects: 25, contactsFound: 8, noContactFound: 15, researchRequired: 2, failed: 0 } }) }), showMessage() {}, actorRole: "SUPERADMIN", documentRef: { getElementById: (id) => elements[id] }, windowRef: { innerWidth: 1200, innerHeight: 800, addEventListener() {}, setTimeout(fn) { timers.push(fn); return timers.length; }, clearTimeout() {} }, operationOverride: async (name) => { if (name === "LIST_CONTACTS") { listReads++; return { items: [], total: 0 }; } } });
+  await controller.recoverResearchTracking(); assert.match(elements.b2bJobStatus.textContent, /10 \/ 25 processed/); assert.equal(timers.length, 1);
+  requestReads++; await timers.shift()(); assert.match(elements.b2bJobStatus.textContent, /Research completed.*25 \/ 25.*8 contacts found.*15 no contact/); assert.equal(listReads, 1); assert.equal(controller.state.activeResearchRequestId, ""); assert.equal(timers.length, 0); assert.equal(requestReads, 1);
 });
 
 test("SEND_APPROVED disabled is never presented as SENT", async () => {
