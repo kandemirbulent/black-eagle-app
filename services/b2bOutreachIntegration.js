@@ -49,6 +49,14 @@ function safeResponse(document = {}) {
     createdAt: document.createdAt || null,
     startedAt: document.startedAt || null,
     completedAt: document.completedAt || null,
+    totalProspects: document.totalProspects || 0,
+    processedProspects: document.processedProspects || 0,
+    completed: document.completed || 0,
+    partialSuccess: document.partialSuccess || 0,
+    researchRequired: document.researchRequired || 0,
+    reviewRequired: document.reviewRequired || 0,
+    failed: document.failed || 0,
+    lastProgressAt: document.lastProgressAt || null,
   };
 }
 

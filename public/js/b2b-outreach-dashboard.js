@@ -3,7 +3,7 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   else root.B2BOutreachDashboard = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
-  const TERMINAL = new Set(["COMPLETED", "FAILED"]);
+  const TERMINAL = new Set(["COMPLETED", "PARTIAL", "FAILED"]);
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const value = (item) => item === null || item === undefined || item === "" ? "—" : String(item);
   const idOf = (item) => String(item?._id || item?.id || "");
@@ -68,6 +68,14 @@
       status("Creating request...");
       const queued = await json("/api/admin/b2b-outreach/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: operationName, payload }) });
       return waitForRequest(queued);
+    }
+
+    async function queueResearch(payload = {}) {
+      status("Creating research request...");
+      const queued = (operationOverride ? await operationOverride("RESEARCH_BATCH", payload) : await json("/api/admin/b2b-outreach/operations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ operation: "RESEARCH_BATCH", payload }) })) || {};
+      const count = Array.isArray(payload.contactIds) ? payload.contactIds.length : null;
+      status(queued.duplicate ? "Research already queued/running." : `Research queued${count ? ` for ${count} prospects` : ""}.`);
+      return queued;
     }
 
     function filters() {
@@ -175,15 +183,12 @@
     async function researchSelected() {
       const contactIds = [...state.researchSelected];
       if (!contactIds.length) throw new Error("Select research-required prospects first.");
-      const result = await operation("RESEARCH_BATCH", { contactIds });
-      state.researchSelected.clear(); status(`Completed · ${result?.completed || 0} enriched · ${result?.researchRequired || 0} research required · ${result?.failed || 0} failed`);
-      await loadContacts();
+      const queued = await queueResearch({ contactIds });
+      state.researchSelected.clear(); updateSelection(); return queued;
     }
 
     async function researchCurrentResults() {
-      const result = await operation("RESEARCH_BATCH", filters());
-      status(`Completed · ${result?.completed || 0} enriched · ${result?.researchRequired || 0} research required · ${result?.failed || 0} failed`);
-      await loadContacts();
+      return queueResearch(filters());
     }
 
     async function generate(contact) {
@@ -278,7 +283,7 @@
       el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; loadContacts().catch((error) => { loaded = false; handleError(error); }); } });
       return null;
     }
-    return { init, operation, loadContacts, toggleContact, toggleResearchContact, selectCurrentPage, selectAllResults, clearSelection, researchSelected, researchCurrentResults, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, isContactSelectionBlocked: selectionBlocked, state };
+    return { init, operation, queueResearch, loadContacts, toggleContact, toggleResearchContact, selectCurrentPage, selectAllResults, clearSelection, researchSelected, researchCurrentResults, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, isContactSelectionBlocked: selectionBlocked, state };
   }
   return { createController, selectionBlockedReason, researchSelectable };
 });

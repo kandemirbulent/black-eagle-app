@@ -16,7 +16,15 @@ function collectionHarness() {
     collection: {
       async insertOne(document) { const stored = { ...document, _id: new ObjectId() }; documents.push(stored); return { insertedId: stored._id }; },
       async updateOne(filter, update) { const found = documents.find((item) => String(item._id) === String(filter._id) && (!filter.status || item.status === filter.status)); if (found) Object.assign(found, update.$set || {}); return { matchedCount: found ? 1 : 0 }; },
-      async findOne(filter) { return documents.find((item) => String(item._id) === String(filter._id) && item.actorId === filter.actorId) || null; },
+      async findOne(filter) { return documents.find((item) => {
+        if (filter._id && String(item._id) !== String(filter._id)) return false;
+        if (filter.actorId && item.actorId !== filter.actorId) return false;
+        if (filter.operation && item.operation !== filter.operation) return false;
+        if (filter.requestFingerprint && item.requestFingerprint !== filter.requestFingerprint) return false;
+        if (filter.status?.$in && !filter.status.$in.includes(item.status)) return false;
+        if (filter.createdAt?.$gte && new Date(item.createdAt) < filter.createdAt.$gte) return false;
+        return true;
+      }) || null; },
     },
   };
 }
@@ -83,6 +91,22 @@ test("Render B2B one-off job receives only a validated request ID environment as
   await trigger({ startCommand: B2B_OUTREACH_WORKER_COMMAND, b2bRequestId: "64b000000000000000000099" });
   assert.deepEqual(requestBody, { startCommand: "B2B_OUTREACH_REQUEST_ID=64b000000000000000000099 npm run b2b:request" });
   await assert.rejects(trigger({ startCommand: B2B_OUTREACH_WORKER_COMMAND, b2bRequestId: "unsafe value" }), (error) => error.code === "B2B_REQUEST_ID_INVALID");
+});
+
+test("research enqueue returns immediately and duplicate active request triggers Render once", () => withServer(async ({ base, state, triggerCalls }) => {
+  const body = { operation: "RESEARCH_BATCH", payload: { contactIds: ["64b000000000000000000011", "64b000000000000000000012"] } };
+  const first = await fetch(`${base}/api/admin/b2b-outreach/operations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const second = await fetch(`${base}/api/admin/b2b-outreach/operations`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, payload: { contactIds: [...body.payload.contactIds].reverse() } }) });
+  assert.equal(first.status, 202); assert.equal((await first.json()).data.status, "QUEUED");
+  const duplicate = (await second.json()).data; assert.equal(duplicate.status, "ALREADY_QUEUED"); assert.equal(duplicate.duplicate, true);
+  assert.equal(state.documents.length, 1); assert.equal(triggerCalls.length, 1);
+}));
+
+test("dashboard research action does not poll a long-running request", async () => {
+  const statusElement = { className: "", textContent: "" }, calls = [];
+  const controller = dashboard.createController({ authFetch: async (url) => { calls.push(url); return { ok: true, json: async () => ({ ok: true, data: { requestId: "64b000000000000000000099", status: "QUEUED" } }) }; }, showMessage() {}, documentRef: { getElementById: (id) => id === "b2bJobStatus" ? statusElement : null } });
+  const queued = await controller.queueResearch({ contactIds: ["one", "two"] });
+  assert.equal(queued.status, "QUEUED"); assert.deepEqual(calls, ["/api/admin/b2b-outreach/operations"]); assert.equal(statusElement.textContent, "Research queued for 2 prospects.");
 });
 
 test("SEND_APPROVED disabled is never presented as SENT", async () => {
