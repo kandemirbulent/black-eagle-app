@@ -9,9 +9,11 @@
   const idOf = (item) => String(item?._id || item?.id || "");
   const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const eligibility = (contact = {}) => contact.eligibilityStatus || (!String(contact.decisionMakerName || "").trim() ? "PROSPECT_RESEARCH_REQUIRED" : ["VERIFIED", "VALID"].includes(String(contact.verificationStatus || "").toUpperCase()) && EMAIL_PATTERN.test(String(contact.businessEmail || "").trim()) && String(contact.role || "").trim() ? "SEND_ELIGIBLE" : "CONTACT_REVIEW_REQUIRED");
-  const selectable = (contact = {}) => EMAIL_PATTERN.test(String(contact.businessEmail || "").trim().toLowerCase()) && contact.optOut !== true && contact.doNotContact !== true && !["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"].includes(String(contact.bounceStatus || "").toUpperCase());
-  const eligibilityLabel = (contact) => selectable(contact) ? "Selectable" : ({ PROSPECT_RESEARCH_REQUIRED: "Prospect – Research Required", CONTACT_REVIEW_REQUIRED: "Review Required", CONTACT_VERIFIED: "Verified Contact", SEND_ELIGIBLE: "Send Eligible" })[eligibility(contact)] || "Not Selectable";
+  const alreadySent = (contact = {}) => String(contact.outreachStatus || "").toUpperCase() === "SENT" || Boolean(contact.lastEmailSentAt);
+  const selectable = (contact = {}) => !alreadySent(contact) && EMAIL_PATTERN.test(String(contact.businessEmail || "").trim().toLowerCase()) && contact.optOut !== true && contact.doNotContact !== true && !["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"].includes(String(contact.bounceStatus || "").toUpperCase());
+  const eligibilityLabel = (contact) => alreadySent(contact) ? "Already Sent" : selectable(contact) ? "Selectable" : ({ PROSPECT_RESEARCH_REQUIRED: "Prospect – Research Required", CONTACT_REVIEW_REQUIRED: "Review Required", CONTACT_VERIFIED: "Verified Contact", SEND_ELIGIBLE: "Send Eligible" })[eligibility(contact)] || "Not Selectable";
   const selectionBlockedReason = (contact = {}) => {
+    if (alreadySent(contact)) return "Not selectable — initial outreach already sent.";
     if (contact.doNotContact === true) return "Not selectable — do not contact.";
     if (contact.optOut === true) return "Not selectable — contact opted out.";
     const bounce = String(contact.bounceStatus || "").toUpperCase();
@@ -27,7 +29,7 @@
     const el = (id) => documentRef.getElementById(id);
     const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, allResultsSelected: false, contacts: [], selected: new Map(), researchSelected: new Set(), activeResearchRequestId: "", researchPollTimer: null, draft: null, draftContact: null, importBatchId: "", importConfirming: false, importResize: null, tooltipControl: null, tooltipPinned: false };
     const isSuperadmin = String(actorRole || "").toUpperCase() === "SUPERADMIN";
-    const selectionBlocked = (contact) => isSuperadmin ? !EMAIL_PATTERN.test(String(contact?.businessEmail || "").trim().toLowerCase()) : !selectable(contact);
+    const selectionBlocked = (contact) => alreadySent(contact) || (isSuperadmin ? !EMAIL_PATTERN.test(String(contact?.businessEmail || "").trim().toLowerCase()) : !selectable(contact));
     const sendSafetyBlocked = (contact) => contact?.optOut === true || contact?.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"].includes(String(contact?.bounceStatus || "").toUpperCase());
 
     function status(message, type = "success") {
@@ -152,10 +154,23 @@
         if (isSuperadmin && researchSelectable(contact)) { const research = documentRef.createElement("input"); research.type = "checkbox"; research.className = "b2b-research-checkbox"; research.checked = state.researchSelected.has(idOf(contact)); research.setAttribute("aria-label", `Select ${value(contact.companyName)} for research`); research.addEventListener("change", () => toggleResearchContact(contact, research.checked)); checkboxWrap.appendChild(research); const marker = documentRef.createElement("span"); marker.className = "subtle"; marker.textContent = "Research"; checkboxWrap.appendChild(marker); }
         const fields = [contact.decisionMakerName, contact.companyName, contact.role, contact.businessEmail || "EMAIL RESEARCH REQUIRED", contact.phone, contact.officialWebsite, contact.segment, contact.bestBlackEagleOffer, contact.verificationStatus, eligibilityLabel(contact), suppressed ? [contact.optOut && "OPT OUT", contact.doNotContact && "DO NOT CONTACT", contact.bounceStatus].filter(Boolean).join(" / ") || contact.outreachStatus : contact.outreachStatus, contact.lastEmailSentAt ? new Date(contact.lastEmailSentAt).toLocaleString() : "Never", contact.replied ? `Replied ${contact.repliedAt ? new Date(contact.repliedAt).toLocaleString() : ""}` : "Not replied"];
         for (const [index, field] of fields.entries()) { const cell = row.insertCell(); if (index === 5 && /^https?:\/\//i.test(String(field || ""))) { const link = documentRef.createElement("a"); link.href = field; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = "Official website"; cell.appendChild(link); } else cell.textContent = value(field); }
-        const action = documentRef.createElement("button"); action.type = "button"; action.className = "btn btn-secondary"; action.textContent = "Generate Draft"; action.disabled = !contact.selectedAt || selectionBlocked(contact); action.addEventListener("click", () => generate(contact).catch(handleError)); row.insertCell().appendChild(action);
+        const action = documentRef.createElement("button"); action.type = "button"; action.className = "btn btn-secondary"; action.textContent = "Generate Draft"; action.disabled = !contact.selectedAt || selectionBlocked(contact); action.addEventListener("click", () => generate(contact).catch(handleError)); const actions = row.insertCell(); actions.appendChild(action);
+        if (isSuperadmin && selectable(contact)) {
+          const manual = documentRef.createElement("button"); manual.type = "button"; manual.className = "btn btn-secondary"; manual.textContent = "Mark as Sent";
+          manual.addEventListener("click", async () => { manual.disabled = true; try { await markAsSent(contact); } catch (error) { handleError(error); } finally { manual.disabled = false; } });
+          actions.appendChild(manual);
+        }
       }
       const pages = Math.max(1, Math.ceil(state.total / state.limit)); el("b2bPageSummary").textContent = `Page ${state.page} of ${pages} · ${state.total} contacts`; el("b2bPreviousPage").disabled = state.page <= 1; el("b2bNextPage").disabled = state.page >= pages;
       updateSelection();
+    }
+
+    async function markAsSent(contact) {
+      if (!isSuperadmin || !selectable(contact)) return;
+      if (!windowRef.confirm("Mark this prospect as manually sent?")) return;
+      await json(`/api/admin/b2b-outreach/contacts/${encodeURIComponent(idOf(contact))}/mark-sent`, { method: "POST" });
+      await loadContacts();
+      status("Manual send recorded.");
     }
 
     async function loadContacts() {
@@ -307,7 +322,7 @@
       el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; Promise.all([loadContacts(), isSuperadmin ? recoverResearchTracking() : null]).catch((error) => { loaded = false; handleError(error); }); } });
       return null;
     }
-    return { init, operation, queueResearch, startResearchTracking, recoverResearchTracking, researchStatusText, loadContacts, toggleContact, toggleResearchContact, selectCurrentPage, selectAllResults, clearSelection, researchSelected, researchCurrentResults, researchAll, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, isContactSelectionBlocked: selectionBlocked, state };
+    return { init, markAsSent, operation, queueResearch, startResearchTracking, recoverResearchTracking, researchStatusText, loadContacts, toggleContact, toggleResearchContact, selectCurrentPage, selectAllResults, clearSelection, researchSelected, researchCurrentResults, researchAll, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, isContactSelectionBlocked: selectionBlocked, state };
   }
   return { createController, selectionBlockedReason, researchSelectable };
 });

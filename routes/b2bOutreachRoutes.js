@@ -9,6 +9,27 @@ const { parseWorkbook, applyDuplicateStatus, summarize, createPreviewBatchStore 
 
 function createB2BOutreachRouter({ requireAdminAuth, getRequestsCollection, getContactsCollection, triggerJob = createRenderSalesAgentTrigger(), env = process.env, now = () => new Date(), logger = console, batchStore = createPreviewBatchStore({ now }) }) {
   const router = express.Router();
+  // Records an external send only; this endpoint never queues a Sales Agent job.
+  router.post("/admin/b2b-outreach/contacts/:id/mark-sent", requireAdminAuth, async (req, res) => {
+    if (String(req.adminUser?.role || "").toUpperCase() !== "SUPERADMIN") return res.status(403).json({ ok: false, code: "SUPERADMIN_REQUIRED" });
+    if (!/^[a-f\d]{24}$/i.test(String(req.params.id))) return res.status(400).json({ ok: false, code: "CONTACT_ID_INVALID" });
+    try {
+      const contacts = getContactsCollection(), _id = new ObjectId(req.params.id), timestamp = now();
+      const result = await contacts.updateOne({ _id, outreachStatus: { $ne: "SENT" }, lastEmailSentAt: null, businessEmail: { $regex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ }, optOut: { $ne: true }, doNotContact: { $ne: true }, bounceStatus: { $nin: ["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"] } }, [{ $set: {
+        outreachStatus: "SENT", lastEmailSentAt: timestamp, updatedAt: timestamp,
+        selectedAt: null, selectedBy: "", selectedAuthority: "",
+        recordVersion: { $add: [{ $ifNull: ["$recordVersion", 0] }, 1] },
+        notes: { $concat: [{ $ifNull: ["$notes", ""] }, { $literal: `\nManually sent; recorded by ${String(req.adminUser._id)} at ${timestamp.toISOString()}.` }] },
+      } }]);
+      const contact = await contacts.findOne({ _id });
+      if (!contact) return res.status(404).json({ ok: false, code: "CONTACT_NOT_FOUND" });
+      if (!result.matchedCount && contact.outreachStatus !== "SENT" && !contact.lastEmailSentAt) return res.status(409).json({ ok: false, code: "CONTACT_NOT_ELIGIBLE", message: "This prospect cannot be marked as sent." });
+      return res.json({ ok: true, data: { contact, alreadySent: !result.matchedCount } });
+    } catch (error) {
+      logger.error?.("B2B_MANUAL_SENT_FAILED");
+      return res.status(500).json({ ok: false, code: "B2B_MANUAL_SENT_FAILED", message: "Manual send could not be recorded." });
+    }
+  });
   const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 }, fileFilter(_req, file, done) { const extension = path.extname(file.originalname || "").toLowerCase(); done(extension && [".xlsx", ".xls", ".csv"].includes(extension) ? null : Object.assign(new Error("Only .xlsx, .xls and .csv files are supported."), { code: "B2B_IMPORT_FILE_TYPE_INVALID" }), Boolean(extension && [".xlsx", ".xls", ".csv"].includes(extension))); } });
 
   const stable = (value) => Array.isArray(value) ? value.map(stable) : value && typeof value === "object" ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])])) : value;
