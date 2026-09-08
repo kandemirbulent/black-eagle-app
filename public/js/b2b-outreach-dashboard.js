@@ -149,7 +149,7 @@
     function renderContacts() {
       const tbody = el("b2bContactsTable");
       tbody.replaceChildren();
-      if (!state.contacts.length) { const row = tbody.insertRow(); const cell = row.insertCell(); cell.colSpan = 15; cell.textContent = "No B2B contacts available."; return; }
+      if (!state.contacts.length) { const row = tbody.insertRow(); const cell = row.insertCell(); cell.colSpan = 15; cell.textContent = "No B2B contacts available."; updateSelection(); return; }
       for (const contact of state.contacts) {
         const row = tbody.insertRow();
         const suppressed = selectionBlocked(contact), warning = suppressed || (isSuperadmin && sendSafetyBlocked(contact));
@@ -180,8 +180,12 @@
     }
 
     async function loadContacts() {
-      const data = await operation("LIST_CONTACTS", filters());
-      state.contacts = Array.isArray(data?.items) ? data.items : []; state.total = Number(data?.total || 0); state.selectedCount = Number(data?.selectedCount || 0); state.allResultsSelected = Number(data?.eligibleCount || 0) > 0 && Number(data?.selectedEligibleCount || 0) === Number(data?.eligibleCount || 0);
+      const activeFilters = filters();
+      const data = await operation("LIST_CONTACTS", activeFilters);
+      const returnedContacts = Array.isArray(data?.items) ? data.items : [];
+      const hideSent = String(activeFilters.recordView || "ACTIVE").toUpperCase() === "ACTIVE";
+      state.contacts = hideSent ? returnedContacts.filter((contact) => !alreadySent(contact)) : returnedContacts;
+      state.total = Math.max(0, Number(data?.total || 0) - (returnedContacts.length - state.contacts.length)); state.selectedCount = Number(data?.selectedCount || 0); state.allResultsSelected = Number(data?.eligibleCount || 0) > 0 && Number(data?.selectedEligibleCount || 0) === Number(data?.eligibleCount || 0);
       state.selected.clear(); for (const contact of state.contacts) if (contact.selectedAt) state.selected.set(idOf(contact), contact);
       renderContacts();
     }

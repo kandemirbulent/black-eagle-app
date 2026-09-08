@@ -41,13 +41,23 @@ test('invalid ID rejected server-side and missing prospect returns 404', () => h
 test('existing genuine send keeps timestamp, mailbox and notes', () => harness(async ({ post, contact, writes }) => { assert.equal((await post()).status, 200); assert.equal(contact.lastEmailSentAt, FIRST); assert.equal(contact.senderMailbox, 'sales@example.com'); assert.equal(contact.notes, 'Existing note'); assert.equal(writes(), 0); }, { outreachStatus: 'SENT', lastEmailSentAt: FIRST, senderMailbox: 'sales@example.com' }));
 test('unsuitable prospect cannot be marked', () => harness(async ({ post, writes }) => { assert.equal((await post()).status, 409); assert.equal(writes(), 0); }, { optOut: true }));
 function element() { return { children: [], textContent: '', value: '', dataset: {}, addEventListener(name, handler) { this[name] = handler; }, setAttribute() {}, appendChild(child) { this.children.push(child); }, replaceChildren() { this.children = []; }, insertRow() { const row = element(); this.children.push(row); return row; }, insertCell() { return this.insertRow(); } }; }
-test('confirmation gates mutation; refreshed dashboard shows SENT and Last Sent and blocks selection', async () => {
+test('confirmation gates mutation; refreshed ACTIVE dashboard immediately hides the sent contact', async () => {
   const elements = new Proxy({}, { get(target, key) { return target[key] ||= element(); } });
   const contact = { _id: ID, businessEmail: 'person@example.com', outreachStatus: 'READY' }; let confirmed = false, posts = 0;
   const controller = createController({ actorRole: 'SUPERADMIN', documentRef: { getElementById: id => elements[id], createElement: element }, windowRef: { confirm(text) { assert.equal(text, 'Mark this prospect as manually sent?'); return confirmed; } }, showMessage() {}, authFetch: async (url, options) => { posts++; assert.equal(url, `/api/admin/b2b-outreach/contacts/${ID}/mark-sent`); assert.deepEqual(options, { method: 'POST' }); Object.assign(contact, { outreachStatus: 'SENT', lastEmailSentAt: FIRST }); return { ok: true, json: async () => ({ ok: true }) }; }, operationOverride: async name => { assert.equal(name, 'LIST_CONTACTS'); return { items: [contact], total: 1, selectedCount: 0, eligibleCount: 0 }; } });
   await controller.loadContacts(); let row = elements.b2bContactsTable.children[0]; assert.ok(row.children[14].children.some(button => button.textContent === 'Mark as Sent'));
   await controller.markAsSent(contact); assert.equal(posts, 0); confirmed = true; await controller.markAsSent(contact); assert.equal(posts, 1);
-  row = elements.b2bContactsTable.children[0]; assert.equal(row.children[11].textContent, 'SENT'); assert.equal(row.children[12].textContent, new Date(FIRST).toLocaleString()); assert.equal(row.children[0].children[0].children[0].disabled, true); assert.equal(row.children[14].children.some(button => button.textContent === 'Mark as Sent'), false); assert.equal(controller.isContactSelectionBlocked(contact), true); assert.equal(elements.b2bSelectPage.disabled, true);
+  assert.equal(elements.b2bContactsTable.children.length, 1); row = elements.b2bContactsTable.children[0]; assert.equal(row.children.length, 1); assert.equal(row.children[0].textContent, 'No B2B contacts available.'); assert.equal(controller.state.contacts.length, 0); assert.equal(controller.isContactSelectionBlocked(contact), true); assert.equal(elements.b2bSelectPage.disabled, true);
+  elements.b2bRecordView.value = 'ALL'; await controller.loadContacts(); row = elements.b2bContactsTable.children[0]; assert.equal(row.children[11].textContent, 'SENT'); assert.equal(row.children[12].textContent, new Date(FIRST).toLocaleString()); assert.equal(row.children[14].children.some(button => button.textContent === 'Mark as Sent'), false);
+});
+
+test('genuine sent contacts are excluded from ACTIVE but retained in ALL without deletion or mutation', async () => {
+  const elements = new Proxy({}, { get(target, key) { return target[key] ||= element(); } });
+  const sent = { _id: ID, businessEmail: 'person@example.com', outreachStatus: 'SENT', lastEmailSentAt: FIRST };
+  let listCalls = 0;
+  const controller = createController({ actorRole: 'SUPERADMIN', documentRef: { getElementById: id => elements[id], createElement: element }, windowRef: {}, showMessage() {}, authFetch: async () => { throw new Error('No write expected'); }, operationOverride: async (name) => { assert.equal(name, 'LIST_CONTACTS'); listCalls++; return { items: [sent], total: 1, selectedCount: 0, eligibleCount: 0 }; } });
+  await controller.loadContacts(); assert.equal(controller.state.contacts.length, 0);
+  elements.b2bRecordView.value = 'ALL'; await controller.loadContacts(); assert.equal(controller.state.contacts.length, 1); assert.equal(controller.state.contacts[0], sent); assert.equal(listCalls, 2);
 });
 
 test('concurrent marking records one timestamp and one note', () => harness(async ({ post, contact, writes }) => {
