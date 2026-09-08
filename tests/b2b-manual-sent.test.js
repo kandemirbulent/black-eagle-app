@@ -66,6 +66,7 @@ test('ACTIVE row actions show Generate Draft, Edit, then Mark as Sent without el
   const controller = createController({ actorRole: 'SUPERADMIN', documentRef: { getElementById: id => elements[id], createElement: element }, windowRef: {}, showMessage() {}, authFetch: async () => { throw new Error('No click expected'); }, operationOverride: async name => { assert.equal(name, 'LIST_CONTACTS'); return { items: [contact], total: 1, selectedCount: 0, eligibleCount: 0 }; } });
   await controller.loadContacts();
   const actions = elements.b2bContactsTable.children[0].children[14];
+  assert.equal(actions.className, 'b2b-row-actions');
   assert.deepEqual(actions.children.map((button) => button.textContent), ['Generate Draft', 'Edit', 'Mark as Sent']);
   assert.equal(contact.outreachStatus, 'REVIEW_REQUIRED'); assert.equal(contact.lastEmailSentAt, null);
 });
