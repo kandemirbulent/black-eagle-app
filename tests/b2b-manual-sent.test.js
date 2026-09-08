@@ -60,6 +60,16 @@ test('genuine sent contacts are excluded from ACTIVE but retained in ALL without
   elements.b2bRecordView.value = 'ALL'; await controller.loadContacts(); assert.equal(controller.state.contacts.length, 1); assert.equal(controller.state.contacts[0], sent); assert.equal(listCalls, 2);
 });
 
+test('ACTIVE row actions show Generate Draft, Edit, then Mark as Sent without eligibility gating', async () => {
+  const elements = new Proxy({}, { get(target, key) { return target[key] ||= element(); } });
+  const contact = { _id: ID, companyName: 'Research Prospect', businessEmail: '', outreachStatus: 'REVIEW_REQUIRED', lastEmailSentAt: null, outreachEligible: false };
+  const controller = createController({ actorRole: 'SUPERADMIN', documentRef: { getElementById: id => elements[id], createElement: element }, windowRef: {}, showMessage() {}, authFetch: async () => { throw new Error('No click expected'); }, operationOverride: async name => { assert.equal(name, 'LIST_CONTACTS'); return { items: [contact], total: 1, selectedCount: 0, eligibleCount: 0 }; } });
+  await controller.loadContacts();
+  const actions = elements.b2bContactsTable.children[0].children[14];
+  assert.deepEqual(actions.children.map((button) => button.textContent), ['Generate Draft', 'Edit', 'Mark as Sent']);
+  assert.equal(contact.outreachStatus, 'REVIEW_REQUIRED'); assert.equal(contact.lastEmailSentAt, null);
+});
+
 test('concurrent marking records one timestamp and one note', () => harness(async ({ post, contact, writes }) => {
   const responses = await Promise.all([post(), post()]); assert.ok(responses.every(response => response.status === 200));
   assert.equal(writes(), 1); assert.equal(contact.lastEmailSentAt.toISOString(), FIRST); assert.equal(contact.notes.match(/Manually sent/g).length, 1);
