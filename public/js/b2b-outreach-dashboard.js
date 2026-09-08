@@ -27,7 +27,7 @@
 
   function createController({ authFetch, showMessage, actorRole = "ADMIN", documentRef = document, windowRef = typeof window !== "undefined" ? window : { innerWidth: 1280, innerHeight: 800, addEventListener() {} }, sleep = wait, pollIntervalMs = 1500, timeoutMs = 90000, refreshAfterImport, operationOverride }) {
     const el = (id) => documentRef.getElementById(id);
-    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, allResultsSelected: false, contacts: [], selected: new Map(), researchSelected: new Set(), activeResearchRequestId: "", researchPollTimer: null, draft: null, draftContact: null, importBatchId: "", importConfirming: false, importResize: null, tooltipControl: null, tooltipPinned: false };
+    const state = { page: 1, limit: 25, total: 0, selectedCount: 0, unavailableCount: 0, allResultsSelected: false, contacts: [], selected: new Map(), researchSelected: new Set(), editContact: null, activeResearchRequestId: "", researchPollTimer: null, draft: null, draftContact: null, importBatchId: "", importConfirming: false, importResize: null, tooltipControl: null, tooltipPinned: false };
     const isSuperadmin = String(actorRole || "").toUpperCase() === "SUPERADMIN";
     const selectionBlocked = (contact) => alreadySent(contact) || (isSuperadmin ? !EMAIL_PATTERN.test(String(contact?.businessEmail || "").trim().toLowerCase()) : !selectable(contact));
     const sendSafetyBlocked = (contact) => contact?.optOut === true || contact?.doNotContact === true || ["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"].includes(String(contact?.bounceStatus || "").toUpperCase());
@@ -45,6 +45,11 @@
       if (!response.ok || body.ok === false) throw Object.assign(new Error(body.message || "B2B operation failed."), { code: body.code || "B2B_OPERATION_FAILED" });
       return body.data;
     }
+
+    const editFields = [["decisionMakerName", "b2bEditDecisionMakerName"], ["companyName", "b2bEditCompanyName"], ["role", "b2bEditRole"], ["businessEmail", "b2bEditBusinessEmail"], ["phone", "b2bEditPhone"], ["officialWebsite", "b2bEditOfficialWebsite"], ["segment", "b2bEditSegment"], ["bestBlackEagleOffer", "b2bEditBestOffer"], ["sourceUrl", "b2bEditSourceUrl"], ["notes", "b2bEditNotes"]];
+    function openContactEditor(contact) { if (!isSuperadmin) return; state.editContact = contact; for (const [field, elementId] of editFields) el(elementId).value = contact?.[field] || ""; el("b2bEditContactModal").classList.remove("hidden"); }
+    function closeContactEditor() { state.editContact = null; el("b2bEditContactModal").classList.add("hidden"); }
+    async function saveContact() { if (!isSuperadmin || !state.editContact) return null; const fields = {}; for (const [field, elementId] of editFields) fields[field] = el(elementId).value; const updated = await json(`/api/admin/b2b-outreach/contacts/${encodeURIComponent(idOf(state.editContact))}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) }); closeContactEditor(); await loadContacts(); status("Contact updated."); return updated; }
 
     async function waitForRequest(queued) {
       status("Queued...");
@@ -160,6 +165,7 @@
           manual.addEventListener("click", async () => { manual.disabled = true; try { await markAsSent(contact); } catch (error) { handleError(error); } finally { manual.disabled = false; } });
           actions.appendChild(manual);
         }
+        if (isSuperadmin) { const edit = documentRef.createElement("button"); edit.type = "button"; edit.className = "btn btn-secondary"; edit.textContent = "Edit"; edit.addEventListener("click", () => openContactEditor(contact)); actions.appendChild(edit); }
       }
       const pages = Math.max(1, Math.ceil(state.total / state.limit)); el("b2bPageSummary").textContent = `Page ${state.page} of ${pages} · ${state.total} contacts`; el("b2bPreviousPage").disabled = state.page <= 1; el("b2bNextPage").disabled = state.page >= pages;
       updateSelection();
@@ -310,6 +316,7 @@
 
     async function init() {
       if (isSuperadmin) el("b2bSelectionHelp").textContent = "Outreach selection requires a business email. Research-required prospects can be selected separately for research. Sending safety checks are applied before email delivery.";
+      el("b2bSaveContact")?.addEventListener("click", () => saveContact().catch(handleError)); el("b2bCancelContact")?.addEventListener("click", closeContactEditor); el("b2bEditContactClose")?.addEventListener("click", closeContactEditor); el("b2bEditContactModal")?.addEventListener("click", (event) => { if (event.target === el("b2bEditContactModal")) closeContactEditor(); });
       const researchSelectedButton = el("b2bResearchSelected"), researchResultsButton = el("b2bResearchResults"), researchAllButton = el("b2bResearchAll");
       if (researchSelectedButton) { researchSelectedButton.hidden = !isSuperadmin; researchSelectedButton.addEventListener("click", () => researchSelected().catch(handleError)); }
       if (researchResultsButton) { researchResultsButton.hidden = !isSuperadmin; researchResultsButton.addEventListener("click", () => researchCurrentResults().catch(handleError)); }
@@ -322,7 +329,7 @@
       el("b2bOutreachNavButton")?.addEventListener("click", () => { if (!loaded) { loaded = true; Promise.all([loadContacts(), isSuperadmin ? recoverResearchTracking() : null]).catch((error) => { loaded = false; handleError(error); }); } });
       return null;
     }
-    return { init, markAsSent, operation, queueResearch, startResearchTracking, recoverResearchTracking, researchStatusText, loadContacts, toggleContact, toggleResearchContact, selectCurrentPage, selectAllResults, clearSelection, researchSelected, researchCurrentResults, researchAll, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, isContactSelectionBlocked: selectionBlocked, state };
+    return { init, markAsSent, openContactEditor, closeContactEditor, saveContact, operation, queueResearch, startResearchTracking, recoverResearchTracking, researchStatusText, loadContacts, toggleContact, toggleResearchContact, selectCurrentPage, selectAllResults, clearSelection, researchSelected, researchCurrentResults, researchAll, generate, saveDraft, approveDraft, sendApproved, previewImport, confirmImport, renderImportPreview, importModalSize, resetImportModalSize, startImportResize, moveImportResize, stopImportResize, clampImportModal, showEligibilityTooltip, hideEligibilityTooltip, toggleEligibilityTooltip, handleEligibilityOutsideClick, handleEligibilityKeydown, isContactSelectionBlocked: selectionBlocked, state };
   }
   return { createController, selectionBlockedReason, researchSelectable };
 });

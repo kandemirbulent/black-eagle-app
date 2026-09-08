@@ -6,9 +6,30 @@ const { Types: { ObjectId } } = require("mongoose");
 const { B2B_OUTREACH_WORKER_COMMAND, createRenderSalesAgentTrigger, RenderTriggerError } = require("../services/salesAgentJobTrigger");
 const { buildSignedRequest, safeResponse } = require("../services/b2bOutreachIntegration");
 const { parseWorkbook, applyDuplicateStatus, summarize, createPreviewBatchStore } = require("../services/b2bProspectImport");
+const { buildContactUpdate } = require("../services/b2bContactAdmin");
 
 function createB2BOutreachRouter({ requireAdminAuth, getRequestsCollection, getContactsCollection, triggerJob = createRenderSalesAgentTrigger(), env = process.env, now = () => new Date(), logger = console, batchStore = createPreviewBatchStore({ now }) }) {
   const router = express.Router();
+  router.patch("/admin/b2b-outreach/contacts/:id", requireAdminAuth, async (req, res) => {
+    if (String(req.adminUser?.role || "").toUpperCase() !== "SUPERADMIN") return res.status(403).json({ ok: false, code: "SUPERADMIN_REQUIRED", message: "Superadmin access is required." });
+    if (!ObjectId.isValid(String(req.params.id))) return res.status(400).json({ ok: false, code: "CONTACT_ID_INVALID", message: "Invalid contact ID." });
+    try {
+      const contacts = getContactsCollection(), _id = new ObjectId(String(req.params.id)), existing = await contacts.findOne({ _id });
+      if (!existing) return res.status(404).json({ ok: false, code: "CONTACT_NOT_FOUND", message: "Contact was not found." });
+      const $set = buildContactUpdate(req.body, existing, req.adminUser._id, now());
+      if (Object.hasOwn($set, "normalizedEmail") && $set.normalizedEmail !== String(existing.normalizedEmail || existing.businessEmail || "").trim().toLowerCase()) {
+        const duplicate = await contacts.findOne({ normalizedEmail: $set.normalizedEmail, _id: { $ne: _id } });
+        if (duplicate) return res.status(409).json({ ok: false, code: "B2B_CONTACT_EMAIL_DUPLICATE", message: "Another contact already uses this email address." });
+      }
+      const result = await contacts.updateOne({ _id }, { $set, $inc: { recordVersion: 1 } });
+      if (!result.matchedCount) return res.status(404).json({ ok: false, code: "CONTACT_NOT_FOUND", message: "Contact was not found." });
+      return res.json({ ok: true, data: await contacts.findOne({ _id }) });
+    } catch (error) {
+      const known = { B2B_CONTACT_FIELDS_INVALID: "Only supported contact fields can be edited.", B2B_CONTACT_COMPANY_REQUIRED: "Company name is required.", B2B_CONTACT_EMAIL_INVALID: "Enter a valid business email.", B2B_CONTACT_URL_INVALID: "Enter a valid HTTP or HTTPS URL.", B2B_CONTACT_SEGMENT_INVALID: "Select a supported segment." };
+      const code = error.code || "B2B_CONTACT_UPDATE_FAILED";
+      return res.status(known[code] ? 400 : 500).json({ ok: false, code, message: known[code] || "Contact could not be updated." });
+    }
+  });
   // Records an external send only; this endpoint never queues a Sales Agent job.
   router.post("/admin/b2b-outreach/contacts/:id/mark-sent", requireAdminAuth, async (req, res) => {
     if (String(req.adminUser?.role || "").toUpperCase() !== "SUPERADMIN") return res.status(403).json({ ok: false, code: "SUPERADMIN_REQUIRED" });

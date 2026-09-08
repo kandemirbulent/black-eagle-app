@@ -672,6 +672,17 @@
             <div id="b2bImportResizeHandle" class="b2b-import-resize-handle" role="separator" aria-label="Resize import modal" aria-orientation="horizontal"></div>
           </div>
         </div>
+        <div id="b2bEditContactModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="b2bEditContactTitle">
+          <div class="modal-panel sales-agent-details-panel"><div class="modal-header"><h3 id="b2bEditContactTitle" class="modal-title">Edit Contact</h3><button type="button" class="icon-button" id="b2bEditContactClose" aria-label="Close contact editor">&times;</button></div>
+            <div class="form-grid">
+              <div><label for="b2bEditDecisionMakerName">Contact Name</label><input id="b2bEditDecisionMakerName" type="text" /></div><div><label for="b2bEditCompanyName">Company Name</label><input id="b2bEditCompanyName" type="text" /></div>
+              <div><label for="b2bEditRole">Role</label><input id="b2bEditRole" type="text" /></div><div><label for="b2bEditBusinessEmail">Email</label><input id="b2bEditBusinessEmail" type="email" /></div>
+              <div><label for="b2bEditPhone">Phone</label><input id="b2bEditPhone" type="text" /></div><div><label for="b2bEditOfficialWebsite">Official Website</label><input id="b2bEditOfficialWebsite" type="url" /></div>
+              <div><label for="b2bEditSegment">Segment</label><select id="b2bEditSegment"><option value="HOTELS">Hotels</option><option value="CATERING">Catering</option><option value="EVENT_VENUES">Event Venues</option><option value="FACILITIES_MANAGEMENT">Facilities Management</option><option value="PROPERTY_MANAGEMENT">Property Management</option><option value="CORPORATE">Corporate</option></select></div><div><label for="b2bEditBestOffer">Best Offer</label><input id="b2bEditBestOffer" type="text" /></div>
+              <div><label for="b2bEditSourceUrl">Source URL</label><input id="b2bEditSourceUrl" type="url" /></div><div><label for="b2bEditNotes">Notes</label><textarea id="b2bEditNotes" rows="4"></textarea></div>
+            </div><div class="btn-row" style="margin-top:14px;"><button type="button" class="btn btn-success" id="b2bSaveContact">Save Changes</button><button type="button" class="btn btn-secondary" id="b2bCancelContact">Cancel</button></div>
+          </div>
+        </div>
       </section>
 
       <section id="pendingCustomersSection" class="section">
