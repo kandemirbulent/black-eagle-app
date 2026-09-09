@@ -36,7 +36,7 @@ function createB2BOutreachRouter({ requireAdminAuth, getRequestsCollection, getC
     if (!/^[a-f\d]{24}$/i.test(String(req.params.id))) return res.status(400).json({ ok: false, code: "CONTACT_ID_INVALID" });
     try {
       const contacts = getContactsCollection(), _id = new ObjectId(req.params.id), timestamp = now();
-      const result = await contacts.updateOne({ _id, outreachStatus: { $ne: "SENT" }, lastEmailSentAt: null, businessEmail: { $regex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/ }, optOut: { $ne: true }, doNotContact: { $ne: true }, bounceStatus: { $nin: ["HARD_BOUNCE", "BLOCKED", "INVALID", "INVALID_EMAIL"] } }, [{ $set: {
+      const result = await contacts.updateOne({ _id, outreachStatus: { $ne: "SENT" }, lastEmailSentAt: null }, [{ $set: {
         outreachStatus: "SENT", lastEmailSentAt: timestamp, updatedAt: timestamp,
         selectedAt: null, selectedBy: "", selectedAuthority: "",
         recordVersion: { $add: [{ $ifNull: ["$recordVersion", 0] }, 1] },

@@ -13,7 +13,14 @@ async function harness(run, overrides = {}) {
       if (String(filter._id) !== ID) return { matchedCount: 0 };
       assert.equal(filter.lastEmailSentAt, null);
       assert.deepEqual(filter.outreachStatus, { $ne: 'SENT' });
-      if (contact.outreachStatus === 'SENT' || contact.lastEmailSentAt || contact.optOut || !filter.businessEmail.$regex.test(contact.businessEmail)) return { matchedCount: 0 };
+      assert.equal(Object.hasOwn(filter, 'businessEmail'), false);
+      assert.equal(Object.hasOwn(filter, 'verificationStatus'), false);
+      assert.equal(Object.hasOwn(filter, 'eligibilityStatus'), false);
+      assert.equal(Object.hasOwn(filter, 'researchStatus'), false);
+      assert.equal(Object.hasOwn(filter, 'optOut'), false);
+      assert.equal(Object.hasOwn(filter, 'doNotContact'), false);
+      assert.equal(Object.hasOwn(filter, 'bounceStatus'), false);
+      if (contact.outreachStatus === 'SENT' || contact.lastEmailSentAt) return { matchedCount: 0 };
       const set = pipeline[0].$set;
       assert.equal(Object.hasOwn(set, 'senderMailbox'), false);
       assert.equal(Object.keys(set).some(key => /research/i.test(key)), false);
@@ -39,7 +46,9 @@ test('SUPERADMIN records server timestamp and manual note without sending; repea
 test('normal admin and unauthenticated caller cannot record manual send', () => harness(async ({ post, writes }) => { assert.equal((await post(ID, 'ADMIN')).status, 403); assert.equal((await post(ID, '')).status, 401); assert.equal(writes(), 0); }));
 test('invalid ID rejected server-side and missing prospect returns 404', () => harness(async ({ post, writes }) => { assert.equal((await post('invalid')).status, 400); assert.equal((await post('64b000000000000000000099')).status, 404); assert.equal(writes(), 0); }));
 test('existing genuine send keeps timestamp, mailbox and notes', () => harness(async ({ post, contact, writes }) => { assert.equal((await post()).status, 200); assert.equal(contact.lastEmailSentAt, FIRST); assert.equal(contact.senderMailbox, 'sales@example.com'); assert.equal(contact.notes, 'Existing note'); assert.equal(writes(), 0); }, { outreachStatus: 'SENT', lastEmailSentAt: FIRST, senderMailbox: 'sales@example.com' }));
-test('unsuitable prospect cannot be marked', () => harness(async ({ post, writes }) => { assert.equal((await post()).status, 409); assert.equal(writes(), 0); }, { optOut: true }));
+test('SUPERADMIN can manually mark a research-required unverified prospect without an email', () => harness(async ({ post, contact, writes }) => {
+  const response = await post(); assert.equal(response.status, 200); assert.equal(contact.outreachStatus, 'SENT'); assert.equal(contact.lastEmailSentAt.toISOString(), FIRST); assert.equal(writes(), 1);
+}, { businessEmail: '', verificationStatus: 'NOT_VERIFIED', eligibilityStatus: 'EMAIL_RESEARCH_REQUIRED', researchStatus: 'EMAIL_RESEARCH_REQUIRED', outreachStatus: 'REVIEW_REQUIRED', optOut: true, doNotContact: true, bounceStatus: 'BLOCKED' }));
 function element() { return { children: [], textContent: '', value: '', dataset: {}, addEventListener(name, handler) { this[name] = handler; }, setAttribute() {}, appendChild(child) { this.children.push(child); }, replaceChildren() { this.children = []; }, insertRow() { const row = element(); this.children.push(row); return row; }, insertCell() { return this.insertRow(); } }; }
 test('confirmation gates mutation; refreshed ACTIVE dashboard immediately hides the sent contact', async () => {
   const elements = new Proxy({}, { get(target, key) { return target[key] ||= element(); } });
