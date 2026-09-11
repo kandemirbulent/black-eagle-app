@@ -25,6 +25,20 @@ function harness(items, actorRole = "ADMIN") {
   return { controller, calls, elements };
 }
 
+test("B2B sorting is optional, uses parity keys and resets pagination when changed", async () => {
+  const html = fs.readFileSync(path.join(__dirname, "../public/dashboard.html"), "utf8");
+  const source = fs.readFileSync(path.join(__dirname, "../public/js/b2b-outreach-dashboard.js"), "utf8");
+  for (const value of ["CREATED_DESC", "CREATED_ASC", "NAME_ASC", "NAME_DESC", "COMPANY_ASC", "COMPANY_DESC", "LAST_EMAIL_DESC", "LAST_EMAIL_ASC", "UNSENT_FIRST", "SENT_FIRST", "REPLIED_FIRST", "AWAITING_REPLY_FIRST"]) assert.match(html, new RegExp(`<option value="${value}">`));
+  assert.match(html, /id="b2bSort"><option value="">Default \/ Current order<\/option>/);
+  assert.match(source, /if \(el\("b2bSort"\)\?\.value\) payload\.sort = el\("b2bSort"\)\.value/);
+  assert.match(source, /el\("b2bSort"\)\.addEventListener\("change", \(\) => \{ state\.page = 1; loadContacts\(\)/);
+  const { controller, calls, elements } = harness([contact("1")]);
+  elements.b2bSort.value = ""; await controller.loadContacts();
+  assert.equal(Object.hasOwn(calls.at(-1).payload, "sort"), false);
+  elements.b2bSort.value = "COMPANY_DESC"; await controller.loadContacts();
+  assert.equal(calls.at(-1).payload.sort, "COMPANY_DESC");
+});
+
 test("current page selects and deselects eligible contacts but never blocked contacts", async () => {
   const items = [contact("1", { verificationStatus: "REQUIRES_REVIEW", eligibilityStatus: "CONTACT_REVIEW_REQUIRED" }), contact("2", { decisionMakerName: "", role: "", businessEmail: "events@real.example", verificationStatus: "NOT_VERIFIED", eligibilityStatus: "PROSPECT_RESEARCH_REQUIRED" }), contact("3", { eligibilityStatus: "PROSPECT_RESEARCH_REQUIRED", decisionMakerName: "", businessEmail: "EMAIL RESEARCH REQUIRED" })];
   const { controller, calls } = harness(items);
