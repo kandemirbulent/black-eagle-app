@@ -30,8 +30,11 @@ test("B2B sorting is optional, uses parity keys and resets pagination when chang
   const source = fs.readFileSync(path.join(__dirname, "../public/js/b2b-outreach-dashboard.js"), "utf8");
   for (const value of ["CREATED_DESC", "CREATED_ASC", "NAME_ASC", "NAME_DESC", "COMPANY_ASC", "COMPANY_DESC", "LAST_EMAIL_DESC", "LAST_EMAIL_ASC", "UNSENT_FIRST", "SENT_FIRST", "REPLIED_FIRST", "AWAITING_REPLY_FIRST"]) assert.match(html, new RegExp(`<option value="${value}">`));
   assert.match(html, /id="b2bSort"><option value="">Default \/ Current order<\/option>/);
-  assert.match(source, /if \(el\("b2bSort"\)\?\.value\) payload\.sort = el\("b2bSort"\)\.value/);
-  assert.match(source, /el\("b2bSort"\)\.addEventListener\("change", \(\) => \{ state\.page = 1; loadContacts\(\)/);
+  assert.match(source, /payload\.sort = sorts\.join\(","\)/);
+  assert.match(source, /sortChanged\(select\)[\s\S]+state\.page = 1; loadContacts\(\)/);
+  assert.match(source, /sortControls\(\)\.length >= 3/);
+  assert.match(source, /selected\.includes\(sortField\(option\.value\)\)/);
+  assert.match(html, /id="b2bSortExtras"/); assert.match(html, /id="b2bAddSort">\+ Add Sort/);
   const { controller, calls, elements } = harness([contact("1")]);
   elements.b2bSort.value = ""; await controller.loadContacts();
   assert.equal(Object.hasOwn(calls.at(-1).payload, "sort"), false);
