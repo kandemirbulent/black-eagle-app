@@ -18,6 +18,7 @@ const Staff = require("./models/staff");
 const SupportMessage = require("./models/supportMessage");
 const AdminUser = require("./models/adminUser");
 const Event = require("./models/event");
+const { createAdminOrderDetailsUpdate } = require("./services/admin-order-update");
 const EventApplication = require("./models/eventApplication");
 const EventAssignment = require("./models/eventAssignment");
 const SalesAgentRun = require("./models/salesAgentRun");
@@ -2027,6 +2028,8 @@ app.patch("/admin/orders/:id/status", requireAdminAuth, async (req, res) => {
     });
   }
 });
+
+app.patch("/admin/orders/:id", requireAdminAuth, requireSuperAdmin, createAdminOrderDetailsUpdate({ Order, Event }));
 
 app.get("/admin/orders", requireAdminAuth, async (req, res) => {
   try {

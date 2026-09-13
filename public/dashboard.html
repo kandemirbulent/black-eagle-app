@@ -1253,6 +1253,26 @@
     </main>
   </div>
 
+  <div id="orderDetailsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="orderDetailsTitle">
+    <div class="modal-panel">
+      <div class="modal-header"><h3 id="orderDetailsTitle" class="modal-title">Order details</h3><button type="button" class="icon-button" id="orderDetailsClose" aria-label="Close order details">&times;</button></div>
+      <div id="orderDetailsContent"></div>
+      <p id="orderDetailsError" role="alert"></p>
+      <button type="button" class="btn" id="orderDetailsEdit">Edit</button>
+      <form id="orderDetailsForm" class="hidden">
+        <label for="orderDetailsEventName">Event name</label>
+        <input id="orderDetailsEventName" name="eventName">
+        <label for="orderDetailsLocation">Venue / location</label>
+        <input id="orderDetailsLocation" name="location">
+        <label for="orderDetailsNotes">Notes</label>
+        <textarea id="orderDetailsNotes" name="notes" rows="3"></textarea>
+        <label for="orderDetailsStatus">Order status</label>
+        <input id="orderDetailsStatus" name="orderStatus" required>
+        <div class="btn-row"><button type="submit" class="btn" id="orderDetailsSave">Save</button><button type="button" class="btn" id="orderDetailsCancel">Cancel</button></div>
+      </form>
+    </div>
+  </div>
+  <script src="/js/order-details.js"></script>
   <script src="/js/sales-agent-dashboard.js"></script>
   <script src="/js/b2b-outreach-dashboard.js"></script>
   <script>
@@ -2067,6 +2087,19 @@
       }).join("");
     }
 
+    const orderDetails = OrderDetails.create({
+      document,
+      authFetch,
+      canEdit: canDelete,
+      onSaved: () => loadOrders(),
+    });
+    document.getElementById("ordersTable").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-order-details]");
+      if (!button) return;
+      const order = ordersCache.find((item) => String(item._id) === button.dataset.orderDetails);
+      if (order) orderDetails.open(order);
+    });
+
     async function loadOrders() {
       const response = await authFetch("/admin/orders");
       ordersCache = await response.json();
@@ -2082,7 +2115,7 @@
         <tr>
           <td>${order.orderId || "-"}</td>
           <td>${order.companyName || order.customerName || "-"}</td>
-          <td>${order.eventName || "-"}</td>
+          <td><button type="button" class="btn" data-order-details="${escapeHtml(order._id)}">${escapeHtml(order.eventName || "View order")}</button></td>
           <td>${formatDate(order.eventDate)}</td>
           <td><span class="tag">${order.orderStatus || order.paymentStatus || order.status || "-"}</span></td>
           <td>${formatMoney(order.totalWithVat || order.totalAmount || 0)}</td>
