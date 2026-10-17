@@ -626,6 +626,40 @@ test("opportunity edit requires exact ID/version, rejects operators, and increme
   assert.equal((await stale.json()).code, "OPPORTUNITY_VERSION_CONFLICT");
 }));
 
+test("Togather quote edit saves canonical staff and price without resolving safety review", () => withServer(async ({ request, state }) => {
+  state.results.push(eligibleAddToEvent({ platform: "togather", resultStatus: "MANUAL_REVIEW", analysisStatus: "MANUAL_REVIEW",
+    blockingReasons: ["TOGATHER_CUSTOMER_DETAIL_UNREAD"], reviewCodes: ["TOGATHER_CUSTOMER_DETAIL_UNREAD"], manualSubmissionEligible: false }));
+  const response = await request("/api/admin/sales-agent/opportunities/64f000000000000000000001", jsonOptions("admin", "PATCH", {
+    expectedVersion: 1, staffBreakdown: [{ role: "Waiter", quantity: 3 }], finalPrice: 600,
+  }));
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.opportunity.platform, "togather");
+  assert.equal(body.opportunity.finalPrice, 600);
+  assert.deepEqual(body.opportunity.staffBreakdown, [{ role: "Waiter", quantity: 3 }]);
+  assert.equal(body.opportunity.resultStatus, "MANUAL_REVIEW");
+  assert.deepEqual(body.opportunity.blockingReasons, ["TOGATHER_CUSTOMER_DETAIL_UNREAD"]);
+  assert.deepEqual(body.opportunity.reviewCodes, ["TOGATHER_CUSTOMER_DETAIL_UNREAD"]);
+  assert.equal(body.opportunity.manualSubmissionEligible, false);
+  assert.equal(body.opportunity.recordVersion, 2);
+  assert.equal(body.opportunity.submissionEligible, false);
+  assert.equal(state.results.length, 1);
+}));
+
+test("Togather quote edit rejects approval bypass, invalid values and stale versions", () => withServer(async ({ request, state }) => {
+  state.results.push(eligibleAddToEvent({ platform: "togather", resultStatus: "MANUAL_REVIEW" }));
+  for (const [changes, expected] of [
+    [{ expectedVersion: 1, finalPrice: 600, saveAndApprove: true }, 400],
+    [{ expectedVersion: 1, finalPrice: -5 }, 400],
+    [{ expectedVersion: 1, staffBreakdown: [{ role: "Waiter", quantity: 0 }] }, 400],
+    [{ expectedVersion: 99, finalPrice: 600 }, 409],
+  ]) {
+    const response = await request("/api/admin/sales-agent/opportunities/64f000000000000000000001", jsonOptions("admin", "PATCH", changes));
+    assert.equal(response.status, expected);
+  }
+  assert.equal(state.results[0].recordVersion, 1);
+}));
+
 test("manual Add to Event quote override resolves review and becomes selectable at the new version", () => withServer(async ({ request, state }) => {
   state.results.push(eligibleAddToEvent({
     resultStatus: "MANUAL_REVIEW",

@@ -509,7 +509,7 @@
         detailsButton.type = "button";
         detailsButton.addEventListener("click", () => openDetails(result));
         actionCell.appendChild(detailsButton);
-        if (String(result?.platform || "").toLowerCase() === "addtoevent" && String(result?.resultStatus || "").toUpperCase() === "MANUAL_REVIEW") {
+        if (["addtoevent", "togather"].includes(String(result?.platform || "").toLowerCase()) && String(result?.resultStatus || "").toUpperCase() === "MANUAL_REVIEW") {
           const editButton = createElement("button", "Edit Quote", "button secondary sales-agent-action-button");
           editButton.type = "button";
           editButton.addEventListener("click", () => editOpportunity(result));
@@ -629,6 +629,7 @@
       const response = await requestJson(`/api/admin/sales-agent/opportunities/${encodeURIComponent(id)}`);
       if (!response.response.ok || !response.payload.opportunity) return null;
       const opportunity = response.payload.opportunity;
+      const isTogather = String(opportunity.platform || "").toLowerCase() === "togather";
       const saveAndApprove = String(opportunity.platform || "").toLowerCase() === "addtoevent"
         && String(opportunity.resultStatus || "").toUpperCase() === "MANUAL_REVIEW";
       openDetails(opportunity);
@@ -640,7 +641,7 @@
         ["travelCharge", "Travel charge", "number"], ["finalPrice", "Final price", "number"],
         ["discountType", "Discount type", "text"], ["discountValue", "Discount amount/percentage", "number"],
         ["discountReason", "Discount reason", "text"], ["customerMessage", "Customer message", "text"]
-      ];
+      ].filter(([key]) => !isTogather || ["staffBreakdown", "finalPrice"].includes(key));
       const manual = opportunity.manualOverrides || {};
       const canonicalStaff = Array.isArray(opportunity.staffBreakdown) ? opportunity.staffBreakdown : [];
       const currentValue = (key) => {
@@ -663,10 +664,11 @@
             .filter(Number.isFinite)
             .reduce((total, value) => total + value, 0);
         }
-        if (key === "finalPrice") return opportunity.quoteSnapshot?.calculatedPrice || opportunity.finalPrice || "";
+        if (key === "finalPrice") return (isTogather ? opportunity.finalPrice : opportunity.quoteSnapshot?.calculatedPrice || opportunity.finalPrice) || "";
         return opportunity[key] ?? "";
       };
       const inputs = {};
+      if (isTogather) form.appendChild(createElement("p", "Saving changes preserves manual review and all safety blockers. Use Submit Manual Reviews separately to request submission."));
       for (const [key, label, type] of fields) {
         const wrapper = createElement("label", label);
         const input = documentRef.createElement(key === "customerMessage" ? "textarea" : "input");

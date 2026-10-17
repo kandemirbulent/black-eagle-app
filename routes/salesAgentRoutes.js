@@ -523,6 +523,33 @@ function createSalesAgentRouter({
     const existing = await SalesAgentOpportunityResult.findById(req.params.id).lean();
     if (!existing) return res.status(404).json({ success: false, code: "OPPORTUNITY_NOT_FOUND" });
     const policy = opportunitySelectionPolicy(existing);
+    if (normalizePlatform(existing.platform) === "togather") {
+      if (canonicalStatus(existing) !== "MANUAL_REVIEW" || existing.submissionLock || existing.quoteUuid || existing.quoteSubmitted
+        || /submitted|already_quoted/i.test(String(existing.platformState || existing.verifiedStatus || ""))) {
+        return res.status(409).json({ success: false, code: "TOGATHER_QUOTE_NOT_EDITABLE" });
+      }
+      if (validation.saveAndApprove || Object.keys(validation.overrides).some((key) => !["staffBreakdown", "finalPrice"].includes(key))) {
+        return res.status(400).json({ success: false, code: "TOGATHER_EDITABLE_FIELDS_REQUIRED" });
+      }
+      const changes = validation.overrides;
+      if ((changes.finalPrice !== undefined && (typeof changes.finalPrice !== "number" || !Number.isFinite(changes.finalPrice) || changes.finalPrice <= 0))
+        || (changes.staffBreakdown !== undefined && (!Array.isArray(changes.staffBreakdown) || !changes.staffBreakdown.length
+          || changes.staffBreakdown.some((item) => !item || typeof item.role !== "string" || !item.role.trim() || !Number.isInteger(item.quantity) || item.quantity <= 0)))) {
+        return res.status(400).json({ success: false, code: "INVALID_TOGATHER_QUOTE_VALUES" });
+      }
+      const set = { lastEditedAt: now(), lastEditedBy: String(req.adminUser._id) };
+      for (const [key, value] of Object.entries(changes)) {
+        const safeValue = key === "staffBreakdown" ? value.map((item) => ({ role: item.role.trim(), quantity: item.quantity })) : value;
+        set[key] = safeValue;
+        set[`manualOverrides.${key}`] = safeValue;
+      }
+      const updated = await SalesAgentOpportunityResult.findOneAndUpdate(
+        { _id: req.params.id, recordVersion: validation.expectedVersion, resultStatus: "MANUAL_REVIEW" },
+        { $set: set, $inc: { recordVersion: 1 } }, { new: true, runValidators: true }
+      ).lean();
+      if (!updated) return res.status(409).json({ success: false, code: "OPPORTUNITY_VERSION_CONFLICT" });
+      return res.json({ success: true, opportunity: serializeOpportunity(updated) });
+    }
     if (normalizePlatform(existing.platform) !== "addtoevent" || existing.manualApprovalRequired !== true) {
       return res.status(409).json({ success: false, code: policy.manualSelectionBlocker || "PLATFORM_POLICY_BLOCKED" });
     }

@@ -588,6 +588,29 @@ test("Add to Event manual-review rows are selectable and expose the shared quote
   assert.match(detailText, /Credits required\s+UNKNOWN/);
 });
 
+test("Togather quote edit button uses shared editor and saves without approval or submission", async () => {
+  const opportunity = { _id: "togather-record", platform: "togather", resultStatus: "MANUAL_REVIEW", recordVersion: 2,
+    staffBreakdown: [{ role: "Waiter", quantity: 2 }], finalPrice: 400, manualOverrides: {}, blockingReasons: ["TOGATHER_CUSTOMER_DETAIL_UNREAD"] };
+  const context = controller({ responses: [
+    response(200, { opportunity }), response(200, { opportunity: { ...opportunity, finalPrice: 500, recordVersion: 3 } }),
+    response(200, { runs: [] }), response(200, { run: null }),
+  ] });
+  context.instance.renderResults([opportunity]);
+  assert.equal(context.documentRef.elements.salesAgentResultsTable.children[0].children[11].children[1].textContent, "Edit Quote");
+  await context.instance.editOpportunity(opportunity);
+  const form = context.documentRef.elements.salesAgentDetailsContent.children.at(-1);
+  const inputs = form.children.filter((child) => child.tagName === "LABEL").map((label) => label.children[0]);
+  assert.equal(inputs.length, 2);
+  assert.equal(inputs[0].value, "Waiter: 2");
+  assert.equal(inputs[1].value, 400);
+  inputs[1].value = "500";
+  await form.listeners.submit({ preventDefault() {} });
+  const patch = context.calls.find((item) => item.options?.method === "PATCH");
+  assert.ok(patch);
+  assert.match(patch.url, /togather-record$/);
+  assert.deepEqual(JSON.parse(patch.options.body), { expectedVersion: 2, finalPrice: 500 });
+});
+
 test("manual quote editor prefills canonical values and PATCHes only non-empty changes", async () => {
   const opportunity = {
     _id: "manual-review-id",
