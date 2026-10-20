@@ -5,6 +5,7 @@ const {
   DEFAULT_RENDER_API_BASE_URL,
   ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND,
   MANUAL_REVIEW_WORKER_COMMAND,
+  TOGATHER_SELECTED_SUBMISSION_WORKER_COMMAND,
   WORKER_COMMAND,
   createRenderSalesAgentTrigger,
   createRenderSalesAgentJobStatusClient,
@@ -13,6 +14,17 @@ const {
 } = require("../services/salesAgentJobTrigger");
 
 const fixedNow = () => new Date("2026-07-31T12:00:00.000Z");
+
+test("selected Togather command retains source-run validation and uses the selected-only worker mode", async () => {
+  const calls = [];
+  const trigger = createRenderSalesAgentTrigger({ env: baseEnv, fetchFn: async (_url, options) => {
+    calls.push(JSON.parse(options.body)); return response(201, "Created", { id: "selected-job" });
+  } });
+  await assert.rejects(trigger({ startCommand: TOGATHER_SELECTED_SUBMISSION_WORKER_COMMAND }), /handoff/);
+  assert.equal(calls.length, 0);
+  await trigger({ startCommand: TOGATHER_SELECTED_SUBMISSION_WORKER_COMMAND, sourceRunId: "source", persistedSourceRunId: "source" });
+  assert.equal(calls[0].startCommand, "node src/worker/selected-togather-cli.js");
+});
 const baseEnv = {
   RENDER_API_KEY: "test-render-api-key",
   RENDER_SALES_AGENT_SERVICE_ID: "srv_test_sales_agent",

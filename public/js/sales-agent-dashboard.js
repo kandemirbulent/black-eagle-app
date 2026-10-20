@@ -535,7 +535,7 @@
       ]));
       elements.detailsContent.appendChild(createElement("p", "Unselected opportunities will not be touched."));
       elements.detailsContent.appendChild(createElement("p", submitPlaceholder
-        ? "Only these explicitly selected READY Add to Event opportunities can be submitted."
+        ? "Only these selected opportunity versions can be submitted. Togather selection confirms the proposed estimated staff quantities and roles; other safety checks remain required."
         : "Preview only. No quote or paid action has occurred."));
       elements.detailsModal.classList.remove("hidden");
     }
@@ -587,13 +587,16 @@
       submissionInProgress = true;
       if (elements.submitSelected) elements.submitSelected.disabled = true;
       try {
+        const references = selectedReferences();
         const preview = await previewSelection(true);
         if (!preview || preview.blocked?.length || preview.selectedCount !== selectedOpportunities.size) return null;
-        const confirmation = `Submit ${preview.selectedCount} selected Add to Event quotes? Estimated cost: ${safeNumber(preview.estimatedCredits)} credits. This may consume platform credits.`;
+        const confirmation = preview.platformBreakdown?.togather
+          ? `Submit ${preview.selectedCount} selected Togather quotes? You approve the estimated staffing for these exact quote versions: ${(preview.records || []).map((record) => `${record.opportunityId} v${record.recordVersion}: ${staffText(record.staffBreakdown)}; ${formatPrice(record.finalPrice)}`).join("; ")}. Other safety blockers remain in force.`
+          : `Submit ${preview.selectedCount} selected Add to Event quotes? Estimated cost: ${safeNumber(preview.estimatedCredits)} credits. This may consume platform credits.`;
         if (!await confirmSelectedSubmission(confirmation)) return null;
         const result = await requestJson("/api/admin/sales-agent/opportunities/submit-selected", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ records: selectedReferences() })
+          body: JSON.stringify({ records: references })
         });
         if (!result.response.ok || result.payload.success === false) {
           showMessage("Selected quotes were not queued. Refresh and review the current versions.", "error");

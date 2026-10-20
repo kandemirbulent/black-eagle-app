@@ -5,6 +5,7 @@ const {
   createRenderSalesAgentJobStatusClient,
   createRenderSalesAgentJobCancelClient,
   MANUAL_REVIEW_WORKER_COMMAND,
+  TOGATHER_SELECTED_SUBMISSION_WORKER_COMMAND,
   ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND,
 } = require("../services/salesAgentJobTrigger");
 
@@ -44,6 +45,7 @@ function normalizePlatform(value) {
 }
 
 function currentQuotePrice(record = {}) {
+  if (normalizePlatform(record.platform) === "togather") return Number.isFinite(record.finalPrice) && record.finalPrice > 0 ? record.finalPrice : 0;
   const candidates = [record.manualOverrides?.finalPrice, record.quoteSnapshot?.calculatedPrice, record.finalPrice];
   const value = candidates.map(Number).find((candidate) => Number.isFinite(candidate) && candidate > 0);
   return value || 0;
@@ -51,6 +53,22 @@ function currentQuotePrice(record = {}) {
 
 function opportunitySelectionPolicy(record = {}) {
   const platform = normalizePlatform(record.platform);
+  if (platform === "togather") {
+    const approvalCode = "TOGATHER_ESTIMATED_STAFFING_REQUIRES_MANUAL_APPROVAL";
+    const reasons = [...(record.blockingReasons || []), ...(record.reviewCodes || [])];
+    let blocker = "";
+    if (canonicalStatus(record) !== "MANUAL_REVIEW" || !reasons.includes(approvalCode)) blocker = "TOGATHER_AUTOMATIC_POLICY";
+    else if (reasons.some((reason) => reason !== approvalCode)) blocker = "TOGATHER_SAFETY_BLOCKER";
+    else if (record.quoteSubmitted || record.quoteUuid || /submitted|already_quoted/i.test(`${record.platformState || ""} ${record.verifiedStatus || ""} ${record.verifiedPlatformState || ""}`)) blocker = "ALREADY_QUOTED";
+    else if (record.submissionLock) blocker = "ACTIVE_SUBMISSION_LOCK";
+    else if (["HOLD", "REJECTED"].includes(String(record.approvalStatus || "").toUpperCase())) blocker = "APPROVAL_STATUS_BLOCKED";
+    else if (record.unavailable || (record.expiresAt && new Date(record.expiresAt) <= new Date())) blocker = "UNAVAILABLE";
+    else if (!Number.isInteger(record.recordVersion) || record.recordVersion < 1) blocker = "RECORD_VERSION_REQUIRED";
+    else if (!record.eventDate || !Number.isFinite(Date.parse(record.eventDate)) || !String(record.location || "").trim() || !(record.workingHours > 0)) blocker = "TOGATHER_REQUIRED_FIELDS_MISSING";
+    else if (!Array.isArray(record.staffBreakdown) || !record.staffBreakdown.length || record.staffBreakdown.some((staff) => !String(staff.role || "").trim() || !Number.isInteger(staff.quantity) || staff.quantity <= 0)) blocker = "TOGATHER_STAFFING_INVALID";
+    else if (!Number.isFinite(record.finalPrice) || record.finalPrice <= 0) blocker = "CURRENT_QUOTE_REQUIRED";
+    return { manualSelectionEligible: !blocker, manualSelectionBlocker: blocker, submissionEligible: !blocker, submissionBlocker: blocker };
+  }
   const status = canonicalStatus(record);
   const approvalStatus = String(record.approvalStatus || "NOT_REVIEWED").toUpperCase();
   const version = Number(record.recordVersion);
@@ -674,7 +692,9 @@ function createSalesAgentRouter({
         records,
         blocked,
         noSubmission: true,
-        message: "Submission worker is not enabled in this phase.",
+        message: records.some((record) => normalizePlatform(record.platform) === "togather")
+          ? "Preview only. Submission requires explicit confirmation of the selected versions."
+          : "Submission worker is not enabled in this phase.",
       },
     });
   });
@@ -728,10 +748,51 @@ function createSalesAgentRouter({
         return res.status(409).json({ success: false, code: policy.submissionBlocker || "STATUS_NOT_READY" });
       }
       const credits = existing.platformCostEstimate || {};
-      if (credits.status !== "KNOWN" || !Number.isFinite(Number(credits.amount))) {
+      if (normalizePlatform(existing.platform) !== "togather" && (credits.status !== "KNOWN" || !Number.isFinite(Number(credits.amount)))) {
         return res.status(409).json({ success: false, code: "CREDIT_COST_UNKNOWN" });
       }
       selected.push({ record: existing, reference, price: currentQuotePrice(existing), credits: Number(credits.amount) });
+    }
+    if (selected.some((item) => normalizePlatform(item.record.platform) === "togather")) {
+      if (selected.some((item) => normalizePlatform(item.record.platform) !== "togather")) return res.status(400).json({ success: false, code: "SELECT_ONE_PLATFORM_PER_SUBMISSION" });
+      const sourceRunId = String(selected[0].record.runId || "");
+      if (!mongoose.Types.ObjectId.isValid(sourceRunId) || selected.some((item) => String(item.record.runId) !== sourceRunId)) return res.status(400).json({ success: false, code: "SELECT_ONE_SOURCE_RUN" });
+      if (!await SalesAgentRun.findById(sourceRunId).lean()) return res.status(404).json({ success: false, code: "SOURCE_RUN_NOT_FOUND" });
+      let run;
+      const lockedIds = [];
+      try {
+        run = await SalesAgentRun.create({
+          runType: "MANUAL_REVIEW_RESUME", sourceRunId, status: "QUEUED", activeLock: `manual-review:${sourceRunId}`,
+          origin: "ADMIN_DASHBOARD_TOGATHER_SELECTION", queuedAt: now(), triggeredBy: req.adminUser._id, triggeredByRole: req.adminUser.role, triggerStatus: "TRIGGERING",
+          submissionSelection: { records: selected.map(({ record, reference }) => ({
+            id: reference.id, selectedVersion: reference.expectedVersion, opportunityId: record.opportunityId, platform: "togather", estimatedStaffingApproved: true,
+          })), selectedCount: selected.length, combinedQuotationValue: selected.reduce((sum, item) => sum + item.price, 0) },
+        });
+        for (const item of selected) {
+          const locked = await SalesAgentOpportunityResult.findOneAndUpdate(
+            { _id: item.reference.id, recordVersion: item.reference.expectedVersion, selectedVersion: item.reference.expectedVersion, resultStatus: "MANUAL_REVIEW", submissionLock: null,
+              blockingReasons: item.record.blockingReasons, reviewCodes: item.record.reviewCodes || [], quoteSubmitted: { $ne: true }, quoteUuid: { $in: ["", null] }, unavailable: { $ne: true } },
+            { $set: { submissionLock: { runId: run._id, selectedAt: now(), selectedBy: String(req.adminUser._id), approvedVersion: item.reference.expectedVersion } } },
+            { new: true, runValidators: true }
+          ).lean();
+          if (!locked) throw Object.assign(new Error("Selection changed"), { code: "OPPORTUNITY_VERSION_CONFLICT" });
+          lockedIds.push(item.reference.id);
+        }
+        const trigger = await triggerSalesAgentRun({ startCommand: TOGATHER_SELECTED_SUBMISSION_WORKER_COMMAND, sourceRunId, persistedSourceRunId: String(run.sourceRunId) });
+        const queued = await SalesAgentRun.findOneAndUpdate({ _id: run._id, status: "QUEUED" }, { $set: {
+          triggerStatus: "TRIGGERED", triggerJobId: trigger.jobId, renderJobId: trigger.jobId,
+          renderServiceId: env.RENDER_SALES_AGENT_SERVICE_ID || "", triggeredAt: now(),
+        } }, { new: true, runValidators: true });
+        return res.status(201).json({ success: true, run: queued, selectedCount: selected.length, estimatedCredits: 0 });
+      } catch (error) {
+        for (const id of lockedIds) await SalesAgentOpportunityResult.findOneAndUpdate(
+          { _id: id, "submissionLock.runId": run._id }, { $set: { submissionLock: null } }, { new: true }
+        );
+        if (run) await SalesAgentRun.findOneAndUpdate({ _id: run._id }, { $set: {
+          status: "FAILED", activeLock: `released:${run._id}`, triggerStatus: "FAILED", failureCode: error.code || "WORKER_TRIGGER_FAILED", completedAt: now(), finishedAt: now(),
+        } }, { new: true });
+        return res.status(error.code === 11000 || error.code === "OPPORTUNITY_VERSION_CONFLICT" ? 409 : 503).json({ success: false, code: error.code === 11000 ? "MANUAL_REVIEW_ALREADY_ACTIVE" : error.code || "WORKER_TRIGGER_FAILED" });
+      }
     }
     const activeSubmissionRun = await SalesAgentRun.findOne({
       runType: "ADD_TO_EVENT_SUBMISSION",

@@ -716,6 +716,19 @@ test("Submit Selected Quotes previews count/credits then posts only exact select
   assert.deepEqual(context.instance.selectedReferences(), []);
 });
 
+test("selected Togather estimates confirm staff and exact version before submit", async () => {
+  const item = { _id: "a", opportunityId: "ROMVLZ7E", platform: "togather", recordVersion: 2, selectedVersion: 2, manualSelectionEligible: true, finalPrice: 120, staffBreakdown: [{ role: "Waiter", quantity: 1 }] };
+  const context = controller({ responses: [response(200, { success: true, preview: {
+    selectedCount: 1, platformBreakdown: { togather: 1 }, records: [item], blocked: [], estimatedCredits: 0,
+  } }), response(201, { success: true, selectedCount: 1, estimatedCredits: 0 }),
+  response(200, { runs: [] }), response(200, { run: null }), response(200, { runs: [] })] });
+  context.instance.renderResults([item]);
+  assert.equal(context.documentRef.elements.salesAgentResultsTable.children[0].children[0].children[0].disabled, false);
+  await context.instance.submitSelectedOpportunities();
+  assert.match(context.confirmations[0], /ROMVLZ7E v2.*1 Waiter/);
+  assert.deepEqual(JSON.parse(context.calls[1].options.body), { records: [{ id: "a", expectedVersion: 2 }] });
+});
+
 test("Submit Selected Quotes uses one in-page confirmation and queues only once", async () => {
   const context = controller({ modalConfirmation: true, responses: [response(200, { success: true, preview: {
     selectedCount: 1, opportunityIds: ["ATE-1"], platformBreakdown: { addtoevent: 1 },

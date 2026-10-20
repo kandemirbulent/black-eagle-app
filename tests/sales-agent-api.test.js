@@ -536,6 +536,51 @@ const eligibleAddToEvent = (overrides = {}) => ({
   ...overrides,
 });
 
+const estimatedTogather = (overrides = {}) => eligibleAddToEvent({ platform: "togather", resultStatus: "MANUAL_REVIEW",
+  eventDate: "2027-06-05", location: "London", workingHours: 6, finalPrice: 120, staffBreakdown: [{ role: "Waiter", quantity: 1 }],
+  blockingReasons: ["TOGATHER_ESTIMATED_STAFFING_REQUIRES_MANUAL_APPROVAL"], reviewCodes: [], selectedVersion: 1, ...overrides });
+
+test("selected Togather estimates enable selection only without other safety blockers", () => {
+  assert.equal(opportunitySelectionPolicy(estimatedTogather()).submissionEligible, true);
+  for (const extra of [
+    { blockingReasons: ["TOGATHER_ESTIMATED_STAFFING_REQUIRES_MANUAL_APPROVAL", "TOGATHER_CUSTOMER_DETAIL_UNREAD"] },
+    { reviewCodes: ["CUSTOMER_CONFLICT"] }, { finalPrice: 0 }, { workingHours: 0 }, { location: "" },
+    { quoteUuid: "existing-quote" }, { submissionLock: { runId: "other" } },
+  ]) assert.equal(opportunitySelectionPolicy(estimatedTogather(extra)).manualSelectionEligible, false);
+});
+
+test("selected Togather estimates preview canonical price and queue version-bound approval", () => withServer(async ({ request, state }) => {
+  const item = estimatedTogather();
+  state.results.push(item);
+  state.runs.push({ _id: item.runId, status: "COMPLETED" });
+  const records = [{ id: item._id, expectedVersion: 1 }];
+  const preview = await request("/api/admin/sales-agent/opportunities/selection-preview", jsonOptions("admin", "POST", { records }));
+  const body = await preview.json();
+  assert.equal(body.preview.blocked.length, 0);
+  assert.equal(body.preview.combinedQuotationValue, 120);
+  assert.deepEqual(body.preview.platformBreakdown, { togather: 1 });
+  assert.equal(state.triggerCalls.length, 0);
+  const submit = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", { records }));
+  const queued = await submit.json();
+  assert.equal(submit.status, 201);
+  assert.equal(queued.run.runType, "MANUAL_REVIEW_RESUME");
+  assert.deepEqual(queued.run.submissionSelection.records, [{ id: item._id, selectedVersion: 1, opportunityId: item.opportunityId, platform: "togather", estimatedStaffingApproved: true }]);
+  assert.equal(state.triggerCalls[0].startCommand, "node src/worker/selected-togather-cli.js");
+  assert.equal(state.triggerCalls[0].sourceRunId, item.runId);
+  assert.deepEqual(state.results[0].blockingReasons, item.blockingReasons);
+  assert.equal(state.results[0].resultStatus, "MANUAL_REVIEW");
+}));
+
+test("selected Togather estimates reject stale versions and unread details without queuing", () => withServer(async ({ request, state }) => {
+  const item = estimatedTogather(); state.results.push(item);
+  let res = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", { records: [{ id: item._id, expectedVersion: 2 }] }));
+  assert.equal(res.status, 409);
+  state.results[0].blockingReasons.push("TOGATHER_CUSTOMER_DETAIL_UNREAD");
+  res = await request("/api/admin/sales-agent/opportunities/submit-selected", jsonOptions("admin", "POST", { records: [{ id: item._id, expectedVersion: 1 }] }));
+  assert.equal(res.status, 409);
+  assert.equal(state.triggerCalls.length, 0);
+}));
+
 test("manual selection policy blocks Togather and terminal or unavailable opportunities", () => {
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent()).manualSelectionEligible, true);
   assert.equal(opportunitySelectionPolicy(eligibleAddToEvent({ approvalStatus: "NOT_REVIEWED" })).manualSelectionEligible, true);

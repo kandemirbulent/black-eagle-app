@@ -1,8 +1,9 @@
 const WORKER_COMMAND = "npm run worker:once";
 const MANUAL_REVIEW_WORKER_COMMAND = "npm run worker:submit-manual-review";
+const TOGATHER_SELECTED_SUBMISSION_WORKER_COMMAND = "node src/worker/selected-togather-cli.js";
 const ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND = "npm run worker:submit-addtoevent";
 const B2B_OUTREACH_WORKER_COMMAND = "npm run b2b:request";
-const ALLOWED_WORKER_COMMANDS = new Set([WORKER_COMMAND, MANUAL_REVIEW_WORKER_COMMAND, ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND, B2B_OUTREACH_WORKER_COMMAND]);
+const ALLOWED_WORKER_COMMANDS = new Set([WORKER_COMMAND, MANUAL_REVIEW_WORKER_COMMAND, TOGATHER_SELECTED_SUBMISSION_WORKER_COMMAND, ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND, B2B_OUTREACH_WORKER_COMMAND]);
 const DEFAULT_RENDER_API_BASE_URL = "https://api.render.com/v1";
 const RENDER_TRIGGER_STAGE = "RENDER_TRIGGER";
 
@@ -98,7 +99,7 @@ function createRenderSalesAgentTrigger({
           requestTimestamp,
         });
       }
-      if (startCommand === MANUAL_REVIEW_WORKER_COMMAND && (
+      if ([MANUAL_REVIEW_WORKER_COMMAND, TOGATHER_SELECTED_SUBMISSION_WORKER_COMMAND].includes(startCommand) && (
         !sourceRunId || !persistedSourceRunId || String(sourceRunId) !== String(persistedSourceRunId)
       )) {
         throw new RenderTriggerError("Manual-review source run handoff did not match the selected run.", {
@@ -309,6 +310,7 @@ module.exports = {
   RENDER_TRIGGER_STAGE,
   RenderTriggerError,
   MANUAL_REVIEW_WORKER_COMMAND,
+  TOGATHER_SELECTED_SUBMISSION_WORKER_COMMAND,
   ADD_TO_EVENT_SUBMISSION_WORKER_COMMAND,
   B2B_OUTREACH_WORKER_COMMAND,
   WORKER_COMMAND,
