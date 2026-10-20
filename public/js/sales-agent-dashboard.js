@@ -606,6 +606,10 @@
         closeDetails();
         showMessage(`${result.payload.selectedCount} selected quotes queued with an estimated cost of ${safeNumber(result.payload.estimatedCredits)} credits.`);
         await refresh();
+        if (preview.platformBreakdown?.togather && result.payload.run) {
+          renderManualReviewRun(result.payload.run);
+          startManualPolling();
+        }
         return result.payload;
       } finally {
         submissionInProgress = false;
