@@ -44,6 +44,7 @@
   function formatPlatform(value) {
     const platform = String(value || "").toLowerCase().replace(/[\s_-]+/g, "");
     if (platform === "addtoevent") return "Add to Event";
+    if (platform === "bark") return "Bark";
     if (platform === "togather") return "Togather";
     if (platform === "poptop") return "Poptop";
     return text(value);
@@ -51,7 +52,7 @@
 
   function formatCredits(result) {
     const platform = String(result?.platform || "").toLowerCase().replace(/[\s_-]+/g, "");
-    if (platform !== "addtoevent") return "—";
+    if (!["addtoevent", "bark"].includes(platform)) return "—";
     const estimate = result?.platformCostEstimate;
     const amount = Number(estimate?.amount);
     return String(estimate?.status || "").toUpperCase() === "KNOWN" && Number.isFinite(amount) && amount >= 0
@@ -302,6 +303,18 @@
       const status = text(result?.resultStatus || result?.analysisStatus, "UNKNOWN").toUpperCase();
       elements.detailsContent.replaceChildren();
       elements.detailsTitle.textContent = text(result?.eventName, "Opportunity Details");
+      if (String(result?.platform).toLowerCase() === "bark") {
+        const source = result.barkSource || {};
+        elements.detailsContent.appendChild(detailSection("Original Bark request (email)", [
+          ["Service", source.serviceType], ["Customer notes", source.customerNotes],
+          ["Original location", source.originalRequest?.location], ["Original event date", source.originalRequest?.eventDate],
+          ["Guests", source.guestRange ? `${source.guestRange.min}–${source.guestRange.max}` : source.guestCount],
+          ["Requested hours", source.durationRange ? `${source.durationRange.min}–${source.durationRange.max}` : "Not verified"],
+          ["Billable hours", source.billableHours], ["Labour preview (not total quotation)", formatPrice(result.labourSubtotal)],
+          ["Identity", "Unverified prx candidate; not a verified project_id"],
+          ["Submission", "Unavailable: Bark contact method and credit authorization are not verified."]
+        ]));
+      }
 
       let bannerText = "";
       let bannerClass = "";
@@ -402,6 +415,11 @@
       }
       if (elements.editSelected) elements.editSelected.disabled = count !== 1;
       if (elements.clearSelection) elements.clearSelection.disabled = count === 0;
+      const containsBark = [...selectedOpportunities.values()].some(item => String(item.result?.platform).toLowerCase() === "bark");
+      if (containsBark && elements.submitSelected) {
+        elements.submitSelected.disabled = true;
+        elements.submitSelected.title = "Bark sending and credit spending are not enabled.";
+      } else if (elements.submitSelected) elements.submitSelected.title = "";
     }
 
     async function persistOpportunitySelection(result, selected) {
@@ -434,7 +452,32 @@
       renderResults(currentResults, { preserveSelection: true });
     }
 
+    let barkResultsCache = [];
+    async function refreshBark() {
+      const response = await requestJson("/api/admin/sales-agent/bark/opportunities");
+      if (!response.response.ok) { showMessage("Bark records could not be loaded.", "error"); return; }
+      barkResultsCache = response.payload.results || [];
+      if (elements.platformFilter?.value === "bark") renderResults(barkResultsCache);
+    }
+    async function importBarkEmails() {
+      const button = byId("barkEmailImportButton");
+      const file = byId("barkEmailImportFile")?.files?.[0];
+      if (!file || file.size > 1_500_000) { showMessage("Choose a prepared Bark JSON file under 1.5 MB.", "error"); return; }
+      if (button) button.disabled = true;
+      try {
+        const bundle = JSON.parse(await file.text());
+        const response = await requestJson("/api/admin/sales-agent/bark/import", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bundle)
+        });
+        if (!response.response.ok) { showMessage(response.payload.code || "BARK_IMPORT_FAILED", "error"); return; }
+        const status = byId("barkImportStatus");
+        if (status) status.textContent = `Imported ${response.payload.imported}; updated ${response.payload.updated}; duplicate emails ${response.payload.duplicates}; baseline ${response.payload.baseline}; historical ${response.payload.historical}; expired ${response.payload.expired}. Manual batch only, not a complete mailbox scan.`;
+        await refreshBark();
+      } catch { showMessage("Invalid Bark import file or import unavailable.", "error"); }
+      finally { if (button) button.disabled = false; }
+    }
     function renderResults(results, { preserveSelection = false } = {}) {
+      if (elements.platformFilter?.value === "bark") results = barkResultsCache;
       currentResults = Array.isArray(results) ? results : [];
       if (!preserveSelection) {
         selectedOpportunities.clear();
@@ -456,6 +499,7 @@
       if (elements.manualReviewButton && !ACTIVE_STATUSES.has(String(elements.manualStatus?.textContent || "").toUpperCase())) {
         elements.manualReviewButton.disabled = !displayedResultsRunId || displayedManualReviewCount === 0;
       }
+      if (elements.platformFilter?.value === "bark" && elements.manualReviewButton) elements.manualReviewButton.disabled = true;
       const resultsToRender = visibleResults();
       if (!resultsToRender.length) {
         const row = documentRef.createElement("tr");
@@ -509,7 +553,7 @@
         detailsButton.type = "button";
         detailsButton.addEventListener("click", () => openDetails(result));
         actionCell.appendChild(detailsButton);
-        if (["addtoevent", "togather"].includes(String(result?.platform || "").toLowerCase()) && String(result?.resultStatus || "").toUpperCase() === "MANUAL_REVIEW") {
+        if (["addtoevent", "togather", "bark"].includes(String(result?.platform || "").toLowerCase()) && String(result?.resultStatus || "").toUpperCase() === "MANUAL_REVIEW") {
           const editButton = createElement("button", "Edit Quote", "button secondary sales-agent-action-button");
           editButton.type = "button";
           editButton.addEventListener("click", () => editOpportunity(result));
@@ -583,6 +627,10 @@
     }
 
     async function submitSelectedOpportunities() {
+      if ([...selectedOpportunities.values()].some(item => String(item.result?.platform).toLowerCase() === "bark")) {
+        showMessage("Bark submission is unavailable. No contact or credit action was performed.", "error");
+        return null;
+      }
       if (submissionInProgress) return null;
       submissionInProgress = true;
       if (elements.submitSelected) elements.submitSelected.disabled = true;
@@ -637,6 +685,7 @@
       if (!response.response.ok || !response.payload.opportunity) return null;
       const opportunity = response.payload.opportunity;
       const isTogather = String(opportunity.platform || "").toLowerCase() === "togather";
+      const isBark = String(opportunity.platform || "").toLowerCase() === "bark";
       const saveAndApprove = String(opportunity.platform || "").toLowerCase() === "addtoevent"
         && String(opportunity.resultStatus || "").toUpperCase() === "MANUAL_REVIEW";
       openDetails(opportunity);
@@ -648,7 +697,7 @@
         ["travelCharge", "Travel charge", "number"], ["finalPrice", "Final price", "number"],
         ["discountType", "Discount type", "text"], ["discountValue", "Discount amount/percentage", "number"],
         ["discountReason", "Discount reason", "text"], ["customerMessage", "Customer message", "text"]
-      ].filter(([key]) => !isTogather || ["staffBreakdown", "finalPrice"].includes(key));
+      ].filter(([key]) => isBark ? ["staffBreakdown", "durationHours", "finalPrice", "customerMessage"].includes(key) : !isTogather || ["staffBreakdown", "finalPrice"].includes(key));
       const manual = opportunity.manualOverrides || {};
       const canonicalStaff = Array.isArray(opportunity.staffBreakdown) ? opportunity.staffBreakdown : [];
       const currentValue = (key) => {
@@ -997,6 +1046,7 @@
 
     async function refresh() {
       clearRetry();
+      if (elements.platformFilter?.value === "bark") return refreshBark();
       try {
         await loadRunHistory();
         const run = await pollStatus();
@@ -1191,7 +1241,14 @@
       elements.manualReviewButton?.addEventListener("click", submitManualReviews);
       elements.viewCurrentPartialButton?.addEventListener("click", viewCurrentPartialResults);
       elements.cancelRunButton?.addEventListener("click", cancelCurrentRun);
-      elements.platformFilter?.addEventListener("change", () => renderResults(currentResults, { preserveSelection: true }));
+      elements.platformFilter?.addEventListener("change", async () => {
+        selectedOpportunities.clear();
+        byId("barkEmailImportPanel")?.classList.toggle("hidden", elements.platformFilter.value !== "bark");
+        if (elements.platformFilter.value === "bark") await refreshBark();
+        else await refresh();
+      });
+      byId("barkEmailImportButton")?.addEventListener("click", importBarkEmails);
+      byId("barkRefreshButton")?.addEventListener("click", refreshBark);
       elements.selectCurrentPage?.addEventListener("click", selectAllCurrentPage);
       elements.clearSelection?.addEventListener("click", clearOpportunitySelection);
       elements.previewSelected?.addEventListener("click", () => previewSelection(false));

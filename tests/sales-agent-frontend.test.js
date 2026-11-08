@@ -561,6 +561,22 @@ test("empty results show the empty state", () => {
   assert.equal(row.children[0].colSpan, 12);
 });
 
+test("Bark rows show credit cost, original notes and editing while selected submission stays disabled", async () => {
+  const item={_id:"bark-id",platform:"bark",opportunityId:"prx:12345678",recordVersion:1,resultStatus:"MANUAL_REVIEW",
+    manualSelectionEligible:true,submissionEligible:false,staffBreakdown:[{role:"Bartender",quantity:2}],
+    platformCostEstimate:{status:"KNOWN",amount:8},barkSource:{customerNotes:"Synthetic note",billableHours:6}};
+  const context=controller({responses:[response(200,{success:true,selected:true})]});
+  context.instance.renderResults([item]);
+  const row=context.documentRef.elements.salesAgentResultsTable.children[0];
+  assert.equal(row.children[3].textContent,"Bark");assert.equal(row.children[8].textContent,"8 credits");
+  assert.equal(row.children[11].children[1].textContent,"Edit Quote");
+  row.children[11].children[0].click();assert.match(flattenText(context.documentRef.elements.salesAgentDetailsContent),/Synthetic note/);
+  const checkbox=row.children[0].children[0];checkbox.checked=true;await checkbox.listeners.change();
+  assert.equal(context.documentRef.elements.previewSelectedOpportunities.disabled,false);
+  assert.equal(context.documentRef.elements.submitSelectedOpportunities.disabled,true);
+  await context.instance.submitSelectedOpportunities();assert.equal(context.calls.length,1);
+});
+
 test("Add to Event manual-review rows are selectable and expose the shared quote editor", () => {
   const context = controller();
   context.instance.renderResults([

@@ -1,5 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const { importBarkBundle, SUBMISSION_BLOCKER: BARK_SUBMISSION_BLOCKER } = require("../services/barkEmailImport");
 const {
   createRenderSalesAgentTrigger,
   createRenderSalesAgentJobStatusClient,
@@ -53,6 +54,13 @@ function currentQuotePrice(record = {}) {
 
 function opportunitySelectionPolicy(record = {}) {
   const platform = normalizePlatform(record.platform);
+  if (platform === "bark") {
+    const selectable = Number.isInteger(record.recordVersion) && record.recordVersion > 0
+      && !record.quoteSubmitted && !record.quoteUuid && !record.submissionLock
+      && !TERMINAL_OPPORTUNITY_STATUSES.has(canonicalStatus(record));
+    return { manualSelectionEligible: selectable, manualSelectionBlocker: selectable ? "" : "BARK_RECORD_NOT_SELECTABLE",
+      submissionEligible: false, submissionBlocker: BARK_SUBMISSION_BLOCKER };
+  }
   if (platform === "togather") {
     const approvalCode = "TOGATHER_ESTIMATED_STAFFING_REQUIRES_MANUAL_APPROVAL";
     const reasons = [...(record.blockingReasons || []), ...(record.reviewCodes || [])];
@@ -353,6 +361,24 @@ function createSalesAgentRouter({
 }) {
   const router = express.Router();
 
+  router.get("/admin/sales-agent/bark/opportunities", requireAdminAuth, async (req, res) => {
+    const records = await SalesAgentOpportunityResult.find({ platform: "bark" }).sort({ updatedAt: -1 }).lean();
+    return res.json({ success: true, results: records.map(serializeOpportunity), submissionEnabled: false,
+      reason: BARK_SUBMISSION_BLOCKER });
+  });
+  router.post("/admin/sales-agent/bark/import", requireAdminAuth, async (req, res) => {
+    let session;
+    try {
+      session = await SalesAgentOpportunityResult.db.startSession();
+      const result = await importBarkBundle({ db: SalesAgentOpportunityResult.db.db, session,
+        bundle: req.body, admin: req.adminUser, now: now() });
+      return res.json({ success: true, ...result, mailboxScanComplete: false });
+    } catch (error) {
+      const safe = /^BARK_[A-Z_]+$/.test(error.message || "") ? error.message : "BARK_IMPORT_FAILED_TRANSACTION_REQUIRED";
+      return res.status(400).json({ success: false, code: safe });
+    } finally { if (session) await session.endSession(); }
+  });
+
   async function withPersistedResultCount(run) {
     if (!run) return null;
     const value = typeof run.toObject === "function" ? run.toObject() : { ...run };
@@ -541,6 +567,30 @@ function createSalesAgentRouter({
     const existing = await SalesAgentOpportunityResult.findById(req.params.id).lean();
     if (!existing) return res.status(404).json({ success: false, code: "OPPORTUNITY_NOT_FOUND" });
     const policy = opportunitySelectionPolicy(existing);
+    if (normalizePlatform(existing.platform) === "bark") {
+      if (!policy.manualSelectionEligible || validation.saveAndApprove) return res.status(409).json({ success: false, code: "BARK_QUOTE_NOT_EDITABLE" });
+      const changes = validation.overrides;
+      if (Object.keys(changes).some(k => !["staffBreakdown", "durationHours", "finalPrice", "customerMessage"].includes(k))
+        || (changes.durationHours !== undefined && (typeof changes.durationHours !== "number" || !Number.isFinite(changes.durationHours) || changes.durationHours <= 0))
+        || (changes.finalPrice !== undefined && (typeof changes.finalPrice !== "number" || !Number.isFinite(changes.finalPrice) || changes.finalPrice <= 0))
+        || (changes.customerMessage !== undefined && (typeof changes.customerMessage !== "string" || changes.customerMessage.length > 2000))
+        || (changes.staffBreakdown !== undefined && (!Array.isArray(changes.staffBreakdown) || !changes.staffBreakdown.length || changes.staffBreakdown.some(s => !s || !["Waiter", "Bartender", "Barback", "Mixologist", "Supervisor", "Model"].includes(s.role) || !Number.isInteger(s.quantity) || s.quantity <= 0 || s.quantity > 1000)))) {
+        return res.status(400).json({ success: false, code: "BARK_QUOTE_VALUES_INVALID" });
+      }
+      const set = { lastEditedAt: now(), lastEditedBy: String(req.adminUser._id), selectedVersion: null,
+        manualSubmissionEligible: false, resultStatus: "MANUAL_REVIEW" };
+      for (const [key, value] of Object.entries(changes)) {
+        set[`manualOverrides.${key}`] = value;
+        if (["finalPrice", "staffBreakdown"].includes(key)) set[key] = value;
+        if (key === "durationHours") { set.workingHours = value; set["barkSource.billableHours"] = Math.max(6, value); }
+      }
+      // Editing is not safety approval; original source and all blockers are preserved.
+      const updated = await SalesAgentOpportunityResult.findOneAndUpdate(
+        { _id: req.params.id, platform: "bark", recordVersion: validation.expectedVersion },
+        { $set: set, $inc: { recordVersion: 1 } }, { new: true, runValidators: true }).lean();
+      if (!updated) return res.status(409).json({ success: false, code: "OPPORTUNITY_VERSION_CONFLICT" });
+      return res.json({ success: true, opportunity: serializeOpportunity(updated) });
+    }
     if (normalizePlatform(existing.platform) === "togather") {
       if (canonicalStatus(existing) !== "MANUAL_REVIEW" || existing.submissionLock || existing.quoteUuid || existing.quoteSubmitted
         || /submitted|already_quoted/i.test(String(existing.platformState || existing.verifiedStatus || ""))) {
@@ -667,7 +717,7 @@ function createSalesAgentRouter({
         continue;
       }
       const serialized = serializeOpportunity(existing);
-      if (!serialized.submissionEligible) {
+      if (!serialized.submissionEligible && !(normalizePlatform(existing.platform) === "bark" && serialized.manualSelectionEligible)) {
         blocked.push({ id: reference.id, code: serialized.submissionBlocker });
         continue;
       }

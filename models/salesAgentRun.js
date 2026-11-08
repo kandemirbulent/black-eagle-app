@@ -4,7 +4,7 @@ const salesAgentRunSchema = new mongoose.Schema(
   {
     runType: {
       type: String,
-      enum: ["DISCOVERY", "MANUAL_REVIEW_RESUME", "ADD_TO_EVENT_SUBMISSION"],
+      enum: ["DISCOVERY", "MANUAL_REVIEW_RESUME", "ADD_TO_EVENT_SUBMISSION", "BARK_EMAIL_IMPORT"],
       default: "DISCOVERY",
       required: true,
       index: true,

@@ -192,6 +192,29 @@ function createHarness({
   return { app, state };
 }
 
+test("Bark edit, preview and submission gates keep original blockers and never start Render", () => withServer(async ({ request, state }) => {
+  const id = "64d000000000000000000001";
+  state.results.push({ _id:id, platform:"bark", opportunityId:"prx:12345678", recordVersion:1, selectedVersion:1,
+    resultStatus:"MANUAL_REVIEW", finalPrice:null, blockingReasons:["CUSTOMER_NOTES_UNREAD","BARK_SUBMISSION_NOT_SUPPORTED"],
+    barkSource:{originalRequest:{customerNotes:"Synthetic original"}}, staffBreakdown:[{role:"Bartender",quantity:2}] });
+  const edited=await request(`/api/admin/sales-agent/opportunities/${id}`,jsonOptions("admin","PATCH",{expectedVersion:1,staffBreakdown:[{role:"Bartender",quantity:3}],durationHours:4,finalPrice:500}));
+  assert.equal(edited.status,200);const saved=(await edited.json()).opportunity;
+  assert.equal(saved.recordVersion,2);assert.equal(saved.selectedVersion,null);assert.equal(saved.submissionEligible,false);
+  assert.equal(saved.barkSource.billableHours,6);assert.deepEqual(saved.blockingReasons,["CUSTOMER_NOTES_UNREAD","BARK_SUBMISSION_NOT_SUPPORTED"]);
+  const records=[{id,expectedVersion:2}];
+  const preview=await request("/api/admin/sales-agent/opportunities/selection-preview",jsonOptions("admin","POST",{records}));
+  assert.equal((await preview.json()).preview.selectedCount,1);
+  await request("/api/admin/sales-agent/opportunities/selection",jsonOptions("admin","POST",{records,selected:true}));
+  const submit=await request("/api/admin/sales-agent/opportunities/submit-selected",jsonOptions("admin","POST",{records}));
+  assert.equal(submit.status,409);assert.equal((await submit.json()).code,"BARK_SUBMISSION_NOT_SUPPORTED");assert.equal(state.triggerCalls.length,0);
+  const stale=await request(`/api/admin/sales-agent/opportunities/${id}`,jsonOptions("admin","PATCH",{expectedVersion:1,finalPrice:400}));
+  assert.equal(stale.status,409);
+}));
+
+test("Bark import requires admin authentication before any database access",()=>withServer(async({request})=>{
+  const response=await request("/api/admin/sales-agent/bark/import",jsonOptions("","POST",{}));assert.equal(response.status,401);
+}));
+
 test("status reconciles a canceled Render job, releases the lock, and preserves partial results", () => {
   const runId = "64c000000000000000000091";
   return withServer(async ({ request, state }) => {

@@ -73,6 +73,7 @@ const salesAgentOpportunityResultSchema = new mongoose.Schema(
     accommodationCost: { type: Number, min: 0, default: 0 },
     finalPrice: { type: Number, min: 0, default: 0 },
     platformCostEstimate: { type: platformCostEstimateSchema, default: () => ({}) },
+    barkSource: { type: mongoose.Schema.Types.Mixed, default: undefined },
     assumptions: { type: [String], default: [] },
     blockingReasons: { type: [String], default: [] },
     reviewCodes: { type: [String], default: [] },

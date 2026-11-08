@@ -968,6 +968,7 @@
                 <option value="togather">Togather</option>
                 <option value="addtoevent">Add to Event</option>
                 <option value="poptop">Poptop</option>
+                <option value="bark">Bark</option>
               </select>
             </label>
             <label for="salesAgentRunSelector">Select Run
@@ -978,6 +979,13 @@
           </div>
         </div>
         <p id="salesAgentResultsNotice" class="subtle hidden" style="margin:10px 0 0;"></p>
+        <div id="barkEmailImportPanel" class="hidden" style="margin-top:12px;">
+          <p>Bark email import: upload the private JSON prepared from Proton .eml exports. First import must be a baseline; it creates no opportunities. Bark sending/contact and credit spending are disabled.</p>
+          <input id="barkEmailImportFile" type="file" accept=".json,application/json" aria-label="Bark email import JSON">
+          <button id="barkEmailImportButton" type="button" class="btn btn-secondary">Import Bark Emails</button>
+          <button id="barkRefreshButton" type="button" class="btn btn-secondary">Refresh Bark</button>
+          <p id="barkImportStatus" role="status"></p>
+        </div>
         <div class="btn-row" id="salesAgentOpportunityToolbar" style="margin-top:12px;align-items:center;gap:8px;">
           <button type="button" class="btn btn-secondary" id="selectCurrentOpportunityPage">Select All on Current Page</button>
           <button type="button" class="btn btn-secondary" id="clearOpportunitySelection">Clear Selection</button>
