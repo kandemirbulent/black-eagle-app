@@ -561,6 +561,27 @@ test("empty results show the empty state", () => {
   assert.equal(row.children[0].colSpan, 12);
 });
 
+test("Bark INITIAL JSON import loads existing candidates without starting a run or claiming a mailbox scan",async()=>{
+  const item={_id:"fixture-bark",platform:"bark",opportunityId:"prx:12345678",recordVersion:1,resultStatus:"MANUAL_REVIEW",manualSelectionEligible:true,
+    barkSource:{advertisedCreditsRequired:8},platformCostEstimate:{status:"UNKNOWN",amount:null}};
+  const context=controller({responses:[response(200,{success:true,results:[]}),
+    response(200,{success:true,imported:1,updated:0,duplicates:0,recovered:0,preserved:0,ignored:1,expired:2}),
+    response(200,{success:true,results:[item]})]});
+  for(const id of ["barkEmailImportButton","barkEmailImportFile","barkRefreshButton","barkEmailImportPanel","barkImportStatus"])context.documentRef.elements[id]=new FakeElement();
+  context.documentRef.elements.salesAgentPlatformFilter.value="bark";
+  const bundle={format:"bark-email-import-v2",mode:"INITIAL",complete:true,records:[]};
+  context.documentRef.elements.barkEmailImportFile.files=[{size:100,text:async()=>JSON.stringify(bundle)}];
+  await context.instance.init();await context.documentRef.elements.barkEmailImportButton.listeners.click();
+  const post=context.calls.find(c=>c.options.method==="POST");assert.equal(post.url,"/api/admin/sales-agent/bark/import");
+  assert.deepEqual(JSON.parse(post.options.body),bundle);
+  assert.match(context.documentRef.elements.barkImportStatus.textContent,/Imported 1/);
+  assert.match(context.documentRef.elements.barkImportStatus.textContent,/not the complete mailbox/);
+  const row=context.documentRef.elements.salesAgentResultsTable.children[0];assert.equal(row.children[3].textContent,"Bark");
+  assert.match(row.children[8].textContent,/8 advertised credits/);
+  assert.equal(context.documentRef.elements.submitManualReviewsButton.disabled,true);
+  assert.ok(context.calls.every(c=>!c.url.includes("/runs")));
+});
+
 test("Bark rows show credit cost, original notes and editing while selected submission stays disabled", async () => {
   const item={_id:"bark-id",platform:"bark",opportunityId:"prx:12345678",recordVersion:1,resultStatus:"MANUAL_REVIEW",
     manualSelectionEligible:true,submissionEligible:false,staffBreakdown:[{role:"Bartender",quantity:2}],

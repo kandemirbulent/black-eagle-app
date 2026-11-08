@@ -54,6 +54,9 @@
     const platform = String(result?.platform || "").toLowerCase().replace(/[\s_-]+/g, "");
     if (!["addtoevent", "bark"].includes(platform)) return "—";
     const estimate = result?.platformCostEstimate;
+    const advertised = result?.barkSource?.advertisedCreditsRequired;
+    if (platform === "bark" && typeof advertised === "number" && Number.isFinite(advertised) && advertised >= 0
+      && String(estimate?.status || "").toUpperCase() !== "KNOWN") return `${advertised} advertised credits (unverified cost)`;
     const amount = Number(estimate?.amount);
     return String(estimate?.status || "").toUpperCase() === "KNOWN" && Number.isFinite(amount) && amount >= 0
       ? `${amount} credits`
@@ -307,11 +310,15 @@
         const source = result.barkSource || {};
         elements.detailsContent.appendChild(detailSection("Original Bark request (email)", [
           ["Service", source.serviceType], ["Customer notes", source.customerNotes],
+          ["Original email request (unverified fields)", source.emailRequestText],
           ["Original location", source.originalRequest?.location], ["Original event date", source.originalRequest?.eventDate],
           ["Guests", source.guestRange ? `${source.guestRange.min}–${source.guestRange.max}` : source.guestCount],
           ["Requested hours", source.durationRange ? `${source.durationRange.min}–${source.durationRange.max}` : "Not verified"],
           ["Billable hours", source.billableHours], ["Labour preview (not total quotation)", formatPrice(result.labourSubtotal)],
           ["Identity", "Unverified prx candidate; not a verified project_id"],
+          ["Notification sent", formatDateTime(source.notificationSentAt)],
+          ["Email received", formatDateTime(source.emailReceivedAt)],
+          ["Request created", formatDateTime(source.requestCreatedAt)],
           ["Submission", "Unavailable: Bark contact method and credit authorization are not verified."]
         ]));
       }
@@ -462,16 +469,20 @@
     async function importBarkEmails() {
       const button = byId("barkEmailImportButton");
       const file = byId("barkEmailImportFile")?.files?.[0];
-      if (!file || file.size > 1_500_000) { showMessage("Choose a prepared Bark JSON file under 1.5 MB.", "error"); return; }
+      if (!file || file.size > 10_000_000) { showMessage("Choose a prepared Bark JSON file under 10 MB.", "error"); return; }
       if (button) button.disabled = true;
       try {
         const bundle = JSON.parse(await file.text());
         const response = await requestJson("/api/admin/sales-agent/bark/import", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bundle)
         });
-        if (!response.response.ok) { showMessage(response.payload.code || "BARK_IMPORT_FAILED", "error"); return; }
+        if (!response.response.ok) {
+          showMessage(response.payload.code === "BARK_LEGACY_BASELINE_REEXPORT_REQUIRED"
+            ? "Reconvert your exported .eml files using the updated converter without --baseline. Existing requests are now included."
+            : response.payload.code || "BARK_IMPORT_FAILED", "error"); return;
+        }
         const status = byId("barkImportStatus");
-        if (status) status.textContent = `Imported ${response.payload.imported}; updated ${response.payload.updated}; duplicate emails ${response.payload.duplicates}; baseline ${response.payload.baseline}; historical ${response.payload.historical}; expired ${response.payload.expired}. Manual batch only, not a complete mailbox scan.`;
+        if (status) status.textContent = `Imported ${response.payload.imported}; updated ${response.payload.updated}; duplicate emails ${response.payload.duplicates}; recovered baseline ${response.payload.recovered}; preserved reviewed ${response.payload.preserved}; non-request emails ${response.payload.ignored}; expired ${response.payload.expired}. Only this uploaded batch was processed, not the complete mailbox.`;
         await refreshBark();
       } catch { showMessage("Invalid Bark import file or import unavailable.", "error"); }
       finally { if (button) button.disabled = false; }

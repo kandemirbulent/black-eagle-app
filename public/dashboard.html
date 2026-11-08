@@ -980,7 +980,8 @@
         </div>
         <p id="salesAgentResultsNotice" class="subtle hidden" style="margin:10px 0 0;"></p>
         <div id="barkEmailImportPanel" class="hidden" style="margin-top:12px;">
-          <p>Bark email import: upload the private JSON prepared from Proton .eml exports. First import must be a baseline; it creates no opportunities. Bark sending/contact and credit spending are disabled.</p>
+          <p>Bark email import: upload the private JSON prepared from Proton .eml exports. Initial import includes existing future/today enquiries and undated requests for manual review; past events and promotional mail are excluded. Only uploaded messages are evaluated. Bark sending/contact and credit spending are disabled.</p>
+          <p>Convert an exported email folder locally: <code>node src/platforms/bark/import-cli.js --output NEW_PRIVATE.json EXPORTED_EMAIL_FOLDER</code>. Direct .eml upload and automatic Proton reading are not enabled.</p>
           <input id="barkEmailImportFile" type="file" accept=".json,application/json" aria-label="Bark email import JSON">
           <button id="barkEmailImportButton" type="button" class="btn btn-secondary">Import Bark Emails</button>
           <button id="barkRefreshButton" type="button" class="btn btn-secondary">Refresh Bark</button>
