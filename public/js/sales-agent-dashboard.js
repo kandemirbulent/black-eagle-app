@@ -24,6 +24,10 @@
     }).format(safeNumber(value));
   }
 
+  function knownPrice(value) {
+    return value === null || value === undefined ? "Not calculated" : formatPrice(value);
+  }
+
   function staffText(staffBreakdown) {
     if (!Array.isArray(staffBreakdown) || !staffBreakdown.length) return "—";
     const parts = staffBreakdown
@@ -314,7 +318,7 @@
           ["Original location", source.originalRequest?.location], ["Original event date", source.originalRequest?.eventDate],
           ["Guests", source.guestRange ? `${source.guestRange.min}–${source.guestRange.max}` : source.guestCount],
           ["Requested hours", source.durationRange ? `${source.durationRange.min}–${source.durationRange.max}` : "Not verified"],
-          ["Billable hours", source.billableHours], ["Labour preview (not total quotation)", formatPrice(result.labourSubtotal)],
+          ["Billable hours", result.billableHours ?? source.billableHours], ["Labour preview (not total quotation)", knownPrice(result.labourSubtotal)],
           ["Identity", "Unverified prx candidate; not a verified project_id"],
           ["Notification sent", formatDateTime(source.notificationSentAt)],
           ["Email received", formatDateTime(source.emailReceivedAt)],
@@ -377,18 +381,24 @@
       elements.detailsContent.appendChild(
         detailSection("Staffing Calculation", [
           ["Roles and staff", staffing || "—"],
-          ["Working hours", safeNumber(result?.workingHours)],
+          ["Working hours", result?.workingHours == null ? "Not provided" : safeNumber(result?.workingHours)],
+          ["Billable event hours", result?.billableHours ?? result?.workingHours ?? "Not provided"],
           ["Travel hours", safeNumber(result?.travelHours)]
         ])
       );
       elements.detailsContent.appendChild(
         detailSection("Price Breakdown", [
-          ["Labour subtotal", formatPrice(result?.labourSubtotal)],
-          ["Travel labour", formatPrice(result?.travelLabour)],
-          ["Vehicle cost", formatPrice(result?.vehicleCost)],
+          ["Labour subtotal", knownPrice(result?.labourSubtotal)],
+          ["Pricing status", result?.priceStatus || "Not verified"],
+          ["One-way distance (miles)", result?.oneWayMiles ?? "Not verified"],
+          ["One-way journey hours", result?.oneWayHours ?? "Not verified"],
+          ["Charged one-way travel hours", result?.travelHoursPerStaff ?? result?.travelHours ?? "Not verified"],
+          ["Travel labour", knownPrice(result?.travelLabourCost !== undefined ? result.travelLabourCost : result?.travelLabour)],
+          ["Vehicle count", result?.vehicleCount ?? "Not verified"],
+          ["Vehicle cost", knownPrice(result?.vehicleCost)],
           ["Parking cost", formatPrice(result?.parkingCost)],
           ["Accommodation cost", formatPrice(result?.accommodationCost)],
-          ["Customer quote", formatPrice(result?.finalPrice)],
+          ["Customer quote", result?.priceStatus === "PARTIAL" ? "Incomplete — route or staffing information required" : knownPrice(result?.finalPrice)],
           ["Credits required", formatCredits(result)]
         ])
       );
@@ -600,7 +610,7 @@
           text(result?.resultStatus || result?.analysisStatus),
           reviewReason(result),
           staffText(result?.staffBreakdown),
-          formatPrice(result?.manualOverrides?.finalPrice ?? result?.finalPrice),
+          result?.priceStatus === "PARTIAL" ? `Partial (labour ${knownPrice(result?.labourSubtotal)})` : knownPrice(result?.manualOverrides?.finalPrice ?? result?.finalPrice),
           formatCredits(result),
           text(result?.quoteUuid),
           formatDateTime(result?.updatedAt || result?.createdAt)

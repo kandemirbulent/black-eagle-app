@@ -12,11 +12,21 @@ const {
   workerDiagnosticReason,
   redactFailureLog,
   opportunitySelectionPolicy,
+  serializeOpportunity,
 } = require("../routes/salesAgentRoutes");
 
 const ADMIN_ID = "64b000000000000000000001";
 const SUPERADMIN_ID = "64b000000000000000000002";
 const fixedApiNow = () => new Date("2026-07-31T12:00:00.000Z");
+
+test("route pricing API aliases preserve known zero and never present PARTIAL as a total", () => {
+  const complete=serializeOpportunity({platform:"addtoevent",travelLabourCost:0,travelLabour:99,travelHoursPerStaff:0,
+    priceStatus:"COMPLETE",finalPrice:380});
+  assert.equal(complete.travelLabour,0);assert.equal(complete.travelHours,0);assert.equal(complete.finalPrice,380);
+  const partial=serializeOpportunity({platform:"bark",priceStatus:"PARTIAL",travelLabourCost:null,finalPrice:999});
+  assert.equal(partial.travelLabour,null);assert.equal(partial.finalPrice,null);assert.equal(partial.submissionEligible,false);
+  assert.equal(serializeOpportunity({platform:"togather",travelLabour:50,finalPrice:300}).travelLabour,50);
+});
 
 function query(value) {
   return {

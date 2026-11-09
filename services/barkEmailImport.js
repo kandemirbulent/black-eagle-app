@@ -1,5 +1,7 @@
 const { createHash } = require("node:crypto");
 const { ObjectId } = require("mongoose").Types;
+const { prepareBarkPricing } = require("./barkPricing");
+const { pricingProtectionReason } = require("./agentPricing.generated.cjs");
 const LIMIT = 1000;
 const SUBMISSION_BLOCKER = "BARK_SUBMISSION_NOT_SUPPORTED";
 const digest = value => createHash("sha256").update(value).digest("hex");
@@ -49,6 +51,9 @@ function validateBundle(bundle, now = new Date()) {
           // Never persist token-bearing deep links or raw email/headers.
           requestUrl: prx ? `https://www.bark.com/sellers/dashboard/?prx=${prx}` : "",
           originalRequest: { customerName: text(r.customerName, 200), serviceType: text(r.serviceType, 200), location: text(r.location, 500),
+            requestedStaff: (Array.isArray(r.originalRequest?.requestedStaff) ? r.originalRequest.requestedStaff : staff).map(s => ({
+              role: text(s.role, 100), ...(s.quantity != null ? { quantity: s.quantity } : {})
+            })),
             customerNotes: text(r.customerNotes, 2000000), eventDate: eventDate?.toISOString() || null,
             guestCount: number(r.guestCount), workingHours: number(r.workingHours) },
         },
@@ -61,10 +66,15 @@ function cleanRange(v) {
   return v && number(v.min) !== null && number(v.max) !== null && v.max >= v.min ? { min: v.min, max: v.max } : null;
 }
 
-async function importBarkBundle({ db, session, bundle, admin, now = new Date() }) {
+async function importBarkBundle({ db, session, bundle, admin, now = new Date(), pricingOptions }) {
   const input = validateBundle(bundle, now);
   const checkpoints = db.collection("barkmailcheckpoints"), messages = db.collection("barkmailmessages");
   const results = db.collection("salesagentopportunityresults");
+  const candidateIds = input.records.map(r => new ObjectId(digest(`bark:${r.opportunityId}`).slice(0, 24)));
+  const existingPricing = new Map((await results.find({ _id: { $in: candidateIds } }, { session }).toArray()).map(r => [r.opportunityId, r]));
+  const todayForPricing = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year:"numeric",month:"2-digit",day:"2-digit" }).format(now);
+  const pricingCandidates = input.records.filter(r => r.notificationType !== "NON_REQUEST" && (!r.value.eventDate || r.value.eventDate.toISOString().slice(0,10) >= todayForPricing));
+  await prepareBarkPricing(pricingCandidates, existingPricing, pricingOptions);
   let outcome;
   await session.withTransaction(async () => {
     const options = { session };
@@ -105,7 +115,7 @@ async function importBarkBundle({ db, session, bundle, admin, now = new Date() }
           priorResults.set(String(id), insert);
           outcome.imported++;
         }
-        else if (existing.quoteSubmitted || existing.quoteUuid || existing.verifiedQuoteUuid || existing.platformQuoteId
+        else if (pricingProtectionReason(existing) || existing.quoteSubmitted || existing.quoteUuid || existing.verifiedQuoteUuid || existing.platformQuoteId
           || existing.lastEditedAt || existing.manualOverrideApplied || existing.manualApprovedAt || existing.submissionLock
           || ["READY", "NEEDS_REVIEW", "APPROVED", "HOLD", "REJECTED"].includes(existing.approvalStatus)
           || /SENT|SUBMITTED|PENDING|ACCEPTED|CONFIRMED|BOOKED|ALREADY_QUOTED/.test(String(existing.resultStatus || "").toUpperCase())
@@ -114,7 +124,8 @@ async function importBarkBundle({ db, session, bundle, admin, now = new Date() }
           outcome.preserved++;
         } else {
           // Preserve edited quotation and invalidate any selection on new source evidence.
-          const set = { barkSource: record.value.barkSource, updatedAt: now, selectedVersion: null,
+          const preserveUnmarkedPrice = existing.finalPrice > 0 && existing.priceStatus !== "COMPLETE";
+          const set = { ...(preserveUnmarkedPrice ? { barkSource: record.value.barkSource } : record.value), updatedAt: now, selectedVersion: null,
             blockingReasons: record.value.blockingReasons, resultStatus: "MANUAL_REVIEW", manualSubmissionEligible: false };
           resultWrites.push({ updateOne: { filter: { _id: id, platform: "bark" }, update: { $set: set, $inc: { recordVersion: 1 } } } });
           priorResults.set(String(id), { ...existing, ...set, recordVersion: Number(existing.recordVersion || 0) + 1 });

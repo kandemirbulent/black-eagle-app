@@ -1076,6 +1076,21 @@ test("manual review summary and details show reasons, assumptions, staffing and 
   assert.match(detailText, /£660\.00/);
 });
 
+test("Bark and Add to Event detail show route arithmetic and distinguish partial totals", () => {
+  for(const platform of ["bark","addtoevent"]) {
+    const context=controller();
+    context.instance.openDetails({platform,priceStatus:"COMPLETE",staffBreakdown:[{role:"Bartender",quantity:2}],
+      billableHours:6,workingHours:4,labourSubtotal:300,oneWayMiles:40,oneWayHours:1,
+      travelHoursPerStaff:1,travelLabourCost:50,vehicleCount:1,vehicleCost:80,finalPrice:430});
+    const detail=flattenText(context.documentRef.elements.salesAgentDetailsContent);
+    assert.match(detail,/One-way distance/);assert.match(detail,/Vehicle count/);assert.match(detail,/£50\.00/);
+    assert.match(detail,/£80\.00/);assert.match(detail,/£430\.00/);
+    context.instance.openDetails({platform,priceStatus:"PARTIAL",labourSubtotal:300,travelLabourCost:null,vehicleCost:null,finalPrice:999});
+    const partial=flattenText(context.documentRef.elements.salesAgentDetailsContent);
+    assert.match(partial,/£300\.00/);assert.match(partial,/Not calculated/);assert.match(partial,/Incomplete/);assert.doesNotMatch(partial,/£999\.00/);
+  }
+});
+
 test("review summaries handle long, missing, sent, failed and skipped results safely", () => {
   const context = controller();
   const longReason = "Travel or accommodation cost could not be priced safely because the available route information is incomplete and requires operational review before submission.";

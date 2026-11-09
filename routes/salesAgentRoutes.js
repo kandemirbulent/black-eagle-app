@@ -110,7 +110,12 @@ function opportunitySelectionPolicy(record = {}) {
 }
 
 function serializeOpportunity(record = {}) {
-  return { ...record, ...opportunitySelectionPolicy(record) };
+  const routed = ["bark","addtoevent"].includes(record.platform);
+  return { ...record, ...(routed ? {
+    travelLabour: record.travelLabourCost !== undefined ? record.travelLabourCost : record.travelLabour,
+    travelHours: record.travelHoursPerStaff !== undefined ? record.travelHoursPerStaff : record.travelHours,
+    ...(record.priceStatus === "PARTIAL" ? { finalPrice: null } : {}),
+  } : {}), ...opportunitySelectionPolicy(record) };
 }
 
 function validateRecordReferences(records) {

@@ -149,3 +149,28 @@ test("same-package duplicate messages and reminders preserve ordered candidate s
   assert.equal(m.rows("salesagentopportunityresults").length,1);assert.equal(m.rows("salesagentopportunityresults")[0].recordVersion,2);
   assert.equal(m.rows("barkmailmessages").length,2);
 });
+
+test("Bark importer computes real components from trusted resolver, not uploaded totals/routes",async()=>{
+  const m=memory();let calls=0;
+  const pricingOptions={routeResolver:async()=>{calls++;return {verified:true,source:"GOOGLE_ROUTES",origin:"NW10 5JE",destination:"OX1 1AA",oneWayMiles:40,oneWayHours:1};},
+    locationResolver:async()=>({postcode:"OX1 1AA",source:"POSTCODES_IO",isGreaterLondon:false})};
+  const input=bundle("INITIAL",[record("a",{staffBreakdown:[],serviceType:"Bartending professional",guestCount:70,workingHours:4,
+    location:"OX1 1AA",finalPrice:1,labourSubtotal:1,route:{verified:true,oneWayMiles:1}})]);
+  await importBarkBundle({...m,admin,now,bundle:input,pricingOptions});
+  const saved=m.rows("salesagentopportunityresults")[0];
+  assert.equal(saved.finalPrice,430);assert.equal(saved.labourSubtotal,300);assert.equal(saved.travelLabour,50);
+  assert.equal(saved.vehicleCost,80);assert.equal(saved.vehicleCount,1);assert.equal(saved.billableHours,6);assert.equal(saved.workingHours,4);
+  assert.equal(saved.resultStatus,"MANUAL_REVIEW");assert.equal(saved.manualSubmissionEligible,false);
+  assert.ok(saved.blockingReasons.includes("BARK_SUBMISSION_NOT_SUPPORTED"));
+  await importBarkBundle({...m,admin,now,bundle:input,pricingOptions});
+  assert.equal(calls,1);assert.equal(m.rows("salesagentopportunityresults").length,1);
+});
+
+test("missing route leaves a calculated labour subtotal, never a fabricated total",async()=>{
+  const m=memory();
+  await importBarkBundle({...m,admin,now,bundle:bundle("INITIAL",[record("a")]),
+    pricingOptions:{routeResolver:async()=>({verified:false,reason:"GOOGLE_ROUTES_API_KEY_MISSING"}),locationResolver:()=>assert.fail("lookup")}});
+  const saved=m.rows("salesagentopportunityresults")[0];
+  assert.equal(saved.labourSubtotal,300);assert.equal(saved.finalPrice,null);assert.equal(saved.vehicleCost,null);
+  assert.equal(saved.priceStatus,"PARTIAL");assert.equal(saved.manualSubmissionEligible,false);
+});
