@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { importBarkBundle, validateBundle } = require("../services/barkEmailImport");
+const { importBarkBundle, validateBundle, classifyBarkImportError } = require("../services/barkEmailImport");
 const { opportunitySelectionPolicy } = require("../routes/salesAgentRoutes");
 const now = new Date("2027-01-03T12:00:00Z");
 const admin = { _id: "64b000000000000000000001", role: "admin" };
@@ -105,4 +105,12 @@ test("Bark allows versioned preview selection but never actual submission, even 
   const policy=opportunitySelectionPolicy({platform:"bark",recordVersion:1,resultStatus:"MANUAL_REVIEW",finalPrice:999});
   assert.equal(policy.manualSelectionEligible,true);assert.equal(policy.submissionEligible,false);assert.equal(policy.submissionBlocker,"BARK_SUBMISSION_NOT_SUPPORTED");
   assert.equal(opportunitySelectionPolicy({platform:"bark",recordVersion:1,resultStatus:"SENT"}).manualSelectionEligible,false);
+});
+test("Bark database diagnostics distinguish real causes without exposing raw errors",()=>{
+  for(const[error,code]of [[{code:13},"BARK_DATABASE_PERMISSION_DENIED"],[{code:18},"BARK_DATABASE_AUTHENTICATION_FAILED"],
+    [{code:20,message:"Transaction numbers are only allowed on a replica set member"},"BARK_TRANSACTION_UNSUPPORTED"],
+    [{code:11000,message:"PRIVATE_RECORD"},"BARK_IMPORT_WRITE_CONFLICT"],[{name:"MongoServerSelectionError"},"BARK_DATABASE_UNAVAILABLE"],
+    [{message:"PRIVATE_UNKNOWN_ERROR"},"BARK_IMPORT_FAILED"]]){
+    const result=classifyBarkImportError(error);assert.equal(result.code,code);assert.doesNotMatch(JSON.stringify(result),/PRIVATE/);
+  }
 });

@@ -983,9 +983,9 @@
           <p>Bark email import: upload the private JSON prepared from Proton .eml exports. Initial import includes existing future/today enquiries and undated requests for manual review; past events and promotional mail are excluded. Only uploaded messages are evaluated. Bark sending/contact and credit spending are disabled.</p>
           <p>Convert an exported email folder locally: <code>node src/platforms/bark/import-cli.js --output NEW_PRIVATE.json EXPORTED_EMAIL_FOLDER</code>. Direct .eml upload and automatic Proton reading are not enabled.</p>
           <input id="barkEmailImportFile" type="file" accept=".json,application/json" aria-label="Bark email import JSON">
-          <button id="barkEmailImportButton" type="button" class="btn btn-secondary">Import Bark Emails</button>
+          <button id="barkEmailImportButton" type="button" class="btn btn-secondary" disabled aria-describedby="barkImportStatus">Import Bark Emails</button>
           <button id="barkRefreshButton" type="button" class="btn btn-secondary">Refresh Bark</button>
-          <p id="barkImportStatus" role="status"></p>
+          <p id="barkImportStatus" role="status" aria-live="polite">Bark import controls are loading. If this message remains, refresh the dashboard.</p>
         </div>
         <div class="btn-row" id="salesAgentOpportunityToolbar" style="margin-top:12px;align-items:center;gap:8px;">
           <button type="button" class="btn btn-secondary" id="selectCurrentOpportunityPage">Select All on Current Page</button>
@@ -1282,7 +1282,7 @@
     </div>
   </div>
   <script src="/js/order-details.js"></script>
-  <script src="/js/sales-agent-dashboard.js"></script>
+  <script src="/js/sales-agent-dashboard.js?v=bark-import-feedback-20261109"></script>
   <script src="/js/b2b-outreach-dashboard.js"></script>
   <script>
     const token = localStorage.getItem("adminToken");

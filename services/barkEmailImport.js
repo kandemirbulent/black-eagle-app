@@ -123,4 +123,14 @@ async function importBarkBundle({ db, session, bundle, admin, now = new Date() }
   return outcome;
 }
 
-module.exports = { importBarkBundle, validateBundle, SUBMISSION_BLOCKER };
+function classifyBarkImportError(error = {}) {
+  if (/^BARK_[A-Z_]+$/.test(error.message || "")) return { code: error.message, status: error.message === "BARK_DATABASE_NOT_READY" ? 503 : 400 };
+  if (error.code === 13) return { code: "BARK_DATABASE_PERMISSION_DENIED", status: 503 };
+  if (error.code === 18) return { code: "BARK_DATABASE_AUTHENTICATION_FAILED", status: 503 };
+  if (error.code === 11000 || error.code === 112) return { code: "BARK_IMPORT_WRITE_CONFLICT", status: 409 };
+  if (error.code === 20 && /transaction|replica set/i.test(error.message || "")) return { code: "BARK_TRANSACTION_UNSUPPORTED", status: 503 };
+  if (["MongoServerSelectionError", "MongoNetworkError", "MongoNetworkTimeoutError"].includes(error.name)) return { code: "BARK_DATABASE_UNAVAILABLE", status: 503 };
+  return { code: "BARK_IMPORT_FAILED", status: 500 };
+}
+
+module.exports = { importBarkBundle, validateBundle, classifyBarkImportError, SUBMISSION_BLOCKER };

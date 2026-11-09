@@ -565,21 +565,71 @@ test("Bark INITIAL JSON import loads existing candidates without starting a run 
   const item={_id:"fixture-bark",platform:"bark",opportunityId:"prx:12345678",recordVersion:1,resultStatus:"MANUAL_REVIEW",manualSelectionEligible:true,
     barkSource:{advertisedCreditsRequired:8},platformCostEstimate:{status:"UNKNOWN",amount:null}};
   const context=controller({responses:[response(200,{success:true,results:[]}),
-    response(200,{success:true,imported:1,updated:0,duplicates:0,recovered:0,preserved:0,ignored:1,expired:2}),
+    response(200,{success:true,imported:334,updated:0,duplicates:0,recovered:0,preserved:0,ignored:1,expired:2}),
     response(200,{success:true,results:[item]})]});
   for(const id of ["barkEmailImportButton","barkEmailImportFile","barkRefreshButton","barkEmailImportPanel","barkImportStatus"])context.documentRef.elements[id]=new FakeElement();
   context.documentRef.elements.salesAgentPlatformFilter.value="bark";
-  const bundle={format:"bark-email-import-v2",mode:"INITIAL",complete:true,records:[]};
-  context.documentRef.elements.barkEmailImportFile.files=[{size:100,text:async()=>JSON.stringify(bundle)}];
-  await context.instance.init();await context.documentRef.elements.barkEmailImportButton.listeners.click();
+  const bundle={format:"bark-email-import-v2",mode:"INITIAL",complete:true,records:Array.from({length:334},(_,i)=>({messageKey:`synthetic-${i}`})),syntheticPadding:"x".repeat(2500000)};
+  const file=new Blob([JSON.stringify(bundle)],{type:"application/json"});
+  assert.ok(file.size>2500000&&file.size<10000000);
+  context.documentRef.elements.barkEmailImportFile.files=[file];
+  context.documentRef.elements.barkEmailImportButton.disabled=true;
+  await context.instance.init();assert.equal(context.documentRef.elements.barkEmailImportButton.disabled,false);
+  assert.equal(typeof context.documentRef.elements.barkEmailImportButton.listeners.click,"function");
+  await context.documentRef.elements.barkEmailImportButton.listeners.click();
   const post=context.calls.find(c=>c.options.method==="POST");assert.equal(post.url,"/api/admin/sales-agent/bark/import");
   assert.deepEqual(JSON.parse(post.options.body),bundle);
-  assert.match(context.documentRef.elements.barkImportStatus.textContent,/Imported 1/);
+  assert.match(context.documentRef.elements.barkImportStatus.textContent,/Imported 334/);
   assert.match(context.documentRef.elements.barkImportStatus.textContent,/not the complete mailbox/);
   const row=context.documentRef.elements.salesAgentResultsTable.children[0];assert.equal(row.children[3].textContent,"Bark");
   assert.match(row.children[8].textContent,/8 advertised credits/);
   assert.equal(context.documentRef.elements.submitManualReviewsButton.disabled,true);
   assert.ok(context.calls.every(c=>!c.url.includes("/runs")));
+});
+
+async function barkImportController(file, followingResponses=[]){
+  const context=controller({responses:[response(200,{success:true,results:[]}),...followingResponses]});
+  for(const id of ["barkEmailImportButton","barkEmailImportFile","barkRefreshButton","barkEmailImportPanel","barkImportStatus"])context.documentRef.elements[id]=new FakeElement();
+  context.documentRef.elements.salesAgentPlatformFilter.value="bark";
+  context.documentRef.elements.barkEmailImportFile.files=file?[file]:[];
+  await context.instance.init();return context;
+}
+const syntheticBarkPackage=()=>({format:"bark-email-import-v2",mode:"INITIAL",complete:true,records:[{messageKey:"synthetic-only"}]});
+test("Bark missing, oversized, unreadable and malformed files show local errors without POST",async()=>{
+  for(const[file,code]of [[null,"BARK_FILE_REQUIRED"],[{size:10000001},"BARK_FILE_TOO_LARGE"],
+    [{size:1,text:async()=>{throw Error("PRIVATE_FILE_ERROR");}},"BARK_FILE_READ_FAILED"],
+    [{size:1,text:async()=>"{"},"BARK_INVALID_JSON"],
+    [{size:1,text:async()=>JSON.stringify({...syntheticBarkPackage(),records:[]})},"BARK_INVALID_IMPORT_PACKAGE"]]){
+    const c=await barkImportController(file);await c.documentRef.elements.barkEmailImportButton.listeners.click();
+    assert.match(c.documentRef.elements.barkImportStatus.textContent,new RegExp(code));
+    assert.equal(c.calls.filter(call=>call.options.method==="POST").length,0);
+    assert.equal(c.documentRef.elements.barkEmailImportButton.disabled,false);
+    assert.doesNotMatch(c.documentRef.elements.barkImportStatus.textContent,/PRIVATE_FILE_ERROR/);
+  }
+});
+test("Bark shows HTTP/backend and network failures inline, never a false success",async()=>{
+  const file=new Blob([JSON.stringify(syntheticBarkPackage())]);
+  for(const[reply,code]of [[response(503,{success:false,code:"BARK_DATABASE_PERMISSION_DENIED"}),"BARK_DATABASE_PERMISSION_DENIED"],
+    [response(200,{success:false,code:"BARK_IMPORT_FAILED"}),"BARK_IMPORT_FAILED"],[new Error("PRIVATE_NETWORK_DETAIL"),"BARK_IMPORT_REQUEST_FAILED"]]){
+    const c=await barkImportController(file,[reply]);await c.documentRef.elements.barkEmailImportButton.listeners.click();
+    assert.match(c.documentRef.elements.barkImportStatus.textContent,new RegExp(code));assert.equal(c.calls.length,2);
+    assert.equal(c.documentRef.elements.barkEmailImportButton.disabled,false);
+    assert.doesNotMatch(c.documentRef.elements.barkImportStatus.textContent,/Imported|PRIVATE_NETWORK_DETAIL/);
+  }
+});
+test("Bark click gives immediate read progress and duplicate clicks create only one POST",async()=>{
+  let resolveRead;const text=new Promise(resolve=>{resolveRead=resolve;});
+  const c=await barkImportController({size:2500000,text:()=>text},[response(200,{success:true,imported:1}),response(200,{success:true,results:[]})]);
+  const first=c.documentRef.elements.barkEmailImportButton.listeners.click();
+  assert.match(c.documentRef.elements.barkImportStatus.textContent,/Reading/);assert.equal(c.documentRef.elements.barkEmailImportButton.disabled,true);
+  await c.documentRef.elements.barkEmailImportButton.listeners.click();resolveRead(JSON.stringify(syntheticBarkPackage()));await first;
+  assert.equal(c.calls.filter(call=>call.options.method==="POST").length,1);
+});
+test("Bark successful import with failed list refresh remains reported as saved, not invalid JSON",async()=>{
+  const c=await barkImportController(new Blob([JSON.stringify(syntheticBarkPackage())]),[response(200,{success:true,imported:1}),response(503,{success:false})]);
+  await c.documentRef.elements.barkEmailImportButton.listeners.click();
+  assert.match(c.documentRef.elements.barkImportStatus.textContent,/Imported 1.*Import succeeded, but list reload failed/);
+  assert.equal(c.calls.filter(call=>call.options.method==="POST").length,1);
 });
 
 test("Bark rows show credit cost, original notes and editing while selected submission stays disabled", async () => {

@@ -1,6 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const { importBarkBundle, SUBMISSION_BLOCKER: BARK_SUBMISSION_BLOCKER } = require("../services/barkEmailImport");
+const { importBarkBundle, validateBundle: validateBarkBundle, classifyBarkImportError, SUBMISSION_BLOCKER: BARK_SUBMISSION_BLOCKER } = require("../services/barkEmailImport");
 const {
   createRenderSalesAgentTrigger,
   createRenderSalesAgentJobStatusClient,
@@ -368,15 +368,23 @@ function createSalesAgentRouter({
   });
   router.post("/admin/sales-agent/bark/import", requireAdminAuth, async (req, res) => {
     let session;
+    let stage = "VALIDATE_PACKAGE";
     try {
+      validateBarkBundle(req.body, now());
+      stage = "SESSION_START";
+      if (!SalesAgentOpportunityResult.db?.db || typeof SalesAgentOpportunityResult.db.startSession !== "function") throw new Error("BARK_DATABASE_NOT_READY");
       session = await SalesAgentOpportunityResult.db.startSession();
+      stage = "IMPORT_TRANSACTION";
       const result = await importBarkBundle({ db: SalesAgentOpportunityResult.db.db, session,
         bundle: req.body, admin: req.adminUser, now: now() });
       return res.json({ success: true, ...result, mailboxScanComplete: false });
     } catch (error) {
-      const safe = /^BARK_[A-Z_]+$/.test(error.message || "") ? error.message : "BARK_IMPORT_FAILED_TRANSACTION_REQUIRED";
-      return res.status(400).json({ success: false, code: safe });
-    } finally { if (session) await session.endSession(); }
+      const safe = classifyBarkImportError(error);
+      logger.error("BARK_IMPORT_FAILURE", { stage, code: safe.code, mongoCode: Number.isInteger(error.code) ? error.code : null });
+      return res.status(safe.status).json({ success: false, code: safe.code, stage });
+    } finally {
+      if (session) { try { await session.endSession(); } catch { logger.error("BARK_IMPORT_SESSION_CLOSE_FAILED"); } }
+    }
   });
 
   async function withPersistedResultCount(run) {

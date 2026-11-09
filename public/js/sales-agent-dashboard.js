@@ -460,32 +460,82 @@
     }
 
     let barkResultsCache = [];
+    let barkImportInProgress = false;
+    let barkImportListenerBound = false;
+    function barkImportFeedback(message, error = false) {
+      const status = byId("barkImportStatus");
+      if (status) { status.textContent = message; status.setAttribute?.("data-state", error ? "error" : "info"); }
+      if (error) showMessage(message, "error");
+    }
     async function refreshBark() {
-      const response = await requestJson("/api/admin/sales-agent/bark/opportunities");
-      if (!response.response.ok) { showMessage("Bark records could not be loaded.", "error"); return; }
-      barkResultsCache = response.payload.results || [];
-      if (elements.platformFilter?.value === "bark") renderResults(barkResultsCache);
+      try {
+        const response = await requestJson("/api/admin/sales-agent/bark/opportunities");
+        if (!response.response.ok || response.payload.success === false || !Array.isArray(response.payload.results)) throw new Error("BARK_LIST_UNAVAILABLE");
+        barkResultsCache = response.payload.results;
+        if (elements.platformFilter?.value === "bark") renderResults(barkResultsCache);
+        return true;
+      } catch {
+        barkImportFeedback("BARK_LIST_UNAVAILABLE: Bark records could not be loaded. Use Refresh Bark to retry.", true);
+        return false;
+      }
     }
     async function importBarkEmails() {
+      if (barkImportInProgress) return;
       const button = byId("barkEmailImportButton");
       const file = byId("barkEmailImportFile")?.files?.[0];
-      if (!file || file.size > 10_000_000) { showMessage("Choose a prepared Bark JSON file under 10 MB.", "error"); return; }
-      if (button) button.disabled = true;
+      if (!file) { barkImportFeedback("BARK_FILE_REQUIRED: Choose the prepared Bark JSON file first.", true); return; }
+      if (file.size > 10_000_000) { barkImportFeedback("BARK_FILE_TOO_LARGE: Choose a Bark JSON file under 10 MB.", true); return; }
+      barkImportInProgress = true;
+      const buttonText = button?.textContent || "Import Bark Emails";
+      if (button) { button.disabled = true; button.textContent = "Importing…"; }
+      let stage = "READ_FILE";
       try {
-        const bundle = JSON.parse(await file.text());
+        barkImportFeedback("Reading the selected Bark JSON file…");
+        if (typeof file.text !== "function") throw new Error("BARK_FILE_READ_UNSUPPORTED");
+        const contents = await file.text();
+        stage = "PARSE_JSON";
+        const bundle = JSON.parse(contents);
+        stage = "VALIDATE_FILE";
+        if (bundle?.mode === "BASELINE") {
+          barkImportFeedback("BARK_LEGACY_BASELINE_REEXPORT_REQUIRED: Reconvert the .eml files without --baseline.", true); return;
+        }
+        if (!["bark-email-import-v1", "bark-email-import-v2"].includes(bundle?.format) || bundle.complete !== true
+          || !["INITIAL", "INCREMENTAL"].includes(bundle.mode) || !Array.isArray(bundle.records)
+          || !bundle.records.length || bundle.records.length > 1000) {
+          barkImportFeedback("BARK_INVALID_IMPORT_PACKAGE: Expected a complete INITIAL or INCREMENTAL package with 1–1000 records.", true); return;
+        }
+        stage = "IMPORT_REQUEST";
+        barkImportFeedback(`Validated ${bundle.records.length} records. Sending import request…`);
         const response = await requestJson("/api/admin/sales-agent/bark/import", {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(bundle)
         });
-        if (!response.response.ok) {
-          showMessage(response.payload.code === "BARK_LEGACY_BASELINE_REEXPORT_REQUIRED"
+        if (!response.response.ok || response.payload.success !== true) {
+          const code = /^BARK_[A-Z_]+$/.test(response.payload.code || "") ? response.payload.code : "BARK_IMPORT_FAILED";
+          const detail = {
+            BARK_DATABASE_NOT_READY: "Server database connection is not ready.",
+            BARK_DATABASE_UNAVAILABLE: "Server could not reach the database.",
+            BARK_DATABASE_PERMISSION_DENIED: "Database permission is missing.",
+            BARK_DATABASE_AUTHENTICATION_FAILED: "Server database authentication failed.",
+            BARK_TRANSACTION_UNSUPPORTED: "Database transactions require a replica set or Atlas.",
+            BARK_IMPORT_WRITE_CONFLICT: "A concurrent import conflicted. Retrying this file is safe."
+          }[code] || "No successful import was confirmed. Your file was not changed.";
+          barkImportFeedback(code === "BARK_LEGACY_BASELINE_REEXPORT_REQUIRED"
             ? "Reconvert your exported .eml files using the updated converter without --baseline. Existing requests are now included."
-            : response.payload.code || "BARK_IMPORT_FAILED", "error"); return;
+            : `${code} (HTTP ${response.response.status}): ${detail}`, true); return;
         }
-        const status = byId("barkImportStatus");
-        if (status) status.textContent = `Imported ${response.payload.imported}; updated ${response.payload.updated}; duplicate emails ${response.payload.duplicates}; recovered baseline ${response.payload.recovered}; preserved reviewed ${response.payload.preserved}; non-request emails ${response.payload.ignored}; expired ${response.payload.expired}. Only this uploaded batch was processed, not the complete mailbox.`;
-        await refreshBark();
-      } catch { showMessage("Invalid Bark import file or import unavailable.", "error"); }
-      finally { if (button) button.disabled = false; }
+        const summary = `Imported ${response.payload.imported}; updated ${response.payload.updated}; duplicate emails ${response.payload.duplicates}; recovered baseline ${response.payload.recovered}; preserved reviewed ${response.payload.preserved}; non-request emails ${response.payload.ignored}; expired ${response.payload.expired}. Only this uploaded batch was processed, not the complete mailbox.`;
+        const refreshed = await refreshBark();
+        barkImportFeedback(refreshed ? summary : `${summary} Import succeeded, but list reload failed. Use Refresh Bark.`, !refreshed);
+      } catch {
+        const reason = { READ_FILE: "BARK_FILE_READ_FAILED: The browser could not read the selected file. Select it again.",
+          PARSE_JSON: "BARK_INVALID_JSON: The selected file is not valid JSON.",
+          VALIDATE_FILE: "BARK_INVALID_IMPORT_PACKAGE: The file structure is invalid.",
+          IMPORT_REQUEST: "BARK_IMPORT_REQUEST_FAILED: No successful response was confirmed. Retrying the same file is protected against duplicates." }[stage];
+        barkImportFeedback(reason, true);
+      } finally {
+        barkImportInProgress = false;
+        if (button) { button.disabled = false; button.textContent = buttonText; }
+      }
     }
     function renderResults(results, { preserveSelection = false } = {}) {
       if (elements.platformFilter?.value === "bark") results = barkResultsCache;
@@ -1258,7 +1308,14 @@
         if (elements.platformFilter.value === "bark") await refreshBark();
         else await refresh();
       });
-      byId("barkEmailImportButton")?.addEventListener("click", importBarkEmails);
+      const barkImportButton = byId("barkEmailImportButton");
+      if (barkImportButton && !barkImportListenerBound) {
+        barkImportButton.addEventListener("click", importBarkEmails);
+        barkImportListenerBound = true;
+        barkImportButton.disabled = false;
+        barkImportButton.setAttribute?.("data-bark-import-ready", "true");
+        barkImportFeedback("Bark import is ready. Choose the prepared JSON file and click Import Bark Emails.");
+      }
       byId("barkRefreshButton")?.addEventListener("click", refreshBark);
       elements.selectCurrentPage?.addEventListener("click", selectAllCurrentPage);
       elements.clearSelection?.addEventListener("click", clearOpportunitySelection);
