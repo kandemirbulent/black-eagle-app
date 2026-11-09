@@ -6,18 +6,32 @@ const now = new Date("2027-01-03T12:00:00Z");
 const admin = { _id: "64b000000000000000000001", role: "admin" };
 const record = (key, overrides = {}) => ({ messageKey:key.repeat(64), sentAt:"2027-01-02T10:00:00Z", notificationType:"REQUEST", prx:"12345678", eventDate:"2027-06-05", serviceType:"Bartending", staffBreakdown:[{role:"Bartender",quantity:2}], labourSubtotal:300, ...overrides });
 const bundle = (mode, records, startedAt="2027-01-02T12:00:00Z") => ({format:"bark-email-import-v1",complete:true,mode,startedAt,records});
-function memory() {
+function memory({ networkLatencyMs = 0, transactionLimitMs = Infinity } = {}) {
   let data = {};
+  let bulkDepth = 0, virtualMs = 0;
+  const commands = [];
+  function command(name, options) {
+    if (options?.session !== session) throw new Error("SESSION_REQUIRED");
+    if (bulkDepth) return;
+    commands.push(name); virtualMs += networkLatencyMs;
+    if (virtualMs > transactionLimitMs) { const error = new Error("NoSuchTransaction"); error.code = 251; throw error; }
+  }
   const clone = value => JSON.parse(JSON.stringify(value));
-  const matches = (r,f) => Object.entries(f).every(([k,v])=>String(r[k])===String(v));
+  const matches = (r,f) => Object.entries(f).every(([k,v])=>v?.$in ? v.$in.some(x=>String(r[k])===String(x)) : String(r[k])===String(v));
   const db = { collection(name) { data[name] ||= []; return {
-    async findOne(f) { return data[name].find(r=>matches(r,f)) || null; },
-    async insertOne(r) { if(data[name].some(x=>String(x._id)===String(r._id))) throw Error("duplicate"); data[name].push(clone(r)); },
-    async countDocuments(f) { return data[name].filter(r=>matches(r,f)).length; },
-    async updateOne(f,u,o={}) { let r=data[name].find(x=>matches(x,f));if(!r&&o.upsert){r={...f};data[name].push(r);}if(!r)return;Object.assign(r,clone(u.$set||{}));for(const[k,v]of Object.entries(u.$inc||{}))r[k]=(r[k]||0)+v; }
+    async findOne(f,o) { if(o)command(`${name}.findOne`,o);return data[name].find(r=>matches(r,f)) || null; },
+    find(f,o) { return {toArray:async()=>{command(`${name}.find`,o);return data[name].filter(r=>matches(r,f)).map(clone);}}; },
+    async insertOne(r,o) { if(o)command(`${name}.insertOne`,o);if(data[name].some(x=>String(x._id)===String(r._id))) throw Error("duplicate"); data[name].push(clone(r)); },
+    async countDocuments(f,o) { if(o)command(`${name}.countDocuments`,o);return data[name].filter(r=>matches(r,f)).length; },
+    async updateOne(f,u,o={}) { if(o.session)command(`${name}.updateOne`,o);let r=data[name].find(x=>matches(x,f));if(!r&&o.upsert){r={...f};data[name].push(r);}if(!r)return;Object.assign(r,clone(u.$set||{}));for(const[k,v]of Object.entries(u.$inc||{}))r[k]=(r[k]||0)+v; },
+    async bulkWrite(writes,o) {
+      command(`${name}.bulkWrite`,o);assert.equal(o.ordered,true);bulkDepth++;
+      try { for(const op of writes){if(op.insertOne)await this.insertOne(op.insertOne.document,o);else await this.updateOne(op.updateOne.filter,op.updateOne.update,o);} }
+      finally {bulkDepth--;}
+    }
   }; } };
-  const session = { async withTransaction(fn) {const before=clone(data);try{await fn();}catch(e){data=before;throw e;}} };
-  return { db, session, rows:name=>data[name]||[] };
+  const session = { async withTransaction(fn) {const before=clone(data);virtualMs=0;try{await fn();}catch(e){data=before;throw e;}} };
+  return { db, session, commands, rows:name=>data[name]||[] };
 }
 test("initial import includes existing future enquiries and checkpoint covers only the uploaded batch", async()=>{
   const m=memory();const base=await importBarkBundle({...m,bundle:bundle("INITIAL",[record("a")]),admin,now});
@@ -110,7 +124,28 @@ test("Bark database diagnostics distinguish real causes without exposing raw err
   for(const[error,code]of [[{code:13},"BARK_DATABASE_PERMISSION_DENIED"],[{code:18},"BARK_DATABASE_AUTHENTICATION_FAILED"],
     [{code:20,message:"Transaction numbers are only allowed on a replica set member"},"BARK_TRANSACTION_UNSUPPORTED"],
     [{code:11000,message:"PRIVATE_RECORD"},"BARK_IMPORT_WRITE_CONFLICT"],[{name:"MongoServerSelectionError"},"BARK_DATABASE_UNAVAILABLE"],
+    [{code:251,message:"PRIVATE_TRANSACTION_DETAIL"},"BARK_IMPORT_TRANSACTION_ABORTED"],
     [{message:"PRIVATE_UNKNOWN_ERROR"},"BARK_IMPORT_FAILED"]]){
     const result=classifyBarkImportError(error);assert.equal(result.code,code);assert.doesNotMatch(JSON.stringify(result),/PRIVATE/);
   }
+});
+test("334-request import uses bounded bulk round trips under a 60-second transaction budget",async()=>{
+  const {createHash}=require("node:crypto");
+  const records=Array.from({length:334},(_,i)=>record("a",{messageKey:createHash("sha256").update(`synthetic-${i}`).digest("hex"),prx:String(10000000+i)}));
+  const m=memory({networkLatencyMs:78,transactionLimitMs:60000});
+  const result=await importBarkBundle({...m,admin,now,bundle:bundle("INITIAL",records)});
+  assert.equal(result.imported,334);assert.equal(m.rows("barkmailmessages").length,334);
+  assert.equal(m.rows("salesagentopportunityresults").length,334);
+  assert.ok(m.commands.length<=10,JSON.stringify(m.commands));
+  assert.equal(m.commands.filter(c=>c.endsWith("bulkWrite")).length,2);
+  const repeat=await importBarkBundle({...m,admin,now,bundle:bundle("INITIAL",records)});
+  assert.equal(repeat.duplicates,334);assert.equal(repeat.imported,0);
+  assert.equal(m.rows("salesagentopportunityresults").length,334);
+});
+test("same-package duplicate messages and reminders preserve ordered candidate semantics",async()=>{
+  const m=memory();const initial=record("a"),reminder=record("b",{sentAt:"2027-01-03T11:00:00Z"});
+  const r=await importBarkBundle({...m,admin,now,bundle:bundle("INITIAL",[initial,initial,reminder],now.toISOString())});
+  assert.equal(r.imported,1);assert.equal(r.duplicates,1);assert.equal(r.updated,1);
+  assert.equal(m.rows("salesagentopportunityresults").length,1);assert.equal(m.rows("salesagentopportunityresults")[0].recordVersion,2);
+  assert.equal(m.rows("barkmailmessages").length,2);
 });

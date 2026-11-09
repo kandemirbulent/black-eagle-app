@@ -70,6 +70,14 @@ async function importBarkBundle({ db, session, bundle, admin, now = new Date() }
     const options = { session };
     let checkpoint = await checkpoints.findOne({ _id: "proton:Bark Leads" }, options);
     if (!checkpoint && input.mode !== "INITIAL") throw new Error("BARK_INITIAL_IMPORT_REQUIRED");
+    // Fetch transaction snapshots in two indexed queries, not two round trips per email.
+    const messageKeys = [...new Set(input.records.map(record => `proton:${record.messageKey}`))];
+    const resultId = record => new ObjectId(digest(`bark:${record.opportunityId}`).slice(0, 24));
+    const resultIds = [...new Map(input.records.map(record => { const id = resultId(record); return [String(id), id]; })).values()];
+    const priorMessages = new Map((await messages.find({ _id: { $in: messageKeys } }, options).toArray()).map(record => [String(record._id), record]));
+    const priorResults = new Map((await results.find({ _id: { $in: resultIds } }, options).toArray()).map(record => [String(record._id), record]));
+    const resultWrites = [];
+    const messageWrites = [];
     if (!checkpoint) {
       checkpoint = { _id: "proton:Bark Leads", baselineCutoffUtc: input.startedAt, runId: new ObjectId() };
       await db.collection("salesagentruns").insertOne({ _id: checkpoint.runId, runType: "BARK_EMAIL_IMPORT", status: "COMPLETED", origin: "BARK_MANUAL_EMAIL_IMPORT",
@@ -81,18 +89,22 @@ async function importBarkBundle({ db, session, bundle, admin, now = new Date() }
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
     for (const record of input.records) {
       const messageId = `proton:${record.messageKey}`;
-      const priorMessage = await messages.findOne({ _id: messageId }, options);
+      const priorMessage = priorMessages.get(messageId);
       // Controlled recovery touches only legacy baseline messages present in this INITIAL upload.
       const recover = input.mode === "INITIAL" && (priorMessage?.baseline === true || priorMessage?.historical === true) && !priorMessage.evaluatedAt;
       if (priorMessage && !recover) { outcome.duplicates++; continue; }
       const expired = record.value.eventDate && record.value.eventDate.toISOString().slice(0, 10) < today;
-      const id = new ObjectId(digest(`bark:${record.opportunityId}`).slice(0, 24));
-      const existing = await results.findOne({ _id: id }, options);
+      const id = resultId(record);
+      const existing = priorResults.get(String(id));
       // Unknown identity is a quarantined candidate, never a sendable new quote.
       if (record.notificationType === "NON_REQUEST") outcome.ignored++;
       else if (!expired) {
         const insert = { ...record.value, _id: id, opportunityId: record.opportunityId, runId: checkpoint.runId, recordVersion: 1, createdAt: now, updatedAt: now };
-        if (!existing) { await results.insertOne(insert, options); outcome.imported++; }
+        if (!existing) {
+          resultWrites.push({ insertOne: { document: insert } });
+          priorResults.set(String(id), insert);
+          outcome.imported++;
+        }
         else if (existing.quoteSubmitted || existing.quoteUuid || existing.verifiedQuoteUuid || existing.platformQuoteId
           || existing.lastEditedAt || existing.manualOverrideApplied || existing.manualApprovedAt || existing.submissionLock
           || ["READY", "NEEDS_REVIEW", "APPROVED", "HOLD", "REJECTED"].includes(existing.approvalStatus)
@@ -102,18 +114,26 @@ async function importBarkBundle({ db, session, bundle, admin, now = new Date() }
           outcome.preserved++;
         } else {
           // Preserve edited quotation and invalidate any selection on new source evidence.
-          await results.updateOne({ _id: id, platform: "bark" }, { $set: { barkSource: record.value.barkSource, updatedAt: now, selectedVersion: null,
-            blockingReasons: record.value.blockingReasons, resultStatus: "MANUAL_REVIEW", manualSubmissionEligible: false }, $inc: { recordVersion: 1 } }, options);
+          const set = { barkSource: record.value.barkSource, updatedAt: now, selectedVersion: null,
+            blockingReasons: record.value.blockingReasons, resultStatus: "MANUAL_REVIEW", manualSubmissionEligible: false };
+          resultWrites.push({ updateOne: { filter: { _id: id, platform: "bark" }, update: { $set: set, $inc: { recordVersion: 1 } } } });
+          priorResults.set(String(id), { ...existing, ...set, recordVersion: Number(existing.recordVersion || 0) + 1 });
           outcome.updated++;
         }
       } else outcome.expired++;
       const ledger = { prx: record.prx, sentAt: record.sentAt, receivedAt: record.receivedAt, requestCreatedAt: null,
         importedAt: now, evaluatedAt: now, notificationType: record.notificationType, expired: !!expired };
       if (recover) {
-        await messages.updateOne({ _id: messageId }, { $set: { ...ledger, baselineRecoveredAt: now } }, options);
+        messageWrites.push({ updateOne: { filter: { _id: messageId }, update: { $set: { ...ledger, baselineRecoveredAt: now } } } });
         outcome.recovered++;
-      } else await messages.insertOne({ _id: messageId, ...ledger, baseline: false }, options);
+      } else messageWrites.push({ insertOne: { document: { _id: messageId, ...ledger, baseline: false } } });
+      // Also deduplicate repeated messages and candidate updates within this same package.
+      priorMessages.set(messageId, { ...priorMessage, ...ledger, _id: messageId });
     }
+    // Ordered bulk operations retain input order and all-or-nothing transaction semantics.
+    // Deliberately sequential: parallel operations on the same session are not supported.
+    if (resultWrites.length) await results.bulkWrite(resultWrites, { ...options, ordered: true });
+    if (messageWrites.length) await messages.bulkWrite(messageWrites, { ...options, ordered: true });
     await checkpoints.updateOne({ _id: checkpoint._id }, { $set: { baselineCutoffUtc: checkpoint.baselineCutoffUtc, runId: checkpoint.runId,
       lastSuccessfulScanAtUtc: now, lastSuccessfulImportAtUtc: now, initialImportPolicyVersion: 2, status: "COMPLETE_MANUAL_BATCH", mailboxScanComplete: false,
       lastMessageKey: input.records.at(-1).messageKey }, $inc: { batches: 1 } }, { ...options, upsert: true });
@@ -128,6 +148,7 @@ function classifyBarkImportError(error = {}) {
   if (error.code === 13) return { code: "BARK_DATABASE_PERMISSION_DENIED", status: 503 };
   if (error.code === 18) return { code: "BARK_DATABASE_AUTHENTICATION_FAILED", status: 503 };
   if (error.code === 11000 || error.code === 112) return { code: "BARK_IMPORT_WRITE_CONFLICT", status: 409 };
+  if (error.code === 251) return { code: "BARK_IMPORT_TRANSACTION_ABORTED", status: 503 };
   if (error.code === 20 && /transaction|replica set/i.test(error.message || "")) return { code: "BARK_TRANSACTION_UNSUPPORTED", status: 503 };
   if (["MongoServerSelectionError", "MongoNetworkError", "MongoNetworkTimeoutError"].includes(error.name)) return { code: "BARK_DATABASE_UNAVAILABLE", status: 503 };
   return { code: "BARK_IMPORT_FAILED", status: 500 };

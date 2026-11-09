@@ -369,6 +369,7 @@ function createSalesAgentRouter({
   router.post("/admin/sales-agent/bark/import", requireAdminAuth, async (req, res) => {
     let session;
     let stage = "VALIDATE_PACKAGE";
+    const startedAt = Date.now();
     try {
       validateBarkBundle(req.body, now());
       stage = "SESSION_START";
@@ -380,7 +381,8 @@ function createSalesAgentRouter({
       return res.json({ success: true, ...result, mailboxScanComplete: false });
     } catch (error) {
       const safe = classifyBarkImportError(error);
-      logger.error("BARK_IMPORT_FAILURE", { stage, code: safe.code, mongoCode: Number.isInteger(error.code) ? error.code : null });
+      logger.error("BARK_IMPORT_FAILURE", { stage, code: safe.code, mongoCode: Number.isInteger(error.code) ? error.code : null,
+        elapsedMs: Date.now() - startedAt, recordCount: Array.isArray(req.body?.records) ? req.body.records.length : 0 });
       return res.status(safe.status).json({ success: false, code: safe.code, stage });
     } finally {
       if (session) { try { await session.endSession(); } catch { logger.error("BARK_IMPORT_SESSION_CLOSE_FAILED"); } }

@@ -517,7 +517,8 @@
             BARK_DATABASE_PERMISSION_DENIED: "Database permission is missing.",
             BARK_DATABASE_AUTHENTICATION_FAILED: "Server database authentication failed.",
             BARK_TRANSACTION_UNSUPPORTED: "Database transactions require a replica set or Atlas.",
-            BARK_IMPORT_WRITE_CONFLICT: "A concurrent import conflicted. Retrying this file is safe."
+            BARK_IMPORT_WRITE_CONFLICT: "A concurrent import conflicted. Retrying this file is safe.",
+            BARK_IMPORT_TRANSACTION_ABORTED: "The database canceled the import transaction. No partial transaction was committed. Retrying the same file is protected against duplicates."
           }[code] || "No successful import was confirmed. Your file was not changed.";
           barkImportFeedback(code === "BARK_LEGACY_BASELINE_REEXPORT_REQUIRED"
             ? "Reconvert your exported .eml files using the updated converter without --baseline. Existing requests are now included."
